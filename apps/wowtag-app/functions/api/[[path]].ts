@@ -6,7 +6,7 @@ type Bindings = {
   DB: D1Database;
 };
 
-const app = new Hono<{ Bindings: Bindings }>();
+const app = new Hono<{ Bindings: Bindings }>().basePath('/api');
 
 // 모든 제품 목록 조회
 app.get('/products', async (c) => {
@@ -75,7 +75,9 @@ app.get('/t/:tagId', async (c) => {
   const product = await c.env.DB.prepare(query).bind(tagId).first();
   
   if (!product) {
-    return c.json({ error: 'Tag not found' }, 404);
+    // 404 대신 200에 빈 데이터 혹은 에러 메시지를 보낼 수 있지만, 
+    // 여기서는 404를 유지하되 JSON 포맷을 확실히 합니다.
+    return c.json({ error: 'not_found' }, 404);
   }
 
   // 스캔 로그 기록 (비동기로 실행되도록 처리하거나 일단 간단히)
