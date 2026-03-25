@@ -14,6 +14,19 @@ app.get('/products', async (c) => {
   return c.json(results);
 });
 
+// 특정 태그 UID 정보 조회 (중복 체크용)
+app.get('/tags/:uid', async (c) => {
+  const { uid } = c.req.param();
+  const tagInfo = await c.env.DB.prepare(`
+    SELECT t.*, p.name as product_name 
+    FROM tags t 
+    LEFT JOIN products p ON t.product_id = p.id 
+    WHERE t.tag_uid = ?
+  `).bind(uid).first();
+  
+  return c.json(tagInfo || { message: 'not_found' });
+});
+
 // 제품 등록
 app.post('/products', async (c) => {
   const body = await c.req.json();
@@ -28,23 +41,23 @@ app.post('/products', async (c) => {
 
   const productId = (productResult as any).id;
 
-  // 2. 태그 UID가 함께 전달된 경우 즉시 매핑
+  // 2. 태그 UID가 함께 전달된 경우 즉시 매핑 (덮어쓰기 허용)
   if (tag_uid) {
     await c.env.DB.prepare(
-      'INSERT INTO tags (tag_uid, product_id) VALUES (?, ?)'
+      'INSERT OR REPLACE INTO tags (tag_uid, product_id) VALUES (?, ?)'
     ).bind(tag_uid, productId).run();
   }
 
   return c.json({ success: true, productId }, 201);
 });
 
-// 태그 매핑 (별도 수행 시)
+// 태그 매핑 (별도 수행 시 - 덮어쓰기 허용)
 app.post('/tags', async (c) => {
   const { tag_uid, product_id } = await c.req.json();
   if (!tag_uid || !product_id) return c.json({ error: 'Invalid data' }, 400);
 
   await c.env.DB.prepare(
-    'INSERT INTO tags (tag_uid, product_id) VALUES (?, ?)'
+    'INSERT OR REPLACE INTO tags (tag_uid, product_id) VALUES (?, ?)'
   ).bind(tag_uid, product_id).run();
 
   return c.json({ success: true });

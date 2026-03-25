@@ -48,7 +48,21 @@ export default function AdminDashboard() {
       const ndef = new (window as any).NDEFReader();
       await ndef.scan();
       
-      ndef.onreading = ({ serialNumber }: { serialNumber: string }) => {
+      ndef.onreading = async ({ serialNumber }: { serialNumber: string }) => {
+        // 중복 체크 API 호출
+        const res = await fetch(`/api/tags/${serialNumber}`);
+        const existingData = await res.json();
+
+        if (existingData && existingData.product_name) {
+          const shouldOverwrite = confirm(
+            `[주의] 이 태그는 이미 '${existingData.product_name}' 제품에 등록되어 있습니다.\n\n새로운 제품으로 정보를 덮어씌우시겠습니까?`
+          );
+          if (!shouldOverwrite) {
+            setNfcScanning(false);
+            return;
+          }
+        }
+
         setFormData(prev => ({ ...prev, tag_uid: serialNumber }));
         setNfcScanning(false);
       };
