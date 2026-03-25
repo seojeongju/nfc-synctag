@@ -1,0 +1,25 @@
+{
+  "name": "synctag",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "hono": "^4.12.9"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260317.1",
+    "autoprefixer": "^10.4.27",
+    "lucide-react": "^1.6.0",
+    "postcss": "^8.5.8",
+    "tailwindcss": "^4.2.2",
+    "vitest": "^4.1.1",
+    "wrangler": "^4.77.0"
+  }
+}
