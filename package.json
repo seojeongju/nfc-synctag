@@ -11,10 +11,12 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "hono": "^4.12.9"
+    "hono": "^4.12.9",
+    "react-router-dom": "^7.13.2"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260317.1",
+    "@tailwindcss/vite": "^4.2.2",
     "autoprefixer": "^10.4.27",
     "lucide-react": "^1.6.0",
     "postcss": "^8.5.8",

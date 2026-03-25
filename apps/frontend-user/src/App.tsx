@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Share2, Download, Play, ChevronRight, Bookmark } from 'lucide-react';
 
 function App() {

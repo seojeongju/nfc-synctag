@@ -1,0 +1,9 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "wowtag"
+compatibility_date = "2026-03-25"
+pages_build_output_dir = "dist"
+
+[[d1_databases]]
+binding = "DB" # Hono에서 c.env.DB로 접근할 이름
+database_name = "wowtag-db"
+database_id = "80cbcb78-2e06-4a3d-bbe9-36ffb0cb6304"
