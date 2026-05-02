@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Share2, Download, Play, ChevronRight, Bookmark, Loader2, Award, ShieldCheck, Smartphone } from 'lucide-react';
+import { Share2, Download, Play, ChevronRight, Bookmark, Loader2, Award, ShieldCheck } from 'lucide-react';
 
 export default function UserLanding() {
   const { tagId } = useParams();
@@ -53,78 +53,89 @@ export default function UserLanding() {
   }
 
   // ==========================================
-  // [Case A] NFC 태그 ID가 없을 때: 서비스 소개형 랜딩 페이지
+  // [Case A] NFC 태그 ID가 없을 때: 데모 체험 및 공통 진입 랜딩 페이지
   // ==========================================
   if (!tagId) {
     return (
-      <div className="min-h-screen bg-[#FDFBF7] flex flex-col items-center p-6 pb-20 font-sans leading-relaxed text-slate-900 animate-in fade-in duration-500">
+      <div className="min-h-screen bg-[#F6F7FB] flex flex-col items-center p-5 pb-24 font-sans leading-relaxed text-slate-900 animate-in fade-in duration-500 select-none">
         
         {/* 헤더 */}
-        <header className="w-full max-w-md flex justify-between items-center mb-12">
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 bg-amber-50 rounded-xl flex items-center justify-center border border-amber-200">
-              <ShieldCheck className="w-5 h-5 text-amber-600" />
-            </div>
-            <span className="text-lg font-black text-slate-800 tracking-tight">syncTag <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg">Gold</span></span>
-          </div>
-          <Link to="/login" className="text-xs font-black text-amber-600 bg-amber-50 px-4 py-2 rounded-xl border border-amber-200/60 hover:bg-amber-100 transition-all no-underline">
-            관리자 로그인
+        <header className="w-full max-w-md flex justify-between items-center h-16 px-2 mb-4">
+          <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center border border-slate-100 shadow-sm opacity-0"></div>
+          <span className="text-xl font-extrabold text-slate-800 tracking-tight">syncTag</span>
+          <Link to="/login" className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center border border-slate-100 shadow-sm text-slate-400 hover:text-primary hover:border-primary/40 transition-all">
+            <Bookmark className="w-5 h-5" />
           </Link>
         </header>
 
-        {/* 히어로 섹션 */}
-        <div className="w-full max-w-md bg-white rounded-[2.5rem] border border-amber-100/80 shadow-xl p-8 mb-8 relative overflow-hidden flex flex-col items-center text-center">
-          <div className="absolute -right-16 -top-16 w-48 h-48 bg-amber-50 rounded-full opacity-40 blur-3xl"></div>
-          
-          <div className="w-16 h-16 rounded-3xl bg-amber-50 border-2 border-amber-200/60 flex items-center justify-center text-amber-600 mb-6 shadow-sm">
-            <Award className="w-8 h-8" />
-          </div>
-
-          <h2 className="text-2xl lg:text-3xl font-black text-slate-900 mb-3 tracking-tight">
-            골드바 정품인증<br/>스마트하게 확인하세요
-          </h2>
-          <p className="text-xs font-bold text-slate-400 max-w-xs leading-relaxed mb-6">
-            syncTag NFC 정품인증 시스템을 통해 제품의 고유 일련번호와 순도, 제조일자 및 원본 보증서를 안전하게 확인해 드립니다.
-          </p>
-
-          <div className="w-full bg-slate-50 border border-slate-100 rounded-3xl p-5 flex flex-col gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div>
-              <p className="text-xs font-bold text-slate-600 text-left">위·변조가 불가능한 정품 인증서 발급</p>
+        {/* 중앙 제품 카드 뷰 (이미지 기반 디자인 구현) */}
+        <div className="w-full max-w-md bg-white rounded-[2.5rem] border border-slate-100/60 shadow-xl overflow-hidden mb-6 relative p-4 flex flex-col">
+          <div className="relative w-full aspect-[4/5] rounded-[2rem] bg-purple-gradient overflow-hidden shadow-sm flex items-center justify-center p-3">
+            {/* 배경 그라데이션 및 원형 광채 효과 */}
+            <div className="absolute inset-0 bg-gradient-to-tr from-purple-900/40 via-transparent to-transparent opacity-60"></div>
+            <div className="absolute -right-16 -bottom-16 w-48 h-48 bg-purple-300 rounded-full opacity-30 blur-3xl"></div>
+            
+            {/* 데모 고급 이미지 (사용자가 제시한 보라색 벨벳 및 주얼리 이미지와 매칭되는 일러스트/아이콘 또는 기존 이미지 활용) */}
+            <div className="w-full h-full flex flex-col items-center justify-center relative z-10 p-6">
+              <div className="w-20 h-20 bg-white/20 backdrop-blur-md rounded-3xl border border-white/30 flex items-center justify-center text-white mb-4 shadow-lg animate-pulse">
+                <Award className="w-10 h-10" />
+              </div>
+              <h3 className="text-lg font-black text-white text-center tracking-tight mb-1">제이에로스 프리미엄</h3>
+              <p className="text-xs font-bold text-purple-100 text-center opacity-80">터치 한 번으로 만나는 정품 확인</p>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div>
-              <p className="text-xs font-bold text-slate-600 text-left">터치 한 번으로 다운로드 가능한 원본 보증서</p>
+
+            {/* 하단 글래스모피즘 오버레이 팝업 */}
+            <div className="absolute bottom-3 left-3 right-3 bg-white/70 backdrop-blur-xl rounded-[1.8rem] p-6 border border-white/40 shadow-2xl flex flex-col items-center text-center">
+              <h4 className="text-xl font-black text-slate-800 tracking-tight">프리미엄 제품 (데모)</h4>
+              <p className="text-xs font-bold text-slate-500 mt-1 mb-5 leading-relaxed">
+                NFC 태그를 스캔하면 실제 제품 정보를 확인할 수 있습니다.
+              </p>
+
+              {/* 사용 설명 영상 보기 버튼 */}
+              <button 
+                onClick={() => alert('사용 설명 영상이 곧 준비됩니다.')} 
+                className="w-full h-12 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white font-black text-sm rounded-2xl flex items-center justify-center gap-3 shadow-lg shadow-purple-500/25 active:scale-[0.98] transition-all"
+              >
+                <Play className="w-4.5 h-4.5 fill-white" />
+                사용 설명 영상 보기
+              </button>
             </div>
           </div>
         </div>
 
-        {/* 이용 가이드 */}
-        <div className="w-full max-w-md space-y-4 mb-10">
-          <h3 className="text-sm font-black text-slate-800 px-1 uppercase tracking-wider">이용 가이드</h3>
-
-          {[
-            { step: '01', title: 'NFC 태그 확인', desc: '골드바와 함께 제공된 실물 NFC 태그의 위치를 확인합니다.', icon: Award },
-            { step: '02', title: '스마트폰 터치 (스캔)', desc: '스마트폰을 켠 상태로 NFC 태그 뒷면에 가볍게 터치합니다.', icon: Smartphone },
-            { step: '03', title: '정품인증서 확인', desc: '연결된 웹 화면에서 정품인증을 확인하고 보증서를 다운로드합니다.', icon: ShieldCheck },
-          ].map((item, index) => (
-            <div key={index} className="bg-white border border-slate-100 rounded-3xl p-5 flex gap-5 hover:border-amber-400/40 transition-all cursor-pointer group shadow-sm">
-              <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 group-hover:scale-105 transition-all"><item.icon className="w-5 h-5" /></div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-1">
-                  <h4 className="font-black text-slate-800 text-sm">{item.title}</h4>
-                  <span className="text-[10px] font-black text-amber-500 tracking-wider bg-amber-50 px-2 py-0.5 rounded-lg">STEP {item.step}</span>
-                </div>
-                <p className="text-slate-400 text-xs font-bold leading-relaxed">{item.desc}</p>
+        {/* 하단 화이트 카드 리스트 */}
+        <div className="w-full max-w-md space-y-3.5 mb-6">
+          <div onClick={() => alert('공유하기 기능이 제공됩니다.')} className="bg-white border border-slate-100/80 rounded-2xl p-4 flex items-center justify-between hover:border-purple-300 hover:shadow-lg transition-all cursor-pointer group shadow-sm">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600 group-hover:scale-105 transition-all">
+                <Share2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h5 className="font-black text-slate-800 text-sm">정품 인증서 공유</h5>
+                <p className="text-[11px] font-bold text-slate-400 mt-0.5">디지털 원본을 전송합니다</p>
               </div>
             </div>
-          ))}
+            <ChevronRight className="w-5 h-5 text-slate-300 group-hover:translate-x-1 transition-all" />
+          </div>
+
+          <div onClick={() => alert('설명서 파일 다운로드가 준비 중입니다.')} className="bg-white border border-slate-100/80 rounded-2xl p-4 flex items-center justify-between hover:border-purple-300 hover:shadow-lg transition-all cursor-pointer group shadow-sm">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600 group-hover:scale-105 transition-all">
+                <Download className="w-5 h-5" />
+              </div>
+              <div>
+                <h5 className="font-black text-slate-800 text-sm">설명서 다운로드</h5>
+                <p className="text-[11px] font-bold text-slate-400 mt-0.5">PDF 파일로 제공됩니다</p>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-slate-300 group-hover:translate-x-1 transition-all" />
+          </div>
         </div>
 
         {/* 푸터 */}
-        <footer className="w-full max-w-md text-center border-t border-slate-100 pt-6">
+        <footer className="w-full max-w-md text-center border-t border-slate-100/60 pt-5">
           <p className="text-[10px] text-slate-400 font-bold leading-relaxed">
-            NFC 태그를 스캔하면 즉시 제품의 보증 정보로 이동합니다. <br />
+            NFC 태그를 스캔하면 즉시 제품의 정품 정보로 이동합니다. <br />
             © 2026 제이에로스 (J-Eros Inc.) All rights reserved.
           </p>
         </footer>
