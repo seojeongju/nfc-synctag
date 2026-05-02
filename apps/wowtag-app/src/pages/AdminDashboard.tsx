@@ -1,16 +1,21 @@
 import { useState, useEffect } from 'react';
-import { LayoutDashboard, Tag, Package, Plus, Scan, Bell, ArrowUpRight, Loader2, X, Smartphone, PenTool, ChevronRight, Hash, Link as LinkIcon, Award, FileText, Calendar } from 'lucide-react';
+import { LayoutDashboard, Tag, Package, Plus, Scan, Bell, ArrowUpRight, Loader2, X, Smartphone, PenTool, ChevronRight, Hash, Link as LinkIcon, Award, FileText, Calendar, Search, Filter, Edit3, Trash2 } from 'lucide-react';
 
 export default function AdminDashboard() {
   const [currentTab, setCurrentTab] = useState<'dashboard' | 'products' | 'nfc' | 'goldbars'>('dashboard');
   const [products, setProducts] = useState<any[]>([]);
   const [goldbars, setGoldbars] = useState<any[]>([]);
-  const [stats, setStats] = useState<any>({ scanCount: 0, activeTags: 0, recentLogs: [] });
+  const [stats, setStats] = useState<any>({ scanCount: 0, activeTags: 0, recentLogs: [], topGoldbars: [] });
   
+  // 검색 및 필터 상태 (골드바)
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterPurity, setFilterPurity] = useState('');
+
   // 모달 상태
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isNfcModalOpen, setIsNfcModalOpen] = useState(false);
   const [isGoldbarModalOpen, setIsGoldbarModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   
   // 폼 상태 (제품)
   const [productFormData, setProductFormData] = useState({
@@ -29,6 +34,18 @@ export default function AdminDashboard() {
 
   // 폼 상태 (골드바 & 보증서 등록)
   const [goldbarFormData, setGoldbarFormData] = useState({
+    serial_number: '',
+    weight: '',
+    purity: '99.99%',
+    minted_at: '',
+    tag_uid: '',
+    cert_file_base64: '',
+    file_name: ''
+  });
+
+  // 폼 상태 (골드바 수정용)
+  const [editGoldbarData, setEditGoldbarData] = useState({
+    id: '',
     serial_number: '',
     weight: '',
     purity: '99.99%',
@@ -83,7 +100,7 @@ export default function AdminDashboard() {
   }, []);
 
   // --- NFC 로직 ---
-  const handleNFCScan = async (target: 'nfc' | 'goldbar') => {
+  const handleNFCScan = async (target: 'nfc' | 'goldbar' | 'edit') => {
     if (!('NDEFReader' in window)) {
       alert('이 브라우저는 Web NFC를 지원하지 않습니다.');
       return;
@@ -108,8 +125,10 @@ export default function AdminDashboard() {
             }
           }
           setNfcFormData(prev => ({ ...prev, tag_uid: serialNumber }));
-        } else {
+        } else if (target === 'goldbar') {
           setGoldbarFormData(prev => ({ ...prev, tag_uid: serialNumber }));
+        } else if (target === 'edit') {
+          setEditGoldbarData(prev => ({ ...prev, tag_uid: serialNumber }));
         }
         setNfcScanning(false);
       };
@@ -174,19 +193,30 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, target: 'create' | 'edit') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setGoldbarFormData(prev => ({ ...prev, file_name: file.name }));
+    if (target === 'create') {
+      setGoldbarFormData(prev => ({ ...prev, file_name: file.name }));
+    } else {
+      setEditGoldbarData(prev => ({ ...prev, file_name: file.name }));
+    }
 
     const reader = new FileReader();
     reader.onload = (evt) => {
       if (evt.target?.result) {
-        setGoldbarFormData(prev => ({
-          ...prev,
-          cert_file_base64: evt.target?.result as string
-        }));
+        if (target === 'create') {
+          setGoldbarFormData(prev => ({
+            ...prev,
+            cert_file_base64: evt.target?.result as string
+          }));
+        } else {
+          setEditGoldbarData(prev => ({
+            ...prev,
+            cert_file_base64: evt.target?.result as string
+          }));
+        }
       }
     };
     reader.readAsDataURL(file);
@@ -229,6 +259,61 @@ export default function AdminDashboard() {
     }
   };
 
+  // --- 골드바 수정 ---
+  const handleEditOpen = (g: any) => {
+    setEditGoldbarData({
+      id: g.id,
+      serial_number: g.serial_number,
+      weight: g.weight,
+      purity: g.purity,
+      minted_at: g.minted_at || '',
+      tag_uid: g.tag_uid || '',
+      cert_file_base64: '',
+      file_name: ''
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editGoldbarData.serial_number || !editGoldbarData.weight) return alert('정보를 입력하세요.');
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/goldbars/${editGoldbarData.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editGoldbarData)
+      });
+      if (res.ok) {
+        setIsEditModalOpen(false);
+        alert('수정되었습니다.');
+        fetchGoldbars();
+      } else {
+        const d = await res.json();
+        alert(`수정 실패: ${d.error}`);
+      }
+    } catch (err: any) {
+      alert(`수정 요청 실패: ${err.message}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // --- 골드바 삭제 ---
+  const handleDeleteGoldbar = async (id: string) => {
+    if (!confirm('정말로 이 골드바와 연결된 모든 보증서 정보를 영구 삭제하시겠습니까?')) return;
+    try {
+      const res = await fetch(`/api/goldbars/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        alert('삭제 성공!');
+        fetchGoldbars();
+        fetchStats();
+      }
+    } catch (err: any) {
+      alert('삭제 요청 실패');
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('admin_token');
     window.location.href = '/login';
@@ -237,6 +322,13 @@ export default function AdminDashboard() {
   const usageRate = goldbars.length > 0 
     ? ((stats.activeTags / goldbars.length) * 100).toFixed(0) + '%' 
     : '0%';
+
+  // 검색 및 필터링된 골드바 리스트
+  const filteredGoldbars = goldbars.filter(g => {
+    const matchesSearch = g.serial_number.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesPurity = filterPurity ? g.purity === filterPurity : true;
+    return matchesSearch && matchesPurity;
+  });
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex font-sans leading-relaxed text-slate-900 animate-in fade-in duration-300">
@@ -323,42 +415,71 @@ export default function AdminDashboard() {
                 ))}
               </div>
 
-              {/* 최근 스캔 기록 (Analytics Timeline) */}
-              <div className="bg-white rounded-[2.5rem] p-6 lg:p-10 border border-slate-50 shadow-sm">
-                <div className="flex items-center gap-2 mb-6">
-                  <div className="w-1.5 h-6 bg-amber-500 rounded-full"></div>
-                  <h3 className="text-xl font-black text-slate-800">최근 정품인증 스캔 기록 (실시간)</h3>
+              {/* 인기 골드바 순위 & 최근 스캔 기록 */}
+              <div className="grid lg:grid-cols-3 gap-6">
+                {/* 1) 인기 골드바 리스트 */}
+                <div className="lg:col-span-1 bg-white rounded-[2.5rem] p-6 lg:p-8 border border-slate-50 shadow-sm flex flex-col h-full">
+                  <div className="flex items-center gap-2 mb-6">
+                    <div className="w-1.5 h-6 bg-amber-500 rounded-full"></div>
+                    <h3 className="text-lg font-black text-slate-800">인기 골드바 (스캔량 순위)</h3>
+                  </div>
+
+                  <div className="space-y-3 flex-1 flex flex-col justify-start">
+                    {stats.topGoldbars && stats.topGoldbars.map((g: any, i: number) => (
+                      <div key={i} className="p-4 bg-amber-50/40 rounded-2xl border border-amber-100 flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-black text-amber-700 uppercase tracking-widest">RANK 0{i + 1}</p>
+                          <p className="text-sm font-black text-slate-800 mt-0.5">{g.serial_number}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs font-bold text-slate-400">누적 스캔</p>
+                          <p className="text-lg font-black text-amber-600">{g.scan_count}회</p>
+                        </div>
+                      </div>
+                    ))}
+                    {(!stats.topGoldbars || stats.topGoldbars.length === 0) && (
+                      <p className="text-xs font-bold text-slate-400 text-center py-6">아직 스캔된 데이터가 없습니다.</p>
+                    )}
+                  </div>
                 </div>
 
-                <div className="space-y-4">
-                  {stats.recentLogs && stats.recentLogs.map((log: any, idx: number) => (
-                    <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100/60 hover:border-amber-400/30 transition-all">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-white border border-slate-100 rounded-xl flex items-center justify-center text-amber-500">
-                          <Award className="w-5 h-5" />
+                {/* 2) 최근 스캔 로그 리스트 (Timeline) */}
+                <div className="lg:col-span-2 bg-white rounded-[2.5rem] p-6 lg:p-8 border border-slate-50 shadow-sm flex flex-col h-full">
+                  <div className="flex items-center gap-2 mb-6">
+                    <div className="w-1.5 h-6 bg-emerald-500 rounded-full"></div>
+                    <h3 className="text-lg font-black text-slate-800">최근 정품인증 스캔 기록 (실시간)</h3>
+                  </div>
+
+                  <div className="space-y-3 flex-1">
+                    {stats.recentLogs && stats.recentLogs.map((log: any, idx: number) => (
+                      <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100/60 hover:border-amber-400/30 transition-all">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 bg-white border border-slate-100 rounded-xl flex items-center justify-center text-amber-500">
+                            <Award className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-black text-slate-800">일련번호: {log.serial_number || '미지정 골드바'}</p>
+                            <p className="text-xs font-bold text-slate-400 font-mono mt-0.5">UID: {log.tag_uid}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-black text-slate-800">일련번호: {log.serial_number || '미지정 골드바'}</p>
-                          <p className="text-xs font-bold text-slate-400 font-mono mt-0.5">UID: {log.tag_uid}</p>
+
+                        <div className="flex flex-col items-end">
+                          <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-xl flex items-center gap-1 mb-1">
+                            정품인증 성공
+                          </span>
+                          <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                            <Calendar className="w-3 h-3" /> {new Date(log.scanned_at).toLocaleString()}
+                          </span>
                         </div>
                       </div>
+                    ))}
 
-                      <div className="flex flex-col items-end">
-                        <span className="text-[11px] font-black text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-xl flex items-center gap-1 mb-1">
-                          정품인증 성공
-                        </span>
-                        <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
-                          <Calendar className="w-3 h-3" /> {new Date(log.scanned_at).toLocaleString()}
-                        </span>
+                    {(!stats.recentLogs || stats.recentLogs.length === 0) && (
+                      <div className="p-8 text-center text-slate-400 font-bold">
+                        아직 접수된 스캔 기록이 없습니다.
                       </div>
-                    </div>
-                  ))}
-
-                  {(!stats.recentLogs || stats.recentLogs.length === 0) && (
-                    <div className="p-8 text-center text-slate-400 font-bold">
-                      아직 접수된 스캔 기록이 없습니다.
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
             </>
@@ -415,14 +536,45 @@ export default function AdminDashboard() {
           {/* 4. 골드바 정품인증 관리 탭 */}
           {currentTab === 'goldbars' && (
             <>
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl lg:text-3xl font-black text-slate-900">골드바 정품인증 관리</h2>
-                <button onClick={() => setIsGoldbarModalOpen(true)} className="bg-amber-600 hover:bg-amber-700 text-white font-black py-3 px-6 rounded-2xl shadow-lg shadow-amber-500/20 flex items-center gap-2 transition-all"><Award className="w-5 h-5" /> 골드바 & 보증서 등록</button>
+              <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+                <div>
+                  <h2 className="text-2xl lg:text-3xl font-black text-slate-900">골드바 정품인증 관리</h2>
+                  <p className="text-xs font-bold text-slate-400 mt-1">골드바의 정보를 편집하고 정품인증서를 통합 관리합니다.</p>
+                </div>
+                <button onClick={() => setIsGoldbarModalOpen(true)} className="bg-amber-600 hover:bg-amber-700 text-white font-black py-3.5 px-6 rounded-2xl shadow-lg shadow-amber-500/20 flex items-center gap-2 transition-all"><Award className="w-5 h-5" /> 골드바 & 보증서 등록</button>
               </div>
 
+              {/* 검색 및 필터 패널 */}
+              <div className="bg-white rounded-3xl p-5 border border-slate-100 flex flex-col sm:flex-row items-center gap-4 shadow-sm">
+                <div className="flex-1 relative flex items-center w-full">
+                  <Search className="absolute left-4 w-5 h-5 text-slate-300" />
+                  <input 
+                    type="text" 
+                    placeholder="일련번호 검색 (예: GB)"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full h-12 bg-slate-50 rounded-xl pl-12 pr-4 text-sm font-bold border border-transparent focus:border-amber-200 focus:bg-white outline-none transition-all"
+                  />
+                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <Filter className="w-4 h-4 text-slate-400" />
+                  <select 
+                    value={filterPurity} 
+                    onChange={(e) => setFilterPurity(e.target.value)}
+                    className="h-12 bg-slate-50 rounded-xl px-4 text-sm font-bold border-none outline-none ring-1 ring-slate-100 cursor-pointer flex-1 sm:flex-initial"
+                  >
+                    <option value="">순도 전체</option>
+                    <option value="99.99%">99.99%</option>
+                    <option value="99.9%">99.9%</option>
+                    <option value="24K">24K</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* 골드바 리스트 */}
               <div className="grid gap-4 lg:grid-cols-2">
-                {goldbars.map((g) => (
-                  <div key={g.id} className="bg-white p-6 rounded-3xl border border-slate-100 flex flex-col gap-4 hover:border-amber-400/50 transition-all group">
+                {filteredGoldbars.map((g) => (
+                  <div key={g.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 flex flex-col gap-4 hover:border-amber-400/50 hover:shadow-xl transition-all group">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-500"><Award className="w-6 h-6" /></div>
@@ -431,7 +583,16 @@ export default function AdminDashboard() {
                           <p className="text-xs font-bold text-slate-400">등록일: {new Date(g.created_at).toLocaleDateString()}</p>
                         </div>
                       </div>
-                      <span className="text-xs bg-amber-50 text-amber-700 px-3 py-1.5 rounded-xl font-black">순도 {g.purity}</span>
+
+                      {/* 수정 & 삭제 도구 */}
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => handleEditOpen(g)} className="p-2.5 rounded-xl hover:bg-slate-50 text-slate-400 hover:text-amber-600 transition-all">
+                          <Edit3 className="w-4.5 h-4.5" />
+                        </button>
+                        <button onClick={() => handleDeleteGoldbar(g.id)} className="p-2.5 rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-all">
+                          <Trash2 className="w-4.5 h-4.5" />
+                        </button>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100/60 text-sm">
@@ -443,17 +604,20 @@ export default function AdminDashboard() {
                         <span className="text-slate-400 font-bold block">제조일자</span>
                         <span className="font-black text-slate-700">{g.minted_at || '-'}</span>
                       </div>
-                      <div className="col-span-2 border-t border-slate-100 pt-2 mt-1">
-                        <span className="text-slate-400 font-bold block">연결된 NFC 태그 UID</span>
-                        <span className="font-mono font-black text-amber-700 text-sm">{g.tag_uid || '미매핑'}</span>
+                      <div className="col-span-2 border-t border-slate-100 pt-2 mt-1 flex justify-between items-center">
+                        <div>
+                          <span className="text-slate-400 font-bold block">연결된 NFC 태그 UID</span>
+                          <span className="font-mono font-black text-amber-700 text-sm">{g.tag_uid || '미매핑'}</span>
+                        </div>
+                        <span className="text-xs bg-amber-50 text-amber-700 px-3 py-1.5 rounded-xl font-black">{g.purity}</span>
                       </div>
                     </div>
                   </div>
                 ))}
-                {goldbars.length === 0 && (
+                {filteredGoldbars.length === 0 && (
                   <div className="col-span-2 bg-white rounded-3xl border border-slate-100 p-12 flex flex-col items-center justify-center text-center">
                     <Award className="w-16 h-16 text-slate-200 mb-4" />
-                    <p className="font-black text-slate-400">등록된 골드바가 없습니다. 우측 상단의 버튼을 통해 등록해 보세요.</p>
+                    <p className="font-black text-slate-400">등록된 골드바가 없거나 검색 결과가 없습니다.</p>
                   </div>
                 )}
               </div>
@@ -543,7 +707,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* 5. 골드바 & 보증서 등록 모달 */}
+      {/* 골드바 & 보증서 등록 모달 */}
       {isGoldbarModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 lg:p-4">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setIsGoldbarModalOpen(false)}></div>
@@ -599,7 +763,7 @@ export default function AdminDashboard() {
                  <div className="mt-2 flex items-center gap-4">
                     <label className="bg-white border border-slate-200 px-4 py-3 rounded-xl font-bold text-xs text-slate-600 hover:bg-slate-50 cursor-pointer flex items-center gap-2 shadow-sm">
                       <FileText className="w-4 h-4" /> 파일 선택
-                      <input type="file" accept="application/pdf,image/*" onChange={handleFileChange} className="hidden" />
+                      <input type="file" accept="application/pdf,image/*" onChange={(e) => handleFileChange(e, 'create')} className="hidden" />
                     </label>
                     <span className="text-xs font-bold text-slate-400 line-clamp-1 flex-1">
                       {goldbarFormData.file_name || '선택된 파일이 없습니다.'}
@@ -609,6 +773,78 @@ export default function AdminDashboard() {
 
                <button type="submit" disabled={submitting || !goldbarFormData.serial_number || !goldbarFormData.weight} className="w-full h-16 bg-amber-600 hover:bg-amber-700 text-white text-lg font-black shadow-xl shadow-amber-500/30 disabled:opacity-30 transition-all mt-2 flex items-center justify-center gap-2">
                  {submitting && <Loader2 className="w-5 h-5 animate-spin" />} 등록 완료
+               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 골드바 정보 수정 모달 */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 lg:p-4">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setIsEditModalOpen(false)}></div>
+          <div className="relative w-full max-w-lg bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh]">
+            <header className="p-8 border-b border-slate-50 flex justify-between items-center bg-amber-50/50">
+               <div>
+                 <h3 className="text-2xl font-black text-amber-800">골드바 정보 수정</h3>
+                 <p className="text-xs font-bold text-amber-600 mt-1">골드바와 정품인증서 정보를 수정합니다.</p>
+               </div>
+               <button onClick={() => setIsEditModalOpen(false)} className="p-2 bg-white rounded-xl text-slate-400 shadow-sm"><X className="w-6 h-6" /></button>
+            </header>
+            <form onSubmit={handleEditSubmit} className="p-8 space-y-6 overflow-y-auto pb-12">
+               {/* 일련번호 */}
+               <div className="space-y-2">
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">일련번호 *</label>
+                 <input required type="text" value={editGoldbarData.serial_number} onChange={(e) => setEditGoldbarData({...editGoldbarData, serial_number: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all" />
+               </div>
+
+               {/* 중량 및 순도 */}
+               <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-2">
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">중량 *</label>
+                   <input required type="text" value={editGoldbarData.weight} onChange={(e) => setEditGoldbarData({...editGoldbarData, weight: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all" />
+                 </div>
+                 <div className="space-y-2">
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">순도</label>
+                   <input required type="text" value={editGoldbarData.purity} onChange={(e) => setEditGoldbarData({...editGoldbarData, purity: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all" />
+                 </div>
+               </div>
+
+               {/* 제조일자 */}
+               <div className="space-y-2">
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">제조일자 (선택)</label>
+                 <input type="date" value={editGoldbarData.minted_at} onChange={(e) => setEditGoldbarData({...editGoldbarData, minted_at: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all" />
+               </div>
+
+               {/* NFC 태그 UID */}
+               <div className="space-y-2">
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">연결할 NFC UID (선택)</label>
+                 <div className="flex gap-4">
+                    <div className="flex-1 h-14 bg-slate-100 rounded-2xl flex items-center px-6 font-mono font-black text-amber-700 shadow-inner">
+                      {editGoldbarData.tag_uid || 'UID 대기 중...'}
+                    </div>
+                    <button type="button" onClick={() => handleNFCScan('edit')} className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${nfcScanning ? 'bg-amber-100 text-amber-600 animate-pulse' : 'bg-white border-2 border-slate-100 text-slate-400 hover:text-amber-500 hover:border-amber-500 shadow-sm'}`}>
+                      {nfcScanning ? <Loader2 className="w-6 h-6 animate-spin" /> : <Smartphone className="w-6 h-6" />}
+                    </button>
+                 </div>
+               </div>
+
+               {/* 보증서 파일 첨부 */}
+               <div className="space-y-2 bg-slate-50 p-5 rounded-2xl border border-slate-100/80">
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">정품인증서 파일 교체 (선택)</label>
+                 <div className="mt-2 flex items-center gap-4">
+                    <label className="bg-white border border-slate-200 px-4 py-3 rounded-xl font-bold text-xs text-slate-600 hover:bg-slate-50 cursor-pointer flex items-center gap-2 shadow-sm">
+                      <FileText className="w-4 h-4" /> 파일 선택
+                      <input type="file" accept="application/pdf,image/*" onChange={(e) => handleFileChange(e, 'edit')} className="hidden" />
+                    </label>
+                    <span className="text-xs font-bold text-slate-400 line-clamp-1 flex-1">
+                      {editGoldbarData.file_name || '파일을 변경하지 않으려면 비워 두세요.'}
+                    </span>
+                 </div>
+               </div>
+
+               <button type="submit" disabled={submitting || !editGoldbarData.serial_number || !editGoldbarData.weight} className="w-full h-16 bg-amber-600 hover:bg-amber-700 text-white text-lg font-black shadow-xl shadow-amber-500/30 disabled:opacity-30 transition-all mt-2 flex items-center justify-center gap-2">
+                 {submitting && <Loader2 className="w-5 h-5 animate-spin" />} 수정 완료
                </button>
             </form>
           </div>

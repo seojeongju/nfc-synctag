@@ -242,12 +242,9 @@ app.get('/t/:tagId', async (c) => {
   const product = await c.env.DB.prepare(query).bind(tagId).first();
   
   if (!product) {
-    // 404 대신 200에 빈 데이터 혹은 에러 메시지를 보낼 수 있지만, 
-    // 여기서는 404를 유지하되 JSON 포맷을 확실히 합니다.
     return c.json({ error: 'not_found' }, 404);
   }
 
-  // 스캔 로그 기록 (비동기로 실행되도록 처리하거나 일단 간단히)
   c.executionCtx.waitUntil(
     c.env.DB.prepare('INSERT INTO scan_logs (tag_uid, scanned_at) VALUES (?, ?)')
       .bind(tagId, new Date().toISOString())
@@ -255,6 +252,70 @@ app.get('/t/:tagId', async (c) => {
   );
 
   return c.json(product);
+});
+
+// 골드바 정보 수정 API
+app.put('/goldbars/:id', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const { serial_number, weight, purity, minted_at, tag_uid, cert_file_base64, file_name } = await c.req.json();
+
+    if (!serial_number || !weight) {
+      return c.json({ error: 'Serial number and weight are required' }, 400);
+    }
+
+    // 1. 골드바 정보 갱신
+    await c.env.DB.prepare(`
+      UPDATE goldbars 
+      SET serial_number = ?, weight = ?, purity = ?, minted_at = ? 
+      WHERE id = ?
+    `).bind(serial_number, weight, purity || '99.99%', minted_at, id).run();
+
+    // 2. 인증서 파일이 Base64 형태로 전달된 경우 R2 버킷에 저장
+    let certFilePath = `certificates/${serial_number}_cert.pdf`;
+    if (file_name) {
+      certFilePath = `certificates/${serial_number}_${file_name}`;
+    }
+
+    if (cert_file_base64) {
+      const base64Data = cert_file_base64.split(',')[1] || cert_file_base64;
+      const binaryString = atob(base64Data);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+
+      await c.env.BUCKET.put(certFilePath, bytes.buffer, {
+        httpMetadata: { contentType: 'application/pdf' },
+      });
+    }
+
+    // 3. 태그 및 보증서 매핑 정보 갱신
+    if (tag_uid) {
+      await c.env.DB.prepare(`
+        INSERT OR REPLACE INTO certificates (goldbar_id, tag_uid, cert_file_path) 
+        VALUES (?, ?, ?)
+      `).bind(id, tag_uid, certFilePath).run();
+    }
+
+    return c.json({ success: true }, 200);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// 골드바 정보 삭제 API
+app.delete('/goldbars/:id', async (c) => {
+  try {
+    const id = c.req.param('id');
+    // 연관된 인증서와 골드바를 삭제 (ON DELETE CASCADE 처럼 개별 쿼리 실행)
+    await c.env.DB.prepare('DELETE FROM certificates WHERE goldbar_id = ?').bind(id).run();
+    await c.env.DB.prepare('DELETE FROM goldbars WHERE id = ?').bind(id).run();
+    return c.json({ success: true }, 200);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
 });
 
 app.get('/admin/stats', async (c) => {
@@ -274,10 +335,21 @@ app.get('/admin/stats', async (c) => {
       ORDER BY l.scanned_at DESC LIMIT 5
     `).all();
 
+    // 4. 가장 많이 스캔된 인기 골드바 Top 3 조회
+    const { results: topGoldbars } = await c.env.DB.prepare(`
+      SELECT g.serial_number, COUNT(l.id) as scan_count
+      FROM goldbars g
+      JOIN certificates c ON g.id = c.goldbar_id
+      JOIN verification_logs l ON c.tag_uid = l.tag_uid
+      GROUP BY g.id, g.serial_number
+      ORDER BY scan_count DESC LIMIT 3
+    `).all();
+
     return c.json({
       scanCount: (scanCount as any)?.cnt || 0,
       activeTags: (activeTags as any)?.cnt || 0,
-      recentLogs
+      recentLogs,
+      topGoldbars
     });
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
