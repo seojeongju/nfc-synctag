@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LayoutDashboard, Tag, Package, Plus, Scan, Bell, ArrowUpRight, Loader2, X, Smartphone, PenTool, ChevronRight, Hash, Link as LinkIcon, Award, FileText, Calendar, Search, Filter, Edit3, Trash2 } from 'lucide-react';
+import { LayoutDashboard, Tag, Package, Plus, Scan, Bell, ArrowUpRight, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Award, FileText, Calendar, Search, Filter, Edit3, Trash2 } from 'lucide-react';
 
 export default function AdminDashboard() {
   const [currentTab, setCurrentTab] = useState<'dashboard' | 'products' | 'nfc' | 'goldbars'>('dashboard');
@@ -7,18 +7,30 @@ export default function AdminDashboard() {
   const [goldbars, setGoldbars] = useState<any[]>([]);
   const [stats, setStats] = useState<any>({ scanCount: 0, activeTags: 0, recentLogs: [], topGoldbars: [] });
   
-  // 검색 및 필터 상태 (골드바)
+  // 검색 및 필터 상태
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPurity, setFilterPurity] = useState('');
+  const [productSearchTerm, setProductSearchTerm] = useState('');
 
   // 모달 상태
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [isEditProductModalOpen, setIsEditProductModalOpen] = useState(false);
   const [isNfcModalOpen, setIsNfcModalOpen] = useState(false);
   const [isGoldbarModalOpen, setIsGoldbarModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   
   // 폼 상태 (제품)
   const [productFormData, setProductFormData] = useState({
+    name: '',
+    description: '',
+    video_url: '',
+    manual_url: '',
+    image_url: '/jewelry.png'
+  });
+
+  // 폼 상태 (제품 수정용)
+  const [editProductFormData, setEditProductFormData] = useState({
+    id: '',
     name: '',
     description: '',
     video_url: '',
@@ -169,6 +181,58 @@ export default function AdminDashboard() {
       }
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // --- 제품 수정 ---
+  const handleEditProductOpen = (p: any) => {
+    setEditProductFormData({
+      id: p.id,
+      name: p.name,
+      description: p.description || '',
+      video_url: p.video_url || '',
+      manual_url: p.manual_url || '',
+      image_url: p.image_url || '/jewelry.png'
+    });
+    setIsEditProductModalOpen(true);
+  };
+
+  const handleEditProductSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editProductFormData.name) return alert('이름을 입력하세요.');
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/products/${editProductFormData.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editProductFormData)
+      });
+      if (res.ok) {
+        setIsEditProductModalOpen(false);
+        alert('수정되었습니다.');
+        fetchProducts();
+      } else {
+        const d = await res.json();
+        alert(`수정 실패: ${d.error}`);
+      }
+    } catch (err: any) {
+      alert(`수정 요청 실패: ${err.message}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // --- 제품 삭제 ---
+  const handleDeleteProduct = async (id: string) => {
+    if (!confirm('정말로 이 제품 정보와 연관된 NFC 태그 매핑 정보를 모두 영구 삭제하시겠습니까?')) return;
+    try {
+      const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        alert('삭제 성공!');
+        fetchProducts();
+      }
+    } catch (err: any) {
+      alert('삭제 요청 실패');
     }
   };
 
@@ -330,6 +394,11 @@ export default function AdminDashboard() {
     return matchesSearch && matchesPurity;
   });
 
+  // 검색된 일반 제품 리스트
+  const filteredProducts = products.filter(p => 
+    p.name.toLowerCase().includes(productSearchTerm.toLowerCase())
+  );
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex font-sans leading-relaxed text-slate-900 animate-in fade-in duration-300">
       {/* 사이드바 - 데스크탑 */}
@@ -488,21 +557,55 @@ export default function AdminDashboard() {
           {/* 2. 제품 정보 관리 탭 */}
           {currentTab === 'products' && (
             <>
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl lg:text-3xl font-black text-slate-900">제품 정보 관리</h2>
-                <button onClick={() => setIsProductModalOpen(true)} className="purple-btn !py-3 !px-6 flex items-center gap-2"><Plus className="w-5 h-5" /> 제품 등록</button>
+              <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+                <div>
+                  <h2 className="text-2xl lg:text-3xl font-black text-slate-900">제품 정보 관리</h2>
+                  <p className="text-xs font-bold text-slate-400 mt-1">NFC 태그를 매핑할 순수 제품의 제원 정보를 관리합니다.</p>
+                </div>
+                <button onClick={() => setIsProductModalOpen(true)} className="purple-btn !py-3.5 !px-6 flex items-center gap-2"><Plus className="w-5 h-5" /> 제품 등록</button>
               </div>
+
+              {/* 검색 바 */}
+              <div className="bg-white rounded-2xl p-4 border border-slate-100 flex items-center gap-3 shadow-sm max-w-md">
+                <Search className="w-5 h-5 text-slate-300" />
+                <input 
+                  type="text" 
+                  placeholder="제품 이름 검색..." 
+                  value={productSearchTerm}
+                  onChange={(e) => setProductSearchTerm(e.target.value)}
+                  className="w-full text-sm font-bold outline-none bg-transparent"
+                />
+              </div>
+
               <div className="grid gap-4 lg:grid-cols-2">
-                {products.map((p) => (
-                  <div key={p.id} className="bg-white p-5 rounded-3xl border border-slate-100 flex items-center gap-5 hover:border-primary/30 transition-all group">
-                    <div className="w-20 h-20 rounded-2xl bg-slate-50 overflow-hidden ring-4 ring-slate-50"><img src={p.image_url} className="w-full h-full object-cover" /></div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-black text-slate-800 text-lg truncate">{p.name}</h4>
-                      <p className="text-sm text-slate-400 font-bold line-clamp-1">{p.description}</p>
+                {filteredProducts.map((p) => (
+                  <div key={p.id} className="bg-white p-5 rounded-[2rem] border border-slate-100 flex items-center justify-between hover:border-primary/30 transition-all group shadow-sm">
+                    <div className="flex items-center gap-5">
+                      <div className="w-16 h-16 rounded-2xl bg-slate-50 overflow-hidden ring-4 ring-slate-50"><img src={p.image_url} className="w-full h-full object-cover" /></div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-black text-slate-800 text-lg truncate">{p.name}</h4>
+                        <p className="text-xs text-slate-400 font-bold line-clamp-1">{p.description || '상세 설명 없음'}</p>
+                      </div>
                     </div>
-                    <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-primary transition-colors" />
+
+                    {/* 수정 및 삭제 도구 */}
+                    <div className="flex items-center gap-1 pl-4">
+                      <button onClick={() => handleEditProductOpen(p)} className="p-2.5 rounded-xl hover:bg-slate-50 text-slate-400 hover:text-primary transition-all">
+                        <Edit3 className="w-4.5 h-4.5" />
+                      </button>
+                      <button onClick={() => handleDeleteProduct(p.id)} className="p-2.5 rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-all">
+                        <Trash2 className="w-4.5 h-4.5" />
+                      </button>
+                    </div>
                   </div>
                 ))}
+
+                {filteredProducts.length === 0 && (
+                  <div className="col-span-2 bg-white rounded-3xl border border-slate-100 p-12 flex flex-col items-center justify-center text-center">
+                    <Package className="w-16 h-16 text-slate-200 mb-4" />
+                    <p className="font-black text-slate-400">등록된 제품이 없거나 검색 결과가 없습니다.</p>
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -626,7 +729,7 @@ export default function AdminDashboard() {
         </div>
       </main>
 
-      {/* 제품 등록 모달 (NFC 필드 없음) */}
+      {/* 제품 등록 모달 */}
       {isProductModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 lg:p-4">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setIsProductModalOpen(false)}></div>
@@ -649,6 +752,34 @@ export default function AdminDashboard() {
                  <div className="space-y-2"><label className="text-xs font-black text-slate-400 tracking-widest px-1">매뉴얼 URL</label><input type="url" value={productFormData.manual_url} onChange={(e)=>setProductFormData({...productFormData, manual_url: e.target.value})} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 outline-none text-sm" /></div>
                </div>
                <button type="submit" disabled={submitting} className="w-full h-16 purple-btn text-lg font-black shadow-xl shadow-primary/30 mt-4 disabled:opacity-50">정보 저장</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 제품 수정 모달 */}
+      {isEditProductModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 lg:p-4">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setIsEditProductModalOpen(false)}></div>
+          <div className="relative w-full max-w-lg bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[90vh]">
+            <header className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+              <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">제품 정보 수정</h3>
+              <button onClick={() => setIsEditProductModalOpen(false)} className="p-2 bg-white rounded-xl text-slate-400 shadow-sm"><X className="w-6 h-6" /></button>
+            </header>
+            <form onSubmit={handleEditProductSubmit} className="p-8 space-y-6 overflow-y-auto pb-12">
+               <div className="space-y-2">
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">제품 이름 *</label>
+                 <input required type="text" value={editProductFormData.name} onChange={(e) => setEditProductFormData({...editProductFormData, name: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-primary focus:bg-white transition-all" />
+               </div>
+               <div className="space-y-2">
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">상세 설명</label>
+                 <textarea rows={3} value={editProductFormData.description} onChange={(e) => setEditProductFormData({...editProductFormData, description: e.target.value})} className="w-full p-5 bg-slate-100/50 rounded-2xl font-bold outline-none resize-none border border-transparent focus:border-primary focus:bg-white transition-all" />
+               </div>
+               <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-2"><label className="text-xs font-black text-slate-400 tracking-widest px-1">영상 URL</label><input type="url" value={editProductFormData.video_url} onChange={(e)=>setEditProductFormData({...editProductFormData, video_url: e.target.value})} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 outline-none text-sm" /></div>
+                 <div className="space-y-2"><label className="text-xs font-black text-slate-400 tracking-widest px-1">매뉴얼 URL</label><input type="url" value={editProductFormData.manual_url} onChange={(e)=>setEditProductFormData({...editProductFormData, manual_url: e.target.value})} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 outline-none text-sm" /></div>
+               </div>
+               <button type="submit" disabled={submitting} className="w-full h-16 purple-btn text-lg font-black shadow-xl shadow-primary/30 mt-4 disabled:opacity-50">수정 완료</button>
             </form>
           </div>
         </div>

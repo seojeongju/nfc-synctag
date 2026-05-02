@@ -218,6 +218,39 @@ app.post('/products', async (c) => {
   return c.json({ success: true, productId }, 201);
 });
 
+// 제품 수정 API
+app.put('/products/:id', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const { name, description, video_url, manual_url, image_url } = await c.req.json();
+
+    if (!name) return c.json({ error: 'Name is required' }, 400);
+
+    await c.env.DB.prepare(`
+      UPDATE products 
+      SET name = ?, description = ?, video_url = ?, manual_url = ?, image_url = ? 
+      WHERE id = ?
+    `).bind(name, description, video_url, manual_url, image_url, id).run();
+
+    return c.json({ success: true }, 200);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// 제품 삭제 API
+app.delete('/products/:id', async (c) => {
+  try {
+    const id = c.req.param('id');
+    // 연계된 tags 데이터를 먼저 삭제
+    await c.env.DB.prepare('DELETE FROM tags WHERE product_id = ?').bind(id).run();
+    await c.env.DB.prepare('DELETE FROM products WHERE id = ?').bind(id).run();
+    return c.json({ success: true }, 200);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 // 태그 매핑 (별도 수행 시 - 덮어쓰기 허용)
 app.post('/tags', async (c) => {
   const { tag_uid, product_id } = await c.req.json();
