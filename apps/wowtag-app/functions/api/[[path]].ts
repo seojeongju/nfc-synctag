@@ -8,6 +8,19 @@ type Bindings = {
 
 const app = new Hono<{ Bindings: Bindings }>().basePath('/api');
 
+// --- 관리자 로그인 API ---
+app.post('/admin/login', async (c) => {
+  try {
+    const { email, password } = await c.req.json();
+    if (email === 'admin@wowtag.com' && password === 'wowtag2026!') {
+      return c.json({ success: true, token: 'admin_session_token_xyz' }, 200);
+    }
+    return c.json({ error: '아이디 또는 비밀번호가 일치하지 않습니다.' }, 401);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 // --- 골드바 및 보증서 관리 API ---
 
 // 모든 골드바 목록 조회
