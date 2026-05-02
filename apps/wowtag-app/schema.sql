@@ -27,8 +27,46 @@ CREATE TABLE IF NOT EXISTS scan_logs (
 );
 
 -- Initial Mock Data
-INSERT INTO products (name, description, video_url, manual_url, image_url) 
+INSERT OR IGNORE INTO products (name, description, video_url, manual_url, image_url) 
 VALUES ('프리미엄 주얼리 세트', '장인정신이 깃든 특별한 컬렉션입니다.', 'https://example.com/video', 'https://example.com/manual', '/jewelry.png');
 
-INSERT INTO tags (tag_uid, product_id) 
+INSERT OR IGNORE INTO tags (tag_uid, product_id) 
 VALUES ('NFC_X92K4_001', 1);
+
+-- Goldbars Table (골드바 상품 정보)
+CREATE TABLE IF NOT EXISTS goldbars (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    serial_number TEXT UNIQUE NOT NULL,
+    weight TEXT NOT NULL,
+    purity TEXT DEFAULT '99.99%',
+    minted_at TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Certificates Table (정품인증서 및 NFC 태그 매핑)
+CREATE TABLE IF NOT EXISTS certificates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    goldbar_id INTEGER REFERENCES goldbars(id),
+    tag_uid TEXT UNIQUE NOT NULL,
+    cert_file_path TEXT NOT NULL,
+    issued_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Verification Logs Table (스캔 기록)
+CREATE TABLE IF NOT EXISTS verification_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tag_uid TEXT NOT NULL,
+    scanned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    is_valid BOOLEAN DEFAULT 1,
+    ip_hash TEXT,
+    user_agent TEXT
+);
+
+-- Initial Mock Data for Goldbars
+INSERT OR IGNORE INTO goldbars (serial_number, weight, purity, minted_at)
+VALUES ('GB2026-0001', '10g', '99.99%', '2026-05-01');
+
+INSERT OR IGNORE INTO certificates (goldbar_id, tag_uid, cert_file_path)
+VALUES (1, 'NFC_GB_TEST_001', 'certificates/GB2026-0001.pdf');
+
+

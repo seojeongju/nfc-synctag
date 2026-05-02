@@ -1,14 +1,140 @@
-
 import { Hono } from 'hono';
 import { handle } from 'hono/cloudflare-pages';
 
 type Bindings = {
   DB: D1Database;
+  BUCKET: R2Bucket;
 };
 
 const app = new Hono<{ Bindings: Bindings }>().basePath('/api');
 
-// 모든 제품 목록 조회
+// --- 골드바 및 보증서 관리 API ---
+
+// 모든 골드바 목록 조회
+app.get('/goldbars', async (c) => {
+  try {
+    const { results } = await c.env.DB.prepare(`
+      SELECT g.*, c.tag_uid, c.cert_file_path 
+      FROM goldbars g
+      LEFT JOIN certificates c ON g.id = c.goldbar_id
+      ORDER BY g.created_at DESC
+    `).all();
+    return c.json(results);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// 골드바 및 보증서 등록
+app.post('/goldbars', async (c) => {
+  try {
+    const { serial_number, weight, purity, minted_at, tag_uid, cert_file_base64, file_name } = await c.req.json();
+
+    if (!serial_number || !weight) {
+      return c.json({ error: 'Serial number and weight are required' }, 400);
+    }
+
+    // 1. 골드바 정보 저장
+    const insertGoldbar = await c.env.DB.prepare(`
+      INSERT OR REPLACE INTO goldbars (serial_number, weight, purity, minted_at) 
+      VALUES (?, ?, ?, ?) RETURNING id
+    `).bind(serial_number, weight, purity || '99.99%', minted_at).first();
+
+    const goldbarId = (insertGoldbar as any).id;
+
+    // 2. 인증서 파일이 Base64 형태로 함께 전달된 경우 R2 버킷에 저장
+    let certFilePath = `certificates/${serial_number}_cert.pdf`;
+    if (file_name) {
+      certFilePath = `certificates/${serial_number}_${file_name}`;
+    }
+
+    if (cert_file_base64) {
+      // Base64를 ArrayBuffer로 변환하여 R2에 저장
+      const base64Data = cert_file_base64.split(',')[1] || cert_file_base64;
+      const binaryString = atob(base64Data);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+
+      await c.env.BUCKET.put(certFilePath, bytes.buffer, {
+        httpMetadata: { contentType: 'application/pdf' },
+      });
+    }
+
+    // 3. 태그 및 보증서 매핑 정보 저장
+    if (tag_uid) {
+      await c.env.DB.prepare(`
+        INSERT OR REPLACE INTO certificates (goldbar_id, tag_uid, cert_file_path) 
+        VALUES (?, ?, ?)
+      `).bind(goldbarId, tag_uid, certFilePath).run();
+    }
+
+    return c.json({ success: true, goldbarId }, 201);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// 특정 NFC 태그로 골드바 정품인증 정보 조회
+app.get('/goldbars/t/:tagId', async (c) => {
+  try {
+    const tagId = c.req.param('tagId');
+    const query = `
+      SELECT g.*, c.tag_uid, c.cert_file_path 
+      FROM goldbars g
+      JOIN certificates c ON g.id = c.goldbar_id
+      WHERE c.tag_uid = ?
+    `;
+    const goldbar = await c.env.DB.prepare(query).bind(tagId).first();
+
+    if (!goldbar) {
+      return c.json({ error: 'not_found' }, 404);
+    }
+
+    // 스캔 로그 기록
+    c.executionCtx.waitUntil(
+      c.env.DB.prepare('INSERT INTO verification_logs (tag_uid, scanned_at, is_valid) VALUES (?, ?, ?)')
+        .bind(tagId, new Date().toISOString(), 1)
+        .run()
+    );
+
+    return c.json(goldbar);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// 정품인증서 파일 다운로드
+app.get('/certificates/download/:tagId', async (c) => {
+  try {
+    const tagId = c.req.param('tagId');
+    const query = 'SELECT cert_file_path FROM certificates WHERE tag_uid = ?';
+    const cert = await c.env.DB.prepare(query).bind(tagId).first();
+
+    if (!cert || !cert.cert_file_path) {
+      return c.json({ error: 'Certificate not found' }, 404);
+    }
+
+    const object = await c.env.BUCKET.get(cert.cert_file_path as string);
+
+    if (object === null) {
+      return c.json({ error: 'Object not found in R2' }, 404);
+    }
+
+    const headers = new Headers();
+    object.writeHttpMetadata(headers);
+    headers.set('etag', object.httpEtag);
+    headers.set('Content-Disposition', `attachment; filename="${cert.cert_file_path.split('/').pop()}"`);
+
+    return new Response(object.body, { headers });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// 제품 목록 조회
 app.get('/products', async (c) => {
   const { results } = await c.env.DB.prepare('SELECT * FROM products ORDER BY created_at DESC').all();
   return c.json(results);
