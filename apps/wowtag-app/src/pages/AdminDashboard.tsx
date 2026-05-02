@@ -470,7 +470,7 @@ export default function AdminDashboard() {
           <div className="w-10 h-10 rounded-2xl bg-purple-gradient flex items-center justify-center shadow-lg shadow-purple-500/20">
             <Scan className="text-white w-5 h-5" />
           </div>
-          <span className="text-xl font-black tracking-tight bg-clip-text text-transparent bg-purple-gradient">WowTag</span>
+          <span className="text-xl font-black tracking-tight bg-clip-text text-transparent bg-purple-gradient">syncTag</span>
         </div>
         
         <nav className="flex flex-col gap-2 flex-1">
@@ -510,7 +510,7 @@ export default function AdminDashboard() {
             <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
               <Scan className="text-white w-4 h-4" />
             </div>
-            <span className="font-black text-slate-800">WowTag</span>
+            <span className="font-black text-slate-800">syncTag</span>
           </div>
           <div className="flex items-center gap-4 ml-auto">
             <button className="p-2.5 rounded-2xl text-slate-400 hover:bg-slate-50 transition-colors relative"><Bell className="w-5 h-5" /></button>

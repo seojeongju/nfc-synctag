@@ -65,7 +65,7 @@ export default function UserLanding() {
             <div className="w-9 h-9 bg-amber-50 rounded-xl flex items-center justify-center border border-amber-200">
               <ShieldCheck className="w-5 h-5 text-amber-600" />
             </div>
-            <span className="text-lg font-black text-slate-800 tracking-tight">WowTag <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg">Gold</span></span>
+            <span className="text-lg font-black text-slate-800 tracking-tight">syncTag <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg">Gold</span></span>
           </div>
           <Link to="/login" className="text-xs font-black text-amber-600 bg-amber-50 px-4 py-2 rounded-xl border border-amber-200/60 hover:bg-amber-100 transition-all no-underline">
             관리자 로그인
@@ -84,7 +84,7 @@ export default function UserLanding() {
             골드바 정품인증<br/>스마트하게 확인하세요
           </h2>
           <p className="text-xs font-bold text-slate-400 max-w-xs leading-relaxed mb-6">
-            WowTag NFC 정품인증 시스템을 통해 제품의 고유 일련번호와 순도, 제조일자 및 원본 보증서를 안전하게 확인해 드립니다.
+            syncTag NFC 정품인증 시스템을 통해 제품의 고유 일련번호와 순도, 제조일자 및 원본 보증서를 안전하게 확인해 드립니다.
           </p>
 
           <div className="w-full bg-slate-50 border border-slate-100 rounded-3xl p-5 flex flex-col gap-3">
@@ -125,7 +125,7 @@ export default function UserLanding() {
         <footer className="w-full max-w-md text-center border-t border-slate-100 pt-6">
           <p className="text-[10px] text-slate-400 font-bold leading-relaxed">
             NFC 태그를 스캔하면 즉시 제품의 보증 정보로 이동합니다. <br />
-            © 2026 WowTag Inc. All rights reserved.
+            © 2026 제이에로스 (J-Eros Inc.) All rights reserved.
           </p>
         </footer>
       </div>
@@ -211,7 +211,7 @@ export default function UserLanding() {
         </div>
 
         <p className="text-[11px] font-bold text-slate-400 text-center max-w-xs leading-relaxed">
-          본 제품은 WowTag 블록체인 및 Edge Runtime 시스템을 통해 안전하게 무결성 및 정품 확인이 완료되었습니다.
+          본 제품은 syncTag 블록체인 및 Edge Runtime 시스템을 통해 안전하게 무결성 및 정품 확인이 완료되었습니다.
         </p>
       </div>
     );
