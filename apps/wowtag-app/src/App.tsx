@@ -107,7 +107,7 @@ function LoginPage() {
         </form>
 
         <p className="text-[10px] text-slate-400 font-bold text-center mt-8 tracking-wider">
-          관리자 로그인이 필요합니다. (데모 비밀번호: <span className="text-purple-600 font-black">wowtag2026!</span>)
+          제이에로스 관리자 전용 로그인 페이지입니다.
         </p>
       </div>
     </div>

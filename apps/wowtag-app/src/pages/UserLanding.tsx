@@ -86,7 +86,7 @@ export default function UserLanding() {
   }
 
   // ==========================================
-  // [Case A] NFC 태그 ID가 없을 때: 데모 체험 및 공통 진입 랜딩 페이지
+  // [Case A] NFC 태그 ID가 없을 때: 공통 진입 랜딩 페이지
   // ==========================================
   if (!tagId) {
     return (
@@ -108,7 +108,7 @@ export default function UserLanding() {
             className={`flex-1 h-12 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 ${activeTab === 'home' ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-md shadow-purple-500/20' : 'text-slate-400 hover:bg-slate-50'}`}
           >
             <Info className="w-4 h-4" />
-            홈 (데모 체험)
+            홈
           </button>
           <button 
             onClick={() => setActiveTab('products')} 
@@ -119,7 +119,7 @@ export default function UserLanding() {
           </button>
         </div>
 
-        {/* 탭 1: 홈 (데모) */}
+        {/* 탭 1: 홈 */}
         {activeTab === 'home' && (
           <>
             {/* 중앙 제품 카드 뷰 (이미지 기반 디자인 구현) */}
@@ -131,7 +131,7 @@ export default function UserLanding() {
 
                 {/* 하단 글래스모피즘 오버레이 팝업 */}
                 <div className="absolute bottom-3 left-3 right-3 bg-white/70 backdrop-blur-xl rounded-[1.8rem] p-6 border border-white/40 shadow-2xl flex flex-col items-center text-center">
-                  <h4 className="text-xl font-black text-slate-800 tracking-tight">프리미엄 제품 (데모)</h4>
+                  <h4 className="text-xl font-black text-slate-800 tracking-tight">럭셔리 제품 정품인증</h4>
                   <p className="text-xs font-bold text-slate-500 mt-1 mb-5 leading-relaxed">
                     NFC 태그를 스캔하면 실제 제품 정보를 확인할 수 있습니다.
                   </p>
@@ -406,7 +406,7 @@ export default function UserLanding() {
   // [Case D] 일반 제품 인증 성공 UI
   // ==========================================
   const displayData = product || {
-    name: '프리미엄 제품 (데모)',
+    name: '제이에로스 프리미엄 주얼리',
     description: 'NFC 태그를 스캔하면 실제 제품 정보를 확인할 수 있습니다.',
     video_url: '',
     manual_url: '',
