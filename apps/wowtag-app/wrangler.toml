@@ -12,3 +12,6 @@ database_id = "39f78334-6415-4a81-87f8-2e9ee0546626"
 binding = "BUCKET"
 bucket_name = "wowtag-contents"
 
+[vars]
+ADMIN_PASSWORD = "wowtag2026!"
+

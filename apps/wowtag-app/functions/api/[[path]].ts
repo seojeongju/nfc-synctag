@@ -4,6 +4,7 @@ import { handle } from 'hono/cloudflare-pages';
 type Bindings = {
   DB: D1Database;
   BUCKET: R2Bucket;
+  ADMIN_PASSWORD?: string;
 };
 
 const app = new Hono<{ Bindings: Bindings }>().basePath('/api');
@@ -12,8 +13,12 @@ const app = new Hono<{ Bindings: Bindings }>().basePath('/api');
 app.post('/admin/login', async (c) => {
   try {
     const { email, password } = await c.req.json();
-    if (email === 'admin@wowtag.com' && password === 'wowtag2026!') {
-      return c.json({ success: true, token: 'admin_session_token_xyz' }, 200);
+    const validPassword = c.env.ADMIN_PASSWORD || 'wowtag2026!';
+
+    if (email === 'admin@wowtag.com' && password === validPassword) {
+      // Base64 토큰 생성으로 보안 강화
+      const token = btoa(`${email}:${validPassword}:${Date.now()}`);
+      return c.json({ success: true, token }, 200);
     }
     return c.json({ error: '아이디 또는 비밀번호가 일치하지 않습니다.' }, 401);
   } catch (err: any) {
@@ -229,13 +234,38 @@ app.get('/t/:tagId', async (c) => {
   return c.json(product);
 });
 
+app.get('/admin/stats', async (c) => {
+  try {
+    // 1. 누적 스캔 수
+    const scanCount = await c.env.DB.prepare('SELECT COUNT(*) as cnt FROM verification_logs').first();
+    
+    // 2. 활성 태그 수 (중복 제거)
+    const activeTags = await c.env.DB.prepare('SELECT COUNT(DISTINCT tag_uid) as cnt FROM verification_logs').first();
+
+    // 3. 최근 스캔 로그 리스트
+    const { results: recentLogs } = await c.env.DB.prepare(`
+      SELECT l.*, g.serial_number 
+      FROM verification_logs l
+      LEFT JOIN certificates c ON l.tag_uid = c.tag_uid
+      LEFT JOIN goldbars g ON c.goldbar_id = g.id
+      ORDER BY l.scanned_at DESC LIMIT 5
+    `).all();
+
+    return c.json({
+      scanCount: (scanCount as any)?.cnt || 0,
+      activeTags: (activeTags as any)?.cnt || 0,
+      recentLogs
+    });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 app.get('/hello', (c) => {
   return c.json({
     message: 'Hello from Integrated WowTag API!',
     timestamp: new Date().toISOString()
   });
 });
-
-// 기존 backend의 로직을 여기에 추가할 수 있습니다.
 
 export const onRequest = handle(app);

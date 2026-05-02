@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { LayoutDashboard, Tag, Package, Plus, Scan, Bell, ArrowUpRight, Loader2, X, Smartphone, PenTool, ChevronRight, Hash, Link as LinkIcon, Award, FileText } from 'lucide-react';
+import { LayoutDashboard, Tag, Package, Plus, Scan, Bell, ArrowUpRight, Loader2, X, Smartphone, PenTool, ChevronRight, Hash, Link as LinkIcon, Award, FileText, Calendar } from 'lucide-react';
 
 export default function AdminDashboard() {
   const [currentTab, setCurrentTab] = useState<'dashboard' | 'products' | 'nfc' | 'goldbars'>('dashboard');
   const [products, setProducts] = useState<any[]>([]);
   const [goldbars, setGoldbars] = useState<any[]>([]);
+  const [stats, setStats] = useState<any>({ scanCount: 0, activeTags: 0, recentLogs: [] });
   
   // 모달 상태
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -63,9 +64,22 @@ export default function AdminDashboard() {
     }
   };
 
+  const fetchStats = async () => {
+    try {
+      const res = await fetch('/api/admin/stats');
+      if (res.ok) {
+        const data = await res.json();
+        setStats(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch stats', err);
+    }
+  };
+
   useEffect(() => {
     fetchProducts();
     fetchGoldbars();
+    fetchStats();
   }, []);
 
   // --- NFC 로직 ---
@@ -200,6 +214,7 @@ export default function AdminDashboard() {
         });
         alert('골드바 및 정품인증서 등록 성공!');
         fetchGoldbars();
+        fetchStats();
       } else {
         const errData = await res.json();
         alert(`오류 발생: ${errData.error || '알 수 없는 오류'}`);
@@ -211,8 +226,17 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('admin_token');
+    window.location.href = '/login';
+  };
+
+  const usageRate = goldbars.length > 0 
+    ? ((stats.activeTags / goldbars.length) * 100).toFixed(0) + '%' 
+    : '0%';
+
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex font-sans leading-relaxed text-slate-900">
+    <div className="min-h-screen bg-[#F8FAFC] flex font-sans leading-relaxed text-slate-900 animate-in fade-in duration-300">
       {/* 사이드바 - 데스크탑 */}
       <aside className="hidden lg:flex w-72 flex-col p-6 bg-white border-r border-slate-100 shadow-sm fixed h-full z-20">
         <div className="flex items-center gap-3 mb-12 px-2">
@@ -241,6 +265,15 @@ export default function AdminDashboard() {
             </button>
           ))}
         </nav>
+
+        {/* 로그아웃 버튼 */}
+        <button 
+          onClick={handleLogout}
+          className="mt-auto flex items-center gap-4 px-4 py-3 rounded-2xl text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-all font-black text-sm border border-transparent hover:border-rose-100/60"
+        >
+          <X className="w-5 h-5" />
+          로그아웃
+        </button>
       </aside>
 
       <main className="flex-1 lg:ml-72 flex flex-col min-h-screen">
@@ -270,12 +303,14 @@ export default function AdminDashboard() {
                   <p className="text-sm font-bold text-slate-400 mt-1">플랫폼의 전반적인 데이터를 한눈에 확인하세요.</p>
                 </div>
               </div>
+
+              {/* 통계 카드 */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
                 {[
                   { label: '전체 제품', value: products.length, icon: Package, color: 'text-blue-600', bg: 'bg-blue-50' },
                   { label: '골드바 개수', value: goldbars.length, icon: Award, color: 'text-amber-600', bg: 'bg-amber-50' },
-                  { label: '활성 태그', value: '184', icon: Tag, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                  { label: '가동률', value: '92%', icon: ArrowUpRight, color: 'text-rose-600', bg: 'bg-rose-50' },
+                  { label: '활성 태그', value: stats.activeTags, icon: Tag, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                  { label: '가동률', value: usageRate, icon: ArrowUpRight, color: 'text-rose-600', bg: 'bg-rose-50' },
                 ].map((stat, i) => (
                   <div key={i} className="bg-white p-5 lg:p-8 rounded-[2rem] shadow-sm border border-slate-50 hover:shadow-xl transition-all">
                     <div className={`w-12 h-12 rounded-2xl ${stat.bg} ${stat.color} flex items-center justify-center mb-6`}><stat.icon className="w-6 h-6" /></div>
@@ -283,6 +318,45 @@ export default function AdminDashboard() {
                     <h3 className="text-2xl lg:text-3xl font-black text-slate-900 mt-1">{stat.value}</h3>
                   </div>
                 ))}
+              </div>
+
+              {/* 최근 스캔 기록 (Analytics Timeline) */}
+              <div className="bg-white rounded-[2.5rem] p-6 lg:p-10 border border-slate-50 shadow-sm">
+                <div className="flex items-center gap-2 mb-6">
+                  <div className="w-1.5 h-6 bg-amber-500 rounded-full"></div>
+                  <h3 className="text-xl font-black text-slate-800">최근 정품인증 스캔 기록 (실시간)</h3>
+                </div>
+
+                <div className="space-y-4">
+                  {stats.recentLogs && stats.recentLogs.map((log: any, idx: number) => (
+                    <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100/60 hover:border-amber-400/30 transition-all">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-white border border-slate-100 rounded-xl flex items-center justify-center text-amber-500">
+                          <Award className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-black text-slate-800">일련번호: {log.serial_number || '미지정 골드바'}</p>
+                          <p className="text-xs font-bold text-slate-400 font-mono mt-0.5">UID: {log.tag_uid}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col items-end">
+                        <span className="text-[11px] font-black text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-xl flex items-center gap-1 mb-1">
+                          정품인증 성공
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                          <Calendar className="w-3 h-3" /> {new Date(log.scanned_at).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+
+                  {(!stats.recentLogs || stats.recentLogs.length === 0) && (
+                    <div className="p-8 text-center text-slate-400 font-bold">
+                      아직 접수된 스캔 기록이 없습니다.
+                    </div>
+                  )}
+                </div>
               </div>
             </>
           )}

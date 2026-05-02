@@ -6,7 +6,7 @@ import AdminDashboard from './pages/AdminDashboard';
 
 // Auth Check (localStorage 기반)
 const isAuthenticated = () => {
-  return typeof window !== 'undefined' && localStorage.getItem('admin_token') === 'admin_session_token_xyz';
+  return typeof window !== 'undefined' && !!localStorage.getItem('admin_token');
 };
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
