@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LayoutDashboard, Tag, Package, Plus, Scan, Bell, ArrowUpRight, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut } from 'lucide-react';
+import { LayoutDashboard, Tag, Package, Plus, Scan, Bell, ArrowUpRight, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut, Eye } from 'lucide-react';
 
 export default function AdminDashboard() {
   const [currentTab, setCurrentTab] = useState<'dashboard' | 'products' | 'nfc' | 'goldbars'>('dashboard');
@@ -493,14 +493,24 @@ export default function AdminDashboard() {
           ))}
         </nav>
 
-        {/* 로그아웃 버튼 */}
-        <button 
-          onClick={handleLogout}
-          className="mt-auto flex items-center gap-4 px-5 py-3.5 rounded-2xl text-rose-500 bg-rose-50/30 hover:bg-rose-50 hover:text-rose-600 border border-rose-100/40 hover:border-rose-200/60 transition-all font-black text-sm shadow-sm hover:shadow-md active:scale-[0.98]"
-        >
-          <LogOut className="w-5 h-5 transition-transform group-hover:translate-x-0.5" />
-          로그아웃
-        </button>
+        {/* 사용자 화면 보기 & 로그아웃 버튼 */}
+        <div className="mt-auto flex flex-col gap-2">
+          <button 
+            onClick={() => window.open('/', '_blank')}
+            className="flex items-center gap-4 px-5 py-3.5 rounded-2xl text-purple-600 bg-purple-50/40 hover:bg-purple-50 hover:text-purple-700 border border-purple-100/40 hover:border-purple-200/60 transition-all font-black text-sm shadow-sm hover:shadow-md active:scale-[0.98]"
+          >
+            <Eye className="w-5 h-5 transition-transform" />
+            사용자 화면 보기
+          </button>
+
+          <button 
+            onClick={handleLogout}
+            className="flex items-center gap-4 px-5 py-3.5 rounded-2xl text-rose-500 bg-rose-50/30 hover:bg-rose-50 hover:text-rose-600 border border-rose-100/40 hover:border-rose-200/60 transition-all font-black text-sm shadow-sm hover:shadow-md active:scale-[0.98]"
+          >
+            <LogOut className="w-5 h-5 transition-transform group-hover:translate-x-0.5" />
+            로그아웃
+          </button>
+        </div>
       </aside>
 
       <main className="flex-1 lg:ml-72 flex flex-col min-h-screen">
