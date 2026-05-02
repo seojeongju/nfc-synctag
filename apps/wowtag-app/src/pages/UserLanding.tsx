@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Share2, Download, Play, ChevronRight, Bookmark, Loader2, Award, ShieldCheck, ShoppingCart, Info, CheckCircle2, MessageSquare, X } from 'lucide-react';
+import { Share2, Download, Play, ChevronRight, Bookmark, Loader2, Award, ShieldCheck, ShoppingCart, Info, CheckCircle2, MessageSquare, X, BookOpen, Smartphone } from 'lucide-react';
 
 export default function UserLanding() {
   const { tagId } = useParams();
@@ -21,6 +21,7 @@ export default function UserLanding() {
     memo: ''
   });
   const [purchaseSuccess, setPurchaseSuccess] = useState(false);
+  const [showGuideModal, setShowGuideModal] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -163,14 +164,14 @@ export default function UserLanding() {
                 <ChevronRight className="w-5 h-5 text-slate-300 group-hover:translate-x-1 transition-all" />
               </div>
 
-              <div onClick={() => alert('설명서 파일 다운로드가 준비 중입니다.')} className="bg-white border border-slate-100/80 rounded-2xl p-4 flex items-center justify-between hover:border-purple-300 hover:shadow-lg transition-all cursor-pointer group shadow-sm">
+              <div onClick={() => setShowGuideModal(true)} className="bg-white border border-slate-100/80 rounded-2xl p-4 flex items-center justify-between hover:border-purple-300 hover:shadow-lg transition-all cursor-pointer group shadow-sm">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600 group-hover:scale-105 transition-all">
-                    <Download className="w-5 h-5" />
+                    <BookOpen className="w-5 h-5" />
                   </div>
                   <div>
-                    <h5 className="font-black text-slate-800 text-sm">설명서 다운로드</h5>
-                    <p className="text-[11px] font-bold text-slate-400 mt-0.5">PDF 파일로 제공됩니다</p>
+                    <h5 className="font-black text-slate-800 text-sm">프로그램 사용방법</h5>
+                    <p className="text-[11px] font-bold text-slate-400 mt-0.5">NFC 스캔 및 정품확인 가이드</p>
                   </div>
                 </div>
                 <ChevronRight className="w-5 h-5 text-slate-300 group-hover:translate-x-1 transition-all" />
@@ -319,6 +320,69 @@ export default function UserLanding() {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* 사용방법 가이드 모달 */}
+        {showGuideModal && (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 lg:p-4">
+            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setShowGuideModal(false)}></div>
+            <div className="relative w-full max-w-md bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh] overflow-hidden">
+              <header className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/40">
+                <h4 className="text-lg font-black text-slate-800 tracking-tight">프로그램 사용방법 가이드</h4>
+                <button onClick={() => setShowGuideModal(false)} className="p-2 bg-white rounded-xl text-slate-400 hover:text-rose-600 transition-colors shadow-sm">
+                  <X className="w-5 h-5" />
+                </button>
+              </header>
+
+              <div className="p-6 overflow-y-auto space-y-6 flex-1 pb-10">
+                <div className="space-y-4">
+                  {[
+                    {
+                      step: '01',
+                      title: 'NFC 기능 활성화',
+                      desc: '스마트폰의 NFC 기능을 "기본 모드" 또는 "읽기/쓰기 모드"로 켭니다.',
+                      icon: Smartphone
+                    },
+                    {
+                      step: '02',
+                      title: 'NFC 태그 스캔',
+                      desc: '골드바/주얼리와 함께 동봉된 syncTag 칩에 스마트폰 뒷면을 가볍게 터치(스캔)합니다.',
+                      icon: ShieldCheck
+                    },
+                    {
+                      step: '03',
+                      title: '정품 정보 확인',
+                      desc: '화면에 자동으로 열린 페이지에서 제품의 고유 일련번호, 순도, 품질 정보를 완벽하게 확인합니다.',
+                      icon: Award
+                    },
+                    {
+                      step: '04',
+                      title: '상담 및 구매 신청',
+                      desc: '"제품 둘러보기" 탭을 통해 다양한 상품 리스트를 확인하고 즉시 구매 상담을 요청할 수 있습니다.',
+                      icon: ShoppingCart
+                    }
+                  ].map((item, index) => (
+                    <div key={index} className="bg-slate-50/70 border border-slate-100/80 rounded-2xl p-4 flex gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600 flex-shrink-0">
+                        <item.icon className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <h5 className="font-black text-slate-800 text-sm">{item.title}</h5>
+                          <span className="text-[10px] font-black text-purple-600 tracking-widest bg-purple-50 px-2 py-0.5 rounded-lg uppercase">STEP {item.step}</span>
+                        </div>
+                        <p className="text-slate-400 text-xs font-bold leading-relaxed">{item.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <button onClick={() => setShowGuideModal(false)} className="w-full h-14 bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-black rounded-xl text-sm shadow-xl shadow-purple-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                  확인 완료
+                </button>
+              </div>
             </div>
           </div>
         )}
