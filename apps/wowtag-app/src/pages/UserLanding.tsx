@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { Share2, Download, Play, ChevronRight, Bookmark, Loader2, Award, ShieldCheck } from 'lucide-react';
+import { useParams, Link } from 'react-router-dom';
+import { Share2, Download, Play, ChevronRight, Bookmark, Loader2, Award, ShieldCheck, Smartphone } from 'lucide-react';
 
 export default function UserLanding() {
   const { tagId } = useParams();
@@ -52,6 +52,89 @@ export default function UserLanding() {
     );
   }
 
+  // ==========================================
+  // [Case A] NFC 태그 ID가 없을 때: 서비스 소개형 랜딩 페이지
+  // ==========================================
+  if (!tagId) {
+    return (
+      <div className="min-h-screen bg-[#FDFBF7] flex flex-col items-center p-6 pb-20 font-sans leading-relaxed text-slate-900 animate-in fade-in duration-500">
+        
+        {/* 헤더 */}
+        <header className="w-full max-w-md flex justify-between items-center mb-12">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 bg-amber-50 rounded-xl flex items-center justify-center border border-amber-200">
+              <ShieldCheck className="w-5 h-5 text-amber-600" />
+            </div>
+            <span className="text-lg font-black text-slate-800 tracking-tight">WowTag <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg">Gold</span></span>
+          </div>
+          <Link to="/login" className="text-xs font-black text-amber-600 bg-amber-50 px-4 py-2 rounded-xl border border-amber-200/60 hover:bg-amber-100 transition-all no-underline">
+            관리자 로그인
+          </Link>
+        </header>
+
+        {/* 히어로 섹션 */}
+        <div className="w-full max-w-md bg-white rounded-[2.5rem] border border-amber-100/80 shadow-xl p-8 mb-8 relative overflow-hidden flex flex-col items-center text-center">
+          <div className="absolute -right-16 -top-16 w-48 h-48 bg-amber-50 rounded-full opacity-40 blur-3xl"></div>
+          
+          <div className="w-16 h-16 rounded-3xl bg-amber-50 border-2 border-amber-200/60 flex items-center justify-center text-amber-600 mb-6 shadow-sm">
+            <Award className="w-8 h-8" />
+          </div>
+
+          <h2 className="text-2xl lg:text-3xl font-black text-slate-900 mb-3 tracking-tight">
+            골드바 정품인증<br/>스마트하게 확인하세요
+          </h2>
+          <p className="text-xs font-bold text-slate-400 max-w-xs leading-relaxed mb-6">
+            WowTag NFC 정품인증 시스템을 통해 제품의 고유 일련번호와 순도, 제조일자 및 원본 보증서를 안전하게 확인해 드립니다.
+          </p>
+
+          <div className="w-full bg-slate-50 border border-slate-100 rounded-3xl p-5 flex flex-col gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div>
+              <p className="text-xs font-bold text-slate-600 text-left">위·변조가 불가능한 정품 인증서 발급</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div>
+              <p className="text-xs font-bold text-slate-600 text-left">터치 한 번으로 다운로드 가능한 원본 보증서</p>
+            </div>
+          </div>
+        </div>
+
+        {/* 이용 가이드 */}
+        <div className="w-full max-w-md space-y-4 mb-10">
+          <h3 className="text-sm font-black text-slate-800 px-1 uppercase tracking-wider">이용 가이드</h3>
+
+          {[
+            { step: '01', title: 'NFC 태그 확인', desc: '골드바와 함께 제공된 실물 NFC 태그의 위치를 확인합니다.', icon: Award },
+            { step: '02', title: '스마트폰 터치 (스캔)', desc: '스마트폰을 켠 상태로 NFC 태그 뒷면에 가볍게 터치합니다.', icon: Smartphone },
+            { step: '03', title: '정품인증서 확인', desc: '연결된 웹 화면에서 정품인증을 확인하고 보증서를 다운로드합니다.', icon: ShieldCheck },
+          ].map((item, index) => (
+            <div key={index} className="bg-white border border-slate-100 rounded-3xl p-5 flex gap-5 hover:border-amber-400/40 transition-all cursor-pointer group shadow-sm">
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 group-hover:scale-105 transition-all"><item.icon className="w-5 h-5" /></div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1">
+                  <h4 className="font-black text-slate-800 text-sm">{item.title}</h4>
+                  <span className="text-[10px] font-black text-amber-500 tracking-wider bg-amber-50 px-2 py-0.5 rounded-lg">STEP {item.step}</span>
+                </div>
+                <p className="text-slate-400 text-xs font-bold leading-relaxed">{item.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* 푸터 */}
+        <footer className="w-full max-w-md text-center border-t border-slate-100 pt-6">
+          <p className="text-[10px] text-slate-400 font-bold leading-relaxed">
+            NFC 태그를 스캔하면 즉시 제품의 보증 정보로 이동합니다. <br />
+            © 2026 WowTag Inc. All rights reserved.
+          </p>
+        </footer>
+      </div>
+    );
+  }
+
+  // ==========================================
+  // [Case B] 에러 발생 시
+  // ==========================================
   if (error || (!product && !goldbar && tagId)) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC] p-6 text-center">
@@ -65,10 +148,12 @@ export default function UserLanding() {
     );
   }
 
-  // --- 골드바 인증 성공 UI ---
+  // ==========================================
+  // [Case C] 골드바 인증 성공 UI
+  // ==========================================
   if (goldbar) {
     return (
-      <div className="min-h-screen bg-[#FFFDF5] flex flex-col items-center p-6 pb-20 font-sans animate-in fade-in duration-500">
+      <div className="min-h-screen bg-[#FFFDF5] flex flex-col items-center p-6 pb-20 font-sans animate-in fade-in duration-500 leading-relaxed text-slate-900">
         <div className="w-full max-w-md flex justify-between items-center mb-10">
           <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-amber-100">
             <ShieldCheck className="w-6 h-6 text-amber-500" />
@@ -132,7 +217,9 @@ export default function UserLanding() {
     );
   }
 
-  // --- 일반 제품 인증 성공 UI (기존 데모 데이터 fallback) ---
+  // ==========================================
+  // [Case D] 일반 제품 인증 성공 UI
+  // ==========================================
   const displayData = product || {
     name: '프리미엄 제품 (데모)',
     description: 'NFC 태그를 스캔하면 실제 제품 정보를 확인할 수 있습니다.',
@@ -142,7 +229,7 @@ export default function UserLanding() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center p-6 pb-20 animate-in fade-in duration-500 font-sans leading-relaxed">
+    <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center p-6 pb-20 animate-in fade-in duration-500 font-sans leading-relaxed text-slate-900">
       {/* 헤더 영역 */}
       <div className="w-full max-w-md flex justify-between items-center mb-10">
         <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center shadow-sm">
