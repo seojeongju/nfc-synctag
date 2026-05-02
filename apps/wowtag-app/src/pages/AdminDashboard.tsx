@@ -19,13 +19,16 @@ export default function AdminDashboard() {
   const [isGoldbarModalOpen, setIsGoldbarModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   
-  // 폼 상태 (제품)
+  // 폼 상태 (제품 등록)
   const [productFormData, setProductFormData] = useState({
     name: '',
     description: '',
     video_url: '',
     manual_url: '',
-    image_url: '/jewelry.png'
+    image_url: '/jewelry.png',
+    options: '',
+    image_file_base64: '',
+    file_name: ''
   });
 
   // 폼 상태 (제품 수정용)
@@ -35,7 +38,10 @@ export default function AdminDashboard() {
     description: '',
     video_url: '',
     manual_url: '',
-    image_url: '/jewelry.png'
+    image_url: '/jewelry.png',
+    options: '',
+    image_file_base64: '',
+    file_name: ''
   });
 
   // 폼 상태 (NFC 매핑)
@@ -165,8 +171,53 @@ export default function AdminDashboard() {
     }
   };
 
+  // --- 이미지 압축 및 자동 리사이징 (Canvas 사용) ---
+  const handleProductImageChange = (e: React.ChangeEvent<HTMLInputElement>, target: 'create' | 'edit') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const img = new Image();
+    const reader = new FileReader();
+
+    reader.onload = (evt) => {
+      if (evt.target?.result) {
+        img.src = evt.target.result as string;
+      }
+    };
+
+    img.onload = () => {
+      // 500x500 크기로 강제 자동 리사이징
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = 500;
+      canvas.height = 500;
+
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, 500, 500);
+        const base64Resized = canvas.toDataURL('image/jpeg', 0.85); // 퀄리티 85% 최적화
+        
+        if (target === 'create') {
+          setProductFormData(prev => ({
+            ...prev,
+            file_name: file.name,
+            image_file_base64: base64Resized
+          }));
+        } else {
+          setEditProductFormData(prev => ({
+            ...prev,
+            file_name: file.name,
+            image_file_base64: base64Resized
+          }));
+        }
+      }
+    };
+
+    reader.readAsDataURL(file);
+  };
+
   const handleProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!productFormData.name) return alert('제품 이름을 입력해 주세요.');
     setSubmitting(true);
     try {
       const res = await fetch('/api/products', {
@@ -176,7 +227,16 @@ export default function AdminDashboard() {
       });
       if (res.ok) {
         setIsProductModalOpen(false);
-        setProductFormData({ name: '', description: '', video_url: '', manual_url: '', image_url: '/jewelry.png' });
+        setProductFormData({
+          name: '',
+          description: '',
+          video_url: '',
+          manual_url: '',
+          image_url: '/jewelry.png',
+          options: '',
+          image_file_base64: '',
+          file_name: ''
+        });
         fetchProducts();
       }
     } finally {
@@ -192,7 +252,10 @@ export default function AdminDashboard() {
       description: p.description || '',
       video_url: p.video_url || '',
       manual_url: p.manual_url || '',
-      image_url: p.image_url || '/jewelry.png'
+      image_url: p.image_url || '/jewelry.png',
+      options: p.options || '',
+      image_file_base64: '',
+      file_name: ''
     });
     setIsEditProductModalOpen(true);
   };
@@ -579,24 +642,39 @@ export default function AdminDashboard() {
 
               <div className="grid gap-4 lg:grid-cols-2">
                 {filteredProducts.map((p) => (
-                  <div key={p.id} className="bg-white p-5 rounded-[2rem] border border-slate-100 flex items-center justify-between hover:border-primary/30 transition-all group shadow-sm">
-                    <div className="flex items-center gap-5">
-                      <div className="w-16 h-16 rounded-2xl bg-slate-50 overflow-hidden ring-4 ring-slate-50"><img src={p.image_url} className="w-full h-full object-cover" /></div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-black text-slate-800 text-lg truncate">{p.name}</h4>
-                        <p className="text-xs text-slate-400 font-bold line-clamp-1">{p.description || '상세 설명 없음'}</p>
+                  <div key={p.id} className="bg-white p-5 rounded-[2rem] border border-slate-100 flex flex-col gap-4 hover:border-primary/30 transition-all group shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-5">
+                        <div className="w-16 h-16 rounded-2xl bg-slate-50 overflow-hidden ring-4 ring-slate-50">
+                          <img src={p.image_url.startsWith('/') ? p.image_url : p.image_url} className="w-full h-full object-cover" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-black text-slate-800 text-lg truncate">{p.name}</h4>
+                          <p className="text-xs text-slate-400 font-bold line-clamp-1">{p.description || '상세 설명 없음'}</p>
+                        </div>
+                      </div>
+
+                      {/* 수정 및 삭제 도구 */}
+                      <div className="flex items-center gap-1 pl-4">
+                        <button onClick={() => handleEditProductOpen(p)} className="p-2.5 rounded-xl hover:bg-slate-50 text-slate-400 hover:text-primary transition-all">
+                          <Edit3 className="w-4.5 h-4.5" />
+                        </button>
+                        <button onClick={() => handleDeleteProduct(p.id)} className="p-2.5 rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-all">
+                          <Trash2 className="w-4.5 h-4.5" />
+                        </button>
                       </div>
                     </div>
 
-                    {/* 수정 및 삭제 도구 */}
-                    <div className="flex items-center gap-1 pl-4">
-                      <button onClick={() => handleEditProductOpen(p)} className="p-2.5 rounded-xl hover:bg-slate-50 text-slate-400 hover:text-primary transition-all">
-                        <Edit3 className="w-4.5 h-4.5" />
-                      </button>
-                      <button onClick={() => handleDeleteProduct(p.id)} className="p-2.5 rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-all">
-                        <Trash2 className="w-4.5 h-4.5" />
-                      </button>
-                    </div>
+                    {/* 옵션 뱃지 리스트 */}
+                    {p.options && (
+                      <div className="border-t border-slate-50 pt-3 mt-1 flex flex-wrap gap-1.5">
+                        {p.options.split(',').map((opt: string, i: number) => (
+                          <span key={i} className="text-[10px] font-black tracking-wider bg-slate-100 text-slate-600 px-2.5 py-1 rounded-xl uppercase">
+                            {opt.trim()}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
 
@@ -729,11 +807,11 @@ export default function AdminDashboard() {
         </div>
       </main>
 
-      {/* 제품 등록 모달 */}
+      {/* 제품 등록 모달 (이미지 파일 업로드 및 자동 리사이징) */}
       {isProductModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 lg:p-4">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setIsProductModalOpen(false)}></div>
-          <div className="relative w-full max-w-lg bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[90vh]">
+          <div className="relative w-full max-w-lg bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh]">
             <header className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
               <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">순수 제품 등록</h3>
               <button onClick={() => setIsProductModalOpen(false)} className="p-2 bg-white rounded-xl text-slate-400 shadow-sm"><X className="w-6 h-6" /></button>
@@ -741,27 +819,52 @@ export default function AdminDashboard() {
             <form onSubmit={handleProductSubmit} className="p-8 space-y-6 overflow-y-auto pb-12">
                <div className="space-y-2">
                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">제품 이름 *</label>
-                 <input required type="text" value={productFormData.name} onChange={(e) => setProductFormData({...productFormData, name: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none" />
+                 <input required type="text" value={productFormData.name} onChange={(e) => setProductFormData({...productFormData, name: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-primary focus:bg-white transition-all" />
                </div>
+
+               {/* 제품 옵션 */}
+               <div className="space-y-2">
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">제품 옵션 (콤마로 구분)</label>
+                 <input type="text" placeholder="예: 골드, 실버, 로즈골드" value={productFormData.options} onChange={(e) => setProductFormData({...productFormData, options: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-primary focus:bg-white transition-all" />
+               </div>
+
                <div className="space-y-2">
                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">상세 설명</label>
-                 <textarea rows={3} value={productFormData.description} onChange={(e) => setProductFormData({...productFormData, description: e.target.value})} className="w-full p-5 bg-slate-100/50 rounded-2xl font-bold outline-none resize-none" />
+                 <textarea rows={2} value={productFormData.description} onChange={(e) => setProductFormData({...productFormData, description: e.target.value})} className="w-full p-5 bg-slate-100/50 rounded-2xl font-bold outline-none resize-none border border-transparent focus:border-primary focus:bg-white transition-all" />
                </div>
+
+               {/* 제품 이미지 업로드 및 자동 리사이징 */}
+               <div className="space-y-2 bg-slate-50 p-5 rounded-2xl border border-slate-100/80">
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">제품 이미지 업로드 (자동 500x500 압축)</label>
+                 <div className="mt-2 flex items-center gap-4">
+                    <label className="bg-white border border-slate-200 px-4 py-3 rounded-xl font-bold text-xs text-slate-600 hover:bg-slate-50 cursor-pointer flex items-center gap-2 shadow-sm">
+                      <FileText className="w-4 h-4" /> 이미지 파일 선택
+                      <input type="file" accept="image/*" onChange={(e) => handleProductImageChange(e, 'create')} className="hidden" />
+                    </label>
+                    <span className="text-xs font-bold text-slate-400 line-clamp-1 flex-1">
+                      {productFormData.file_name || '선택된 파일이 없습니다.'}
+                    </span>
+                 </div>
+               </div>
+
                <div className="grid grid-cols-2 gap-4">
                  <div className="space-y-2"><label className="text-xs font-black text-slate-400 tracking-widest px-1">영상 URL</label><input type="url" value={productFormData.video_url} onChange={(e)=>setProductFormData({...productFormData, video_url: e.target.value})} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 outline-none text-sm" /></div>
                  <div className="space-y-2"><label className="text-xs font-black text-slate-400 tracking-widest px-1">매뉴얼 URL</label><input type="url" value={productFormData.manual_url} onChange={(e)=>setProductFormData({...productFormData, manual_url: e.target.value})} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 outline-none text-sm" /></div>
                </div>
-               <button type="submit" disabled={submitting} className="w-full h-16 purple-btn text-lg font-black shadow-xl shadow-primary/30 mt-4 disabled:opacity-50">정보 저장</button>
+
+               <button type="submit" disabled={submitting} className="w-full h-16 purple-btn text-lg font-black shadow-xl shadow-primary/30 mt-4 disabled:opacity-50">
+                 {submitting && <Loader2 className="w-5 h-5 animate-spin" />} 정보 저장
+               </button>
             </form>
           </div>
         </div>
       )}
 
-      {/* 제품 수정 모달 */}
+      {/* 제품 정보 수정 모달 */}
       {isEditProductModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 lg:p-4">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setIsEditProductModalOpen(false)}></div>
-          <div className="relative w-full max-w-lg bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[90vh]">
+          <div className="relative w-full max-w-lg bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh]">
             <header className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
               <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">제품 정보 수정</h3>
               <button onClick={() => setIsEditProductModalOpen(false)} className="p-2 bg-white rounded-xl text-slate-400 shadow-sm"><X className="w-6 h-6" /></button>
@@ -771,15 +874,40 @@ export default function AdminDashboard() {
                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">제품 이름 *</label>
                  <input required type="text" value={editProductFormData.name} onChange={(e) => setEditProductFormData({...editProductFormData, name: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-primary focus:bg-white transition-all" />
                </div>
+
+               {/* 제품 옵션 */}
+               <div className="space-y-2">
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">제품 옵션 (콤마로 구분)</label>
+                 <input type="text" placeholder="예: 골드, 실버, 로즈골드" value={editProductFormData.options} onChange={(e) => setEditProductFormData({...editProductFormData, options: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-primary focus:bg-white transition-all" />
+               </div>
+
                <div className="space-y-2">
                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">상세 설명</label>
-                 <textarea rows={3} value={editProductFormData.description} onChange={(e) => setEditProductFormData({...editProductFormData, description: e.target.value})} className="w-full p-5 bg-slate-100/50 rounded-2xl font-bold outline-none resize-none border border-transparent focus:border-primary focus:bg-white transition-all" />
+                 <textarea rows={2} value={editProductFormData.description} onChange={(e) => setEditProductFormData({...editProductFormData, description: e.target.value})} className="w-full p-5 bg-slate-100/50 rounded-2xl font-bold outline-none resize-none border border-transparent focus:border-primary focus:bg-white transition-all" />
                </div>
+
+               {/* 제품 이미지 업로드 및 자동 리사이징 */}
+               <div className="space-y-2 bg-slate-50 p-5 rounded-2xl border border-slate-100/80">
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">제품 이미지 교체 (자동 500x500 압축)</label>
+                 <div className="mt-2 flex items-center gap-4">
+                    <label className="bg-white border border-slate-200 px-4 py-3 rounded-xl font-bold text-xs text-slate-600 hover:bg-slate-50 cursor-pointer flex items-center gap-2 shadow-sm">
+                      <FileText className="w-4 h-4" /> 이미지 파일 선택
+                      <input type="file" accept="image/*" onChange={(e) => handleProductImageChange(e, 'edit')} className="hidden" />
+                    </label>
+                    <span className="text-xs font-bold text-slate-400 line-clamp-1 flex-1">
+                      {editProductFormData.file_name || '파일을 변경하지 않으려면 비워 두세요.'}
+                    </span>
+                 </div>
+               </div>
+
                <div className="grid grid-cols-2 gap-4">
                  <div className="space-y-2"><label className="text-xs font-black text-slate-400 tracking-widest px-1">영상 URL</label><input type="url" value={editProductFormData.video_url} onChange={(e)=>setEditProductFormData({...editProductFormData, video_url: e.target.value})} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 outline-none text-sm" /></div>
                  <div className="space-y-2"><label className="text-xs font-black text-slate-400 tracking-widest px-1">매뉴얼 URL</label><input type="url" value={editProductFormData.manual_url} onChange={(e)=>setEditProductFormData({...editProductFormData, manual_url: e.target.value})} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 outline-none text-sm" /></div>
                </div>
-               <button type="submit" disabled={submitting} className="w-full h-16 purple-btn text-lg font-black shadow-xl shadow-primary/30 mt-4 disabled:opacity-50">수정 완료</button>
+
+               <button type="submit" disabled={submitting} className="w-full h-16 purple-btn text-lg font-black shadow-xl shadow-primary/30 mt-4 disabled:opacity-50">
+                 {submitting && <Loader2 className="w-5 h-5 animate-spin" />} 수정 완료
+               </button>
             </form>
           </div>
         </div>

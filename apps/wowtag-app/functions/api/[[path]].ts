@@ -196,41 +196,94 @@ app.get('/tags/:uid', async (c) => {
 
 // 제품 등록
 app.post('/products', async (c) => {
-  const body = await c.req.json();
-  const { name, description, video_url, manual_url, image_url, tag_uid } = body;
+  try {
+    // products 테이블에 options 컬럼이 없으면 추가 시도 (자동 마이그레이션)
+    try {
+      await c.env.DB.prepare('ALTER TABLE products ADD COLUMN options TEXT').run();
+    } catch (_) {}
 
-  if (!name) return c.json({ error: 'Name is required' }, 400);
+    const body = await c.req.json();
+    const { name, description, video_url, manual_url, image_url, tag_uid, options, image_file_base64, file_name } = body;
 
-  // 1. 제품 생성
-  const productResult = await c.env.DB.prepare(
-    'INSERT INTO products (name, description, video_url, manual_url, image_url) VALUES (?, ?, ?, ?, ?) RETURNING id'
-  ).bind(name, description, video_url, manual_url, image_url).first();
+    if (!name) return c.json({ error: 'Name is required' }, 400);
 
-  const productId = (productResult as any).id;
+    let savedImageUrl = image_url || '/jewelry.png';
 
-  // 2. 태그 UID가 함께 전달된 경우 즉시 매핑 (덮어쓰기 허용)
-  if (tag_uid) {
-    await c.env.DB.prepare(
-      'INSERT OR REPLACE INTO tags (tag_uid, product_id) VALUES (?, ?)'
-    ).bind(tag_uid, productId).run();
+    // 1. 이미지가 Base64로 전달된 경우 R2에 저장
+    if (image_file_base64) {
+      const base64Data = image_file_base64.split(',')[1] || image_file_base64;
+      const binaryString = atob(base64Data);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+
+      const ext = file_name ? file_name.split('.').pop() : 'png';
+      const r2Path = `products/images/${Date.now()}.${ext}`;
+      await c.env.BUCKET.put(r2Path, bytes.buffer, {
+        httpMetadata: { contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}` },
+      });
+      // 이미지 URL을 조회용 경로 또는 API 파일 다운로드 경로로 세팅 (여기선 일단 R2_PUBLIC_DOMAIN 대신 파일 자체 데이터를 추후 가져올 수 있는 endpoint 구현)
+      savedImageUrl = `/api/products/image/${r2Path}`;
+    }
+
+    // 2. 제품 생성
+    const productResult = await c.env.DB.prepare(
+      'INSERT INTO products (name, description, video_url, manual_url, image_url, options) VALUES (?, ?, ?, ?, ?, ?) RETURNING id'
+    ).bind(name, description, video_url, manual_url, savedImageUrl, options).first();
+
+    const productId = (productResult as any).id;
+
+    // 3. 태그 UID가 함께 전달된 경우 즉시 매핑 (덮어쓰기 허용)
+    if (tag_uid) {
+      await c.env.DB.prepare(
+        'INSERT OR REPLACE INTO tags (tag_uid, product_id) VALUES (?, ?)'
+      ).bind(tag_uid, productId).run();
+    }
+
+    return c.json({ success: true, productId }, 201);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
   }
-
-  return c.json({ success: true, productId }, 201);
 });
 
 // 제품 수정 API
 app.put('/products/:id', async (c) => {
   try {
+    try {
+      await c.env.DB.prepare('ALTER TABLE products ADD COLUMN options TEXT').run();
+    } catch (_) {}
+
     const id = c.req.param('id');
-    const { name, description, video_url, manual_url, image_url } = await c.req.json();
+    const { name, description, video_url, manual_url, image_url, options, image_file_base64, file_name } = await c.req.json();
 
     if (!name) return c.json({ error: 'Name is required' }, 400);
 
+    let savedImageUrl = image_url;
+
+    if (image_file_base64) {
+      const base64Data = image_file_base64.split(',')[1] || image_file_base64;
+      const binaryString = atob(base64Data);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+
+      const ext = file_name ? file_name.split('.').pop() : 'png';
+      const r2Path = `products/images/${Date.now()}.${ext}`;
+      await c.env.BUCKET.put(r2Path, bytes.buffer, {
+        httpMetadata: { contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}` },
+      });
+      savedImageUrl = `/api/products/image/${r2Path}`;
+    }
+
     await c.env.DB.prepare(`
       UPDATE products 
-      SET name = ?, description = ?, video_url = ?, manual_url = ?, image_url = ? 
+      SET name = ?, description = ?, video_url = ?, manual_url = ?, image_url = ?, options = ? 
       WHERE id = ?
-    `).bind(name, description, video_url, manual_url, image_url, id).run();
+    `).bind(name, description, video_url, manual_url, savedImageUrl, options, id).run();
 
     return c.json({ success: true }, 200);
   } catch (err: any) {
@@ -246,6 +299,28 @@ app.delete('/products/:id', async (c) => {
     await c.env.DB.prepare('DELETE FROM tags WHERE product_id = ?').bind(id).run();
     await c.env.DB.prepare('DELETE FROM products WHERE id = ?').bind(id).run();
     return c.json({ success: true }, 200);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// 제품 이미지 조회 API
+app.get('/products/image/products/images/:filename', async (c) => {
+  try {
+    const filename = c.req.param('filename');
+    const path = `products/images/${filename}`;
+    const object = await c.env.BUCKET.get(path);
+
+    if (object === null) {
+      return c.json({ error: 'Image not found in R2' }, 404);
+    }
+
+    const headers = new Headers();
+    object.writeHttpMetadata(headers);
+    headers.set('etag', object.httpEtag);
+    headers.set('Content-Type', filename.endsWith('png') ? 'image/png' : 'image/jpeg');
+
+    return new Response(object.body, { headers });
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
   }
