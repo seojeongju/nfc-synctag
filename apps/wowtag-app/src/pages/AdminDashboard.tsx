@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LayoutDashboard, Tag, Package, BarChart3, Plus, Scan, Bell, ArrowUpRight, Loader2, X, Smartphone, PenTool, ChevronRight, Hash, Link as LinkIcon, Award, FileText } from 'lucide-react';
+import { LayoutDashboard, Tag, Package, Plus, Scan, Bell, ArrowUpRight, Loader2, X, Smartphone, PenTool, ChevronRight, Hash, Link as LinkIcon, Award, FileText } from 'lucide-react';
 
 export default function AdminDashboard() {
   const [currentTab, setCurrentTab] = useState<'dashboard' | 'products' | 'nfc' | 'goldbars'>('dashboard');
