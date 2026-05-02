@@ -70,19 +70,10 @@ export default function UserLanding() {
 
         {/* 중앙 제품 카드 뷰 (이미지 기반 디자인 구현) */}
         <div className="w-full max-w-md bg-white rounded-[2.5rem] border border-slate-100/60 shadow-xl overflow-hidden mb-6 relative p-4 flex flex-col">
-          <div className="relative w-full aspect-[4/5] rounded-[2rem] bg-purple-gradient overflow-hidden shadow-sm flex items-center justify-center p-3">
-            {/* 배경 그라데이션 및 원형 광채 효과 */}
-            <div className="absolute inset-0 bg-gradient-to-tr from-purple-900/40 via-transparent to-transparent opacity-60"></div>
-            <div className="absolute -right-16 -bottom-16 w-48 h-48 bg-purple-300 rounded-full opacity-30 blur-3xl"></div>
-            
-            {/* 데모 고급 이미지 (사용자가 제시한 보라색 벨벳 및 주얼리 이미지와 매칭되는 일러스트/아이콘 또는 기존 이미지 활용) */}
-            <div className="w-full h-full flex flex-col items-center justify-center relative z-10 p-6">
-              <div className="w-20 h-20 bg-white/20 backdrop-blur-md rounded-3xl border border-white/30 flex items-center justify-center text-white mb-4 shadow-lg animate-pulse">
-                <Award className="w-10 h-10" />
-              </div>
-              <h3 className="text-lg font-black text-white text-center tracking-tight mb-1">제이에로스 프리미엄</h3>
-              <p className="text-xs font-bold text-purple-100 text-center opacity-80">터치 한 번으로 만나는 정품 확인</p>
-            </div>
+          <div className="relative w-full aspect-[4/5] rounded-[2rem] bg-purple-gradient overflow-hidden shadow-sm flex items-center justify-center p-0">
+            {/* 고화질 럭셔리 주얼리 이미지 */}
+            <img src="/luxury_jewelry.png" alt="Luxury Jewelry" className="w-full h-full object-cover rounded-[2rem] hover:scale-105 transition-all duration-700" />
+            <div className="absolute inset-0 bg-gradient-to-tr from-purple-900/30 via-transparent to-transparent opacity-40"></div>
 
             {/* 하단 글래스모피즘 오버레이 팝업 */}
             <div className="absolute bottom-3 left-3 right-3 bg-white/70 backdrop-blur-xl rounded-[1.8rem] p-6 border border-white/40 shadow-2xl flex flex-col items-center text-center">
