@@ -201,7 +201,7 @@ export default function UserLanding() {
 
           {/* 보증서 파일 다운로드 버튼 */}
           <a 
-            href={`/api/certificates/download/${tagId}`} 
+            href={`/api/certificates/download/${tagId}?token=${goldbar.download_token}`} 
             download
             className="w-full bg-amber-500 hover:bg-amber-600 active:scale-98 text-white font-black h-14 rounded-2xl flex items-center justify-center gap-2 shadow-xl shadow-amber-500/20 no-underline transition-all"
           >

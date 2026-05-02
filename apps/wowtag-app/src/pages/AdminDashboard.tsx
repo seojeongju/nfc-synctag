@@ -95,6 +95,8 @@ export default function AdminDashboard() {
       await ndef.scan();
       
       ndef.onreading = async ({ serialNumber }: { serialNumber: string }) => {
+        if ('vibrate' in navigator) navigator.vibrate(200);
+
         if (target === 'nfc') {
           const res = await fetch(`/api/tags/${serialNumber}`);
           const existingData = await res.json();
@@ -123,6 +125,7 @@ export default function AdminDashboard() {
       const ndef = new (window as any).NDEFReader();
       const url = `${window.location.origin}/t/${nfcFormData.tag_uid}`;
       await ndef.write({ records: [{ recordType: "url", data: url }] });
+      if ('vibrate' in navigator) navigator.vibrate([100, 50, 100]);
       alert('태그 쓰기 성공!');
     } catch (err) {
       alert('쓰기 실패');

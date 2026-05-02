@@ -118,7 +118,14 @@ app.get('/goldbars/t/:tagId', async (c) => {
         .run()
     );
 
-    return c.json(goldbar);
+    // 10분간 유효한 단기 다운로드 토큰 발행
+    const expiry = Date.now() + 10 * 60 * 1000;
+    const downloadToken = btoa(`${tagId}:${expiry}`);
+
+    return c.json({
+      ...goldbar,
+      download_token: downloadToken
+    });
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
   }
@@ -128,6 +135,22 @@ app.get('/goldbars/t/:tagId', async (c) => {
 app.get('/certificates/download/:tagId', async (c) => {
   try {
     const tagId = c.req.param('tagId');
+    const token = c.req.query('token');
+
+    if (!token) {
+      return c.json({ error: '유효하지 않은 요청입니다. (토큰 누락)' }, 400);
+    }
+
+    try {
+      const decoded = atob(token);
+      const [tokenTagId, expiryStr] = decoded.split(':');
+      if (tokenTagId !== tagId || Date.now() > parseInt(expiryStr)) {
+        return c.json({ error: '다운로드 링크가 만료되었거나 유효하지 않습니다.' }, 403);
+      }
+    } catch (e) {
+      return c.json({ error: '올바르지 않은 접근입니다.' }, 400);
+    }
+
     const query = 'SELECT cert_file_path FROM certificates WHERE tag_uid = ?';
     const cert = await c.env.DB.prepare(query).bind(tagId).first();
 
