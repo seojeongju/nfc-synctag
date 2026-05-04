@@ -390,7 +390,8 @@ app.get('/products', async (c) => {
       SELECT
         p.*,
         c.tag_uid AS cert_tag_uid,
-        g.serial_number AS cert_serial_number
+        g.serial_number AS cert_serial_number,
+        g.display_name AS cert_display_name
       FROM products p
       LEFT JOIN certificates c ON p.certificate_id = c.id
       LEFT JOIN goldbars g ON c.goldbar_id = g.id

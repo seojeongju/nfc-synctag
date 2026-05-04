@@ -42,8 +42,9 @@ function isPendingCertTagUid(uid: string) {
   return uid.startsWith('__PENDING_GB_') && uid.endsWith('__');
 }
 
+/** DB placeholder(`__PENDING_GB_*`)는 화면에 기술 문자열로 노출하지 않음 */
 function formatCertTagForUi(uid: string) {
-  return isPendingCertTagUid(uid) ? 'NFC 미연결' : uid;
+  return isPendingCertTagUid(uid) ? 'NFC 태그 미등록' : uid;
 }
 
 /** 모달·overflow 안에서 네이티브 select 옵션이 잘리는 문제 → viewport 고정 + 스크롤 목록 */
@@ -1565,12 +1566,37 @@ export default function AdminDashboard() {
                           ) : null}
                         </div>
                         <p className="text-xs text-slate-400 font-bold line-clamp-2 mt-0.5 break-words">{p.description || '상세 설명 없음'}</p>
-                        {(p.cert_serial_number || p.cert_tag_uid) && (
-                          <p className="text-[10px] font-bold text-amber-700 mt-1.5 flex items-center gap-1.5 min-w-0">
-                            <Award className="w-3.5 h-3.5 shrink-0" />
-                            <span className="truncate">
-                              인증서: {p.cert_serial_number || '?'}
-                              {p.cert_tag_uid ? <span className="font-mono text-amber-800/90"> · {p.cert_tag_uid}</span> : null}
+                        {(p.cert_serial_number || p.cert_tag_uid || p.cert_display_name) && (
+                          <p className="text-[10px] font-bold text-amber-700 mt-1.5 flex items-start gap-1.5 min-w-0">
+                            <Award className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                            <span className="min-w-0 leading-snug">
+                              <span className="text-amber-800/90">인증서 </span>
+                              {p.cert_display_name ? (
+                                <>
+                                  <span className="font-black text-amber-900">{p.cert_display_name}</span>
+                                  {p.cert_serial_number ? (
+                                    <span className="text-amber-700/85 font-mono text-[9px] font-bold ml-1">
+                                      ({p.cert_serial_number})
+                                    </span>
+                                  ) : null}
+                                </>
+                              ) : (
+                                <span className="font-mono font-black text-amber-900">
+                                  {p.cert_serial_number || '?'}
+                                </span>
+                              )}
+                              {p.cert_tag_uid ? (
+                                <span
+                                  className={
+                                    isPendingCertTagUid(String(p.cert_tag_uid))
+                                      ? 'text-amber-800/90 font-sans'
+                                      : 'font-mono text-amber-800/85'
+                                  }
+                                >
+                                  {' '}
+                                  · {formatCertTagForUi(String(p.cert_tag_uid))}
+                                </span>
+                              ) : null}
                             </span>
                           </p>
                         )}
@@ -1967,15 +1993,23 @@ export default function AdminDashboard() {
                             className="flex-1 min-w-0 text-left rounded-xl bg-white/80 hover:bg-amber-50/80 border border-slate-100 hover:border-amber-200/80 px-3 py-2.5 transition-all group/uid"
                           >
                             <span className="text-slate-400 font-bold block text-[11px] flex items-center gap-1.5 justify-between">
-                              <span>인증서 연결 NFC UID</span>
+                              <span>연결된 NFC 태그</span>
                               <ChevronDown
                                 className={`w-4 h-4 shrink-0 text-amber-600 transition-transform ${expandedGoldbarId === g.id ? 'rotate-180' : ''}`}
                               />
                             </span>
-                            <span className="font-mono font-black text-amber-700 text-xs sm:text-sm break-all block mt-1">
+                            <span
+                              className={`font-black text-amber-700 text-xs sm:text-sm break-words block mt-1 ${
+                                g.tag_uid && !isPendingCertTagUid(String(g.tag_uid)) ? 'font-mono' : 'font-sans'
+                              }`}
+                            >
                               {(g.cert_count ?? 0) > 0
-                                ? `총 ${g.cert_count}건 · 최근 ${g.tag_uid}`
-                                : '미매핑'}
+                                ? `총 ${g.cert_count}건 · 최근 ${
+                                    g.tag_uid != null && String(g.tag_uid).length > 0
+                                      ? formatCertTagForUi(String(g.tag_uid))
+                                      : '—'
+                                  }`
+                                : '연결된 태그 없음'}
                             </span>
                           </button>
                           <span className="text-xs bg-amber-50 text-amber-700 px-2.5 py-1 rounded-xl font-black shrink-0 self-start sm:self-center">{g.purity}</span>
@@ -1989,7 +2023,7 @@ export default function AdminDashboard() {
                             ) : (
                               <>
                                 {(goldbarTagUidsMap[g.id]?.length ?? 0) === 0 ? (
-                                  <p className="text-xs font-bold text-slate-500">인증서에 연결된 NFC UID가 없습니다.</p>
+                                  <p className="text-xs font-bold text-slate-500">등록된 NFC 태그가 없습니다.</p>
                                 ) : (
                                   <ul className="space-y-1.5">
                                     {(goldbarTagUidsMap[g.id] ?? [])
@@ -2000,9 +2034,22 @@ export default function AdminDashboard() {
                                       .map((uid) => (
                                         <li
                                           key={uid}
-                                          className="font-mono text-xs font-black text-slate-800 bg-white border border-slate-100 rounded-lg px-2.5 py-2 break-all"
+                                          className={`text-xs font-black bg-white border border-slate-100 rounded-lg px-2.5 py-2 break-words ${
+                                            isPendingCertTagUid(uid)
+                                              ? 'font-sans text-amber-900 border-amber-100'
+                                              : 'font-mono text-slate-800'
+                                          }`}
                                         >
-                                          {uid}
+                                          {isPendingCertTagUid(uid) ? (
+                                            <span className="leading-relaxed">
+                                              {formatCertTagForUi(uid)}
+                                              <span className="mt-1 block text-[11px] font-bold text-slate-500 font-sans">
+                                                실물 태그를 스캔해 등록하면 고유 번호가 표시됩니다.
+                                              </span>
+                                            </span>
+                                          ) : (
+                                            uid
+                                          )}
                                         </li>
                                       ))}
                                   </ul>
