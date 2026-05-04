@@ -517,8 +517,8 @@ export default function UserLanding() {
                   <BookOpen className="w-5 h-5" />
                 </div>
                 <div>
-                  <h5 className="font-black text-slate-800 text-sm group-hover:text-emerald-700 transition-colors">추억 전자 앨범</h5>
-                  <p className="text-[10px] font-bold text-slate-400 mt-0.5 leading-tight">추억 앨범 감상 및 기록</p>
+                  <h5 className="font-black text-slate-800 text-sm group-hover:text-emerald-700 transition-colors">전자앨범</h5>
+                  <p className="text-[10px] font-bold text-slate-400 mt-0.5 leading-tight">소중한 추억 감상 및 기록</p>
                 </div>
               </div>
             </div>
@@ -812,8 +812,8 @@ export default function UserLanding() {
             <div className="relative w-full max-w-md bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh] overflow-hidden">
               <header className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/40">
                 <div>
-                  <h4 className="text-lg font-black text-slate-800 tracking-tight">🔑 전자 앨범 접속 로그인</h4>
-                  <p className="text-[10px] font-bold text-slate-400 mt-0.5">추억 전자 앨범을 열람하려면 로그인해 주세요</p>
+                  <h4 className="text-lg font-black text-slate-800 tracking-tight">🔑 전자앨범 접속 로그인</h4>
+                  <p className="text-[10px] font-bold text-slate-400 mt-0.5">전자앨범을 열람하려면 로그인해 주세요</p>
                 </div>
                 <button onClick={() => setIsLoginModalOpen(false)} className="p-2 bg-white rounded-xl text-slate-400 hover:text-rose-600 transition-colors shadow-sm">
                   <X className="w-5 h-5" />
@@ -824,7 +824,7 @@ export default function UserLanding() {
                 <div className="bg-amber-50/50 border border-amber-100 rounded-2xl p-4">
                   <h5 className="font-black text-amber-800 text-xs">💡 안내 사항</h5>
                   <p className="text-[10px] font-bold text-amber-600 mt-0.5">
-                    로그인하시면 기기를 변경하셔도 소중한 내 정품 목록과 전자 앨범 데이터를 안전하게 영구 보존하여 확인할 수 있습니다.
+                    로그인하시면 기기를 변경하셔도 소중한 내 정품 목록과 전자앨범 데이터를 안전하게 영구 보존하여 확인할 수 있습니다.
                   </p>
                 </div>
 
@@ -871,7 +871,7 @@ export default function UserLanding() {
             <div className="relative w-full max-w-md bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh] overflow-hidden">
               <header className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/40">
                 <div>
-                  <h4 className="text-lg font-black text-slate-800 tracking-tight">📸 추억 전자 앨범</h4>
+                  <h4 className="text-lg font-black text-slate-800 tracking-tight">📸 전자앨범</h4>
                   <p className="text-[10px] font-bold text-slate-400 mt-0.5">제품과 함께한 소중한 기록을 담아보세요</p>
                 </div>
                 <button onClick={() => setIsAlbumModalOpen(false)} className="p-2 bg-white rounded-xl text-slate-400 hover:text-rose-600 transition-colors shadow-sm">
