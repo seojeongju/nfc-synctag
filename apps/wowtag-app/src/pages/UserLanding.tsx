@@ -412,6 +412,42 @@ export default function UserLanding() {
           </div>
         )}
 
+        {/* 간편 로그인 및 회원정보 영역 */}
+        <div className="w-full max-w-md bg-white p-4 rounded-2xl border border-slate-100/80 flex items-center justify-between mb-3 shadow-sm">
+          {currentUser ? (
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-amber-600 font-black text-sm">
+                  {currentUser.name ? currentUser.name.substring(0, 1) : 'G'}
+                </div>
+                <div>
+                  <h5 className="text-xs font-black text-slate-800">{currentUser.name || '간편 가입 회원'} 님</h5>
+                  <p className="text-[10px] font-bold text-slate-400 mt-0.5">{currentUser.email}</p>
+                </div>
+              </div>
+              <button 
+                onClick={handleUserLogout}
+                className="px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-400 hover:text-slate-600 font-black text-[10px] rounded-xl transition-all flex items-center gap-1 cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" /> 로그아웃
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between w-full">
+              <div>
+                <h5 className="text-xs font-black text-slate-800">간편 로그인을 진행하세요</h5>
+                <p className="text-[10px] font-bold text-slate-400 mt-0.5">자산 목록과 추억 앨범을 안전하게 보존합니다.</p>
+              </div>
+              <button 
+                onClick={() => setIsLoginModalOpen(true)}
+                className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-[11px] rounded-xl hover:from-amber-600 hover:to-orange-600 transition-all cursor-pointer shadow-md shadow-amber-500/10"
+              >
+                로그인 / 가입
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* 상단 탭 전환 바 */}
         <div className="w-full max-w-md bg-white p-1.5 rounded-2xl border border-slate-100/80 flex gap-1 mb-5 shadow-sm">
           <button 
