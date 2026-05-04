@@ -55,8 +55,13 @@ export default function AdminDashboard() {
   // 폼 상태 (골드바 & 보증서 등록)
   const [goldbarFormData, setGoldbarFormData] = useState({
     serial_number: '',
+    material: '999.9',
+    purity: '24K',
     weight: '',
-    purity: '99.99%',
+    width_mm: '',
+    height_mm: '',
+    price: '',
+    memo: '',
     minted_at: '',
     tag_uid: '',
     cert_file_base64: '',
@@ -69,8 +74,13 @@ export default function AdminDashboard() {
   const [editGoldbarData, setEditGoldbarData] = useState({
     id: '',
     serial_number: '',
+    material: '999.9',
+    purity: '24K',
     weight: '',
-    purity: '99.99%',
+    width_mm: '',
+    height_mm: '',
+    price: '',
+    memo: '',
     minted_at: '',
     tag_uid: '',
     cert_file_base64: '',
@@ -439,8 +449,13 @@ export default function AdminDashboard() {
         setIsGoldbarModalOpen(false);
         setGoldbarFormData({
           serial_number: '',
+          material: '999.9',
+          purity: '24K',
           weight: '',
-          purity: '99.99%',
+          width_mm: '',
+          height_mm: '',
+          price: '',
+          memo: '',
           minted_at: '',
           tag_uid: '',
           cert_file_base64: '',
@@ -467,8 +482,13 @@ export default function AdminDashboard() {
     setEditGoldbarData({
       id: g.id,
       serial_number: g.serial_number,
+      material: g.material || '999.9',
+      purity: g.purity || '24K',
       weight: g.weight,
-      purity: g.purity,
+      width_mm: g.width_mm || '',
+      height_mm: g.height_mm || '',
+      price: g.price || '',
+      memo: g.memo || '',
       minted_at: g.minted_at || '',
       tag_uid: g.tag_uid || '',
       cert_file_base64: '',
@@ -1350,63 +1370,68 @@ export default function AdminDashboard() {
                </div>
                <button onClick={() => setIsGoldbarModalOpen(false)} className="p-2 bg-white rounded-xl text-slate-400 shadow-sm"><X className="w-6 h-6" /></button>
             </header>
-            <form onSubmit={handleGoldbarSubmit} className="p-8 space-y-6 overflow-y-auto pb-12">
-               {/* 일련번호 */}
-               <div className="space-y-2">
-                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">일련번호 *</label>
-                 <input required type="text" placeholder="예: GB2026-0001" value={goldbarFormData.serial_number} onChange={(e) => setGoldbarFormData({...goldbarFormData, serial_number: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent hover:border-amber-200/50 focus:border-amber-400/50 transition-all focus:bg-white" />
-               </div>
+            <form onSubmit={handleGoldbarSubmit} className="p-8 space-y-4 overflow-y-auto pb-12">
+                {/* 품명 */}
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">품명 *</label>
+                  <input required type="text" placeholder="예: 골드바3.75g" value={goldbarFormData.serial_number} onChange={(e) => setGoldbarFormData({...goldbarFormData, serial_number: e.target.value})} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent hover:border-amber-200/50 focus:border-amber-400/50 transition-all focus:bg-white" />
+                </div>
 
-               {/* 중량 및 순도 */}
-               <div className="grid grid-cols-2 gap-4">
-                 <div className="space-y-2">
-                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">중량 *</label>
-                   <input required type="text" placeholder="예: 10g" value={goldbarFormData.weight} onChange={(e) => setGoldbarFormData({...goldbarFormData, weight: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all" />
-                 </div>
-                 <div className="space-y-2">
-                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">순도</label>
-                   <input required type="text" value={goldbarFormData.purity} onChange={(e) => setGoldbarFormData({...goldbarFormData, purity: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all" />
-                 </div>
-               </div>
-
-               {/* 제조일자 */}
-               <div className="space-y-2">
-                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">제조일자 (선택)</label>
-                 <input type="date" value={goldbarFormData.minted_at} onChange={(e) => setGoldbarFormData({...goldbarFormData, minted_at: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all" />
-               </div>
-
-               {/* NFC 태그 UID */}
-               <div className="space-y-2">
-                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">연결할 NFC UID (선택)</label>
-                 <div className="flex gap-4">
-                    <div className="flex-1 h-14 bg-slate-100 rounded-2xl flex items-center px-6 font-mono font-black text-amber-700 shadow-inner">
-                      {goldbarFormData.tag_uid || 'UID 대기 중...'}
-                    </div>
-                    <button type="button" onClick={() => handleNFCScan('goldbar')} className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${nfcScanning ? 'bg-amber-100 text-amber-600 animate-pulse' : 'bg-white border-2 border-slate-100 text-slate-400 hover:text-amber-500 hover:border-amber-500 shadow-sm'}`}>
-                      {nfcScanning ? <Loader2 className="w-6 h-6 animate-spin" /> : <Smartphone className="w-6 h-6" />}
-                    </button>
-                 </div>
-               </div>
-
-               {/* 보증서 파일 첨부 */}
-               <div className="space-y-2 bg-slate-50 p-5 rounded-2xl border border-slate-100/80">
-                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">정품인증서 파일 첨부 (PDF/이미지)</label>
-                 <div className="mt-2 flex items-center gap-4">
-                    <label className="bg-white border border-slate-200 px-4 py-3 rounded-xl font-bold text-xs text-slate-600 hover:bg-slate-50 cursor-pointer flex items-center gap-2 shadow-sm">
-                      <FileText className="w-4 h-4" /> 파일 선택
-                      <input type="file" accept="application/pdf,image/*" onChange={(e) => handleFileChange(e, 'create')} className="hidden" />
-                    </label>
-                    <span className="text-xs font-bold text-slate-400 line-clamp-1 flex-1">
-                      {goldbarFormData.file_name || '선택된 파일이 없습니다.'}
-                     </span>
+                {/* 소재 및 금 함량 */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">소재</label>
+                    <input required type="text" placeholder="예: 999.9" value={goldbarFormData.material} onChange={(e) => setGoldbarFormData({...goldbarFormData, material: e.target.value})} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all" />
                   </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">금 함량</label>
+                    <select required value={goldbarFormData.purity} onChange={(e) => setGoldbarFormData({...goldbarFormData, purity: e.target.value})} className="w-full h-12 bg-slate-100/50 rounded-xl px-3 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all cursor-pointer">
+                      <option value="24K">24K</option>
+                      <option value="18K">18K</option>
+                      <option value="14K">14K</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* 중량 */}
+                <div className="space-y-2 relative">
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">중량(g) *</label>
+                  <input required type="text" placeholder="예: 3.75" value={goldbarFormData.weight} onChange={(e) => setGoldbarFormData({...goldbarFormData, weight: e.target.value})} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-12 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all" />
+                  <span className="absolute right-4 bottom-3 font-bold text-slate-400 select-none">g</span>
+                </div>
+
+                {/* 가로 세로 길이 */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2 relative">
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">가로 길이(mm)</label>
+                    <input type="text" placeholder="예: 17" value={goldbarFormData.width_mm} onChange={(e) => setGoldbarFormData({...goldbarFormData, width_mm: e.target.value})} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-14 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all" />
+                    <span className="absolute right-4 bottom-3 font-bold text-slate-400 select-none">mm</span>
+                  </div>
+                  <div className="space-y-2 relative">
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">세로 길이(mm)</label>
+                    <input type="text" placeholder="예: 25" value={goldbarFormData.height_mm} onChange={(e) => setGoldbarFormData({...goldbarFormData, height_mm: e.target.value})} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-14 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all" />
+                    <span className="absolute right-4 bottom-3 font-bold text-slate-400 select-none">mm</span>
+                  </div>
+                </div>
+
+                {/* 가격 */}
+                <div className="space-y-2 relative">
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">가격 *</label>
+                  <input required type="number" placeholder="예: 850000" value={goldbarFormData.price} onChange={(e) => setGoldbarFormData({...goldbarFormData, price: e.target.value})} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-12 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all" />
+                  <span className="absolute right-4 bottom-3 font-bold text-slate-400 select-none">원</span>
+                </div>
+
+                {/* 메모 */}
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">메모</label>
+                  <input type="text" placeholder="메모를 입력해 주세요" value={goldbarFormData.memo} onChange={(e) => setGoldbarFormData({...goldbarFormData, memo: e.target.value})} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all" />
                 </div>
 
                 {/* 출고 상태 및 보증서 URL */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">상태</label>
-                    <select value={goldbarFormData.status} onChange={(e) => setGoldbarFormData({...goldbarFormData, status: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-4 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all cursor-pointer">
+                    <select value={goldbarFormData.status} onChange={(e) => setGoldbarFormData({...goldbarFormData, status: e.target.value})} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all cursor-pointer">
                       <option value="CATALOG">카탈로그 생성</option>
                       <option value="TAGGED">태그 등록완료</option>
                       <option value="SHIPPED">출고/정품인증</option>
