@@ -14,6 +14,7 @@ export default function UserLanding() {
   const [allProducts, setAllProducts] = useState<any[]>([]);
   const [myGoldbars, setMyGoldbars] = useState<any[]>([]);
   const [scanningToWallet, setScanningToWallet] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   // 상세 모달 상태
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
@@ -169,6 +170,29 @@ export default function UserLanding() {
     setCurrentUser(null);
     localStorage.removeItem('wowtag_current_user');
     alert('로그아웃 되었습니다.');
+  };
+
+  // PWA 설치 이벤트 캡처
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (!deferredPrompt) {
+      alert('이미 설치되어 있거나 현재 브라우저가 앱 설치를 지원하지 않습니다.\n안드로이드 크롬 또는 삼성 인터넷 등을 이용해 주시기 바랍니다.\n\n해결 방법:\n1. 브라우저 우측 상단 메뉴(점 3개)를 누릅니다.\n2. [홈 화면에 추가] 또는 [앱 설치] 버튼을 눌러 설치해 주세요.');
+      return;
+    }
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
   };
 
   // 해시 기반 탭 네비게이션 구현 (모바일 뒤로가기 대응)
@@ -367,6 +391,26 @@ export default function UserLanding() {
             </Link>
           )}
         </header>
+
+        {/* PWA 설치 유도 배너 */}
+        {deferredPrompt && (
+          <div className="w-full max-w-md bg-gradient-to-r from-amber-50 to-orange-50/50 border border-amber-200/50 rounded-2xl p-4 mb-4 flex items-center justify-between shadow-sm animate-in fade-in duration-300">
+            <div>
+              <h5 className="font-black text-slate-800 text-xs flex items-center gap-1.5">
+                <span>📱</span> Gold SyncTag 전용 앱 설치
+              </h5>
+              <p className="text-[10px] font-bold text-slate-500 mt-0.5">
+                앱으로 설치하여 더욱 편리하게 정품인증을 이용해 보세요.
+              </p>
+            </div>
+            <button
+              onClick={handleInstallApp}
+              className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-[11px] rounded-xl hover:from-amber-600 hover:to-orange-600 transition-all cursor-pointer shadow-md shadow-amber-500/10 whitespace-nowrap"
+            >
+              앱 설치하기
+            </button>
+          </div>
+        )}
 
         {/* 상단 탭 전환 바 */}
         <div className="w-full max-w-md bg-white p-1.5 rounded-2xl border border-slate-100/80 flex gap-1 mb-5 shadow-sm">

@@ -1,6 +1,6 @@
 {
-  "short_name": "WowTag",
-  "name": "WowTag - Integrated App",
+  "short_name": "Gold SyncTag",
+  "name": "Gold SyncTag - 프리미엄 정품인증",
   "icons": [
     {
       "src": "/icon-192.png",
@@ -14,8 +14,8 @@
     }
   ],
   "start_url": "/",
-  "background_color": "#0f172a",
-  "theme_color": "#38bdf8",
+  "background_color": "#ffffff",
+  "theme_color": "#f59e0b",
   "display": "standalone",
   "orientation": "portrait"
 }
