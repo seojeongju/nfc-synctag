@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Tag, Package, Plus, Bell, ArrowUpRight, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Link2Off, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut, Eye, ChevronDown, ChevronUp } from 'lucide-react';
+import { LayoutDashboard, Tag, Package, Plus, Bell, ArrowUpRight, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Link2Off, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut, Eye, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 import { ImeTextInput } from '../components/ImeTextInput';
 
 const ADMIN_TAB_IDS = ['dashboard', 'products', 'nfc', 'goldbars', 'userGoldbars'] as const;
@@ -18,6 +18,17 @@ function formatProductGoldSummary(weight: string, price: string) {
       ? `${Math.round(pr / w).toLocaleString('ko-KR')}원`
       : '0원';
   return { totalStr, perG };
+}
+
+/** 골드바 카탈로그 일련번호 자동 생성 (GB + 연도 + 랜덤 6자리 16진) */
+function generateGoldbarSerialNumber(): string {
+  const y = new Date().getFullYear();
+  const bytes = new Uint8Array(3);
+  crypto.getRandomValues(bytes);
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0'))
+    .join('')
+    .toUpperCase();
+  return `GB${y}-${hex}`;
 }
 
 type CertCatalogRow = { id: number; tag_uid: string; serial_number: string };
@@ -253,6 +264,7 @@ export default function AdminDashboard() {
   // 폼 상태 (골드바 & 보증서 등록)
   const [goldbarFormData, setGoldbarFormData] = useState({
     serial_number: '',
+    display_name: '',
     material: '999.9',
     purity: '24K',
     weight: '',
@@ -272,6 +284,7 @@ export default function AdminDashboard() {
   const [editGoldbarData, setEditGoldbarData] = useState({
     id: '',
     serial_number: '',
+    display_name: '',
     material: '999.9',
     purity: '24K',
     weight: '',
@@ -991,6 +1004,7 @@ export default function AdminDashboard() {
         setIsGoldbarModalOpen(false);
         setGoldbarFormData({
           serial_number: '',
+          display_name: '',
           material: '999.9',
           purity: '24K',
           weight: '',
@@ -1024,6 +1038,7 @@ export default function AdminDashboard() {
     setEditGoldbarData({
       id: g.id,
       serial_number: g.serial_number,
+      display_name: g.display_name || '',
       material: g.material || '999.9',
       purity: g.purity || '24K',
       weight: g.weight,
@@ -1847,7 +1862,16 @@ export default function AdminDashboard() {
                     <div className="flex gap-2 sm:gap-3 w-full min-w-0 items-start">
                       <div className="shrink-0 w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-500"><Award className="w-5 h-5 sm:w-6 sm:h-6" /></div>
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-black text-slate-800 text-base sm:text-lg break-words line-clamp-2">일련번호: {g.serial_number}</h4>
+                        <h4 className="font-black text-slate-800 text-base sm:text-lg break-words line-clamp-3">
+                          {g.display_name ? (
+                            <>
+                              <span className="block line-clamp-2">{g.display_name}</span>
+                              <span className="block text-xs font-mono font-bold text-slate-500 mt-1">{g.serial_number}</span>
+                            </>
+                          ) : (
+                            <>일련번호: {g.serial_number}</>
+                          )}
+                        </h4>
                         <p className="text-xs font-bold text-slate-400 mt-0.5">등록일: {new Date(g.created_at).toLocaleDateString()}</p>
                       </div>
                       <div className="shrink-0 flex flex-col sm:flex-row items-end gap-0.5">
@@ -2671,17 +2695,48 @@ export default function AdminDashboard() {
               onSubmit={handleGoldbarSubmit}
               className="p-8 space-y-4 overflow-y-auto overflow-x-hidden overscroll-y-contain pb-[max(7rem,calc(5rem+env(safe-area-inset-bottom)))] sm:pb-8 lg:pb-12"
             >
-                {/* 품명 */}
+                {/* 일련번호 · 품명 */}
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">품명 *</label>
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">일련번호 *</label>
+                  <p className="text-[11px] font-bold text-slate-500 pl-1 leading-snug">
+                    카탈로그 고유 번호입니다. 자동 생성하거나 직접 입력할 수 있습니다.
+                  </p>
+                  <div className="flex gap-2 items-stretch">
+                    <ImeTextInput
+                      required
+                      type="text"
+                      placeholder="예: GB2026-A1B2C3"
+                      autoComplete="off"
+                      scrollIntoViewOnFocus
+                      value={goldbarFormData.serial_number}
+                      onChange={(v) => setGoldbarFormData({ ...goldbarFormData, serial_number: v })}
+                      className="flex-1 min-w-0 h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent hover:border-amber-200/50 focus:border-amber-400/50 transition-all focus:bg-white font-mono text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setGoldbarFormData((prev) => ({
+                          ...prev,
+                          serial_number: generateGoldbarSerialNumber(),
+                        }))
+                      }
+                      className="shrink-0 px-3 h-12 rounded-xl border border-amber-200 bg-white text-amber-800 font-black text-xs flex flex-col items-center justify-center gap-0.5 hover:bg-amber-50 transition-all shadow-sm"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      자동
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">품명 (선택)</label>
                   <ImeTextInput
-                    required
                     type="text"
                     placeholder="예: 골드바3.75g"
                     autoComplete="off"
                     scrollIntoViewOnFocus
-                    value={goldbarFormData.serial_number}
-                    onChange={(v) => setGoldbarFormData({ ...goldbarFormData, serial_number: v })}
+                    value={goldbarFormData.display_name}
+                    onChange={(v) => setGoldbarFormData({ ...goldbarFormData, display_name: v })}
                     className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent hover:border-amber-200/50 focus:border-amber-400/50 transition-all focus:bg-white"
                   />
                 </div>
@@ -2835,16 +2890,45 @@ export default function AdminDashboard() {
               onSubmit={handleEditSubmit}
               className="p-8 space-y-6 overflow-y-auto overflow-x-hidden overscroll-y-contain pb-[max(7rem,calc(5rem+env(safe-area-inset-bottom)))] sm:pb-8 lg:pb-12"
             >
-               {/* 일련번호 */}
+               {/* 일련번호 · 품명 */}
                <div className="space-y-2">
                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">일련번호 *</label>
+                 <p className="text-[11px] font-bold text-slate-500 pl-1">자동 생성 또는 직접 수정할 수 있습니다.</p>
+                 <div className="flex gap-2 items-stretch">
+                   <ImeTextInput
+                     required
+                     type="text"
+                     autoComplete="off"
+                     scrollIntoViewOnFocus
+                     value={editGoldbarData.serial_number}
+                     onChange={(v) => setEditGoldbarData({ ...editGoldbarData, serial_number: v })}
+                     className="flex-1 min-w-0 h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all font-mono text-sm"
+                   />
+                   <button
+                     type="button"
+                     onClick={() =>
+                       setEditGoldbarData((prev) => ({
+                         ...prev,
+                         serial_number: generateGoldbarSerialNumber(),
+                       }))
+                     }
+                     className="shrink-0 px-3 h-14 rounded-2xl border border-amber-200 bg-white text-amber-800 font-black text-xs flex flex-col items-center justify-center gap-0.5 hover:bg-amber-50 transition-all shadow-sm"
+                   >
+                     <RefreshCw className="w-4 h-4" />
+                     자동
+                   </button>
+                 </div>
+               </div>
+
+               <div className="space-y-2">
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">품명 (선택)</label>
                  <ImeTextInput
-                   required
                    type="text"
+                   placeholder="예: 골드바3.75g"
                    autoComplete="off"
                    scrollIntoViewOnFocus
-                   value={editGoldbarData.serial_number}
-                   onChange={(v) => setEditGoldbarData({ ...editGoldbarData, serial_number: v })}
+                   value={editGoldbarData.display_name}
+                   onChange={(v) => setEditGoldbarData({ ...editGoldbarData, display_name: v })}
                    className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all"
                  />
                </div>

@@ -107,7 +107,19 @@ app.get('/goldbars/:id/tag-uids', async (c) => {
 // 골드바 및 보증서 등록
 app.post('/goldbars', async (c) => {
   try {
-    const { serial_number, weight, purity, minted_at, tag_uid, cert_file_base64, file_name, status, cert_url } = await c.req.json();
+    const body = await c.req.json();
+    const {
+      serial_number,
+      weight,
+      purity,
+      minted_at,
+      tag_uid,
+      cert_file_base64,
+      file_name,
+      status,
+      cert_url,
+      display_name,
+    } = body;
 
     if (!serial_number || !weight) {
       return c.json({ error: 'Serial number and weight are required' }, 400);
@@ -120,12 +132,25 @@ app.post('/goldbars', async (c) => {
     try {
       await c.env.DB.prepare('ALTER TABLE goldbars ADD COLUMN cert_url TEXT').run();
     } catch (_) {}
+    try {
+      await c.env.DB.prepare('ALTER TABLE goldbars ADD COLUMN display_name TEXT').run();
+    } catch (_) {}
 
     // 1. 골드바 정보 저장
     const insertGoldbar = await c.env.DB.prepare(`
-      INSERT OR REPLACE INTO goldbars (serial_number, weight, purity, minted_at, status, cert_url) 
-      VALUES (?, ?, ?, ?, ?, ?) RETURNING id
-    `).bind(serial_number, weight, purity || '99.99%', minted_at, status || 'CATALOG', cert_url || '').first();
+      INSERT OR REPLACE INTO goldbars (serial_number, weight, purity, minted_at, status, cert_url, display_name)
+      VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id
+    `)
+      .bind(
+        serial_number,
+        weight,
+        purity || '99.99%',
+        minted_at ?? '',
+        status || 'CATALOG',
+        cert_url || '',
+        typeof display_name === 'string' ? display_name : ''
+      )
+      .first();
 
     const goldbarId = (insertGoldbar as any).id;
 
@@ -980,7 +1005,19 @@ app.get('/t/:tagId', async (c) => {
 app.put('/goldbars/:id', async (c) => {
   try {
     const id = c.req.param('id');
-    const { serial_number, weight, purity, minted_at, tag_uid, cert_file_base64, file_name, status, cert_url } = await c.req.json();
+    const body = await c.req.json();
+    const {
+      serial_number,
+      weight,
+      purity,
+      minted_at,
+      tag_uid,
+      cert_file_base64,
+      file_name,
+      status,
+      cert_url,
+      display_name,
+    } = body;
 
     if (!serial_number || !weight) {
       return c.json({ error: 'Serial number and weight are required' }, 400);
@@ -993,13 +1030,27 @@ app.put('/goldbars/:id', async (c) => {
     try {
       await c.env.DB.prepare('ALTER TABLE goldbars ADD COLUMN cert_url TEXT').run();
     } catch (_) {}
+    try {
+      await c.env.DB.prepare('ALTER TABLE goldbars ADD COLUMN display_name TEXT').run();
+    } catch (_) {}
 
     // 1. 골드바 정보 갱신
     await c.env.DB.prepare(`
       UPDATE goldbars 
-      SET serial_number = ?, weight = ?, purity = ?, minted_at = ?, status = ?, cert_url = ? 
+      SET serial_number = ?, weight = ?, purity = ?, minted_at = ?, status = ?, cert_url = ?, display_name = ?
       WHERE id = ?
-    `).bind(serial_number, weight, purity || '99.99%', minted_at, status || 'CATALOG', cert_url || '', id).run();
+    `)
+      .bind(
+        serial_number,
+        weight,
+        purity || '99.99%',
+        minted_at ?? '',
+        status || 'CATALOG',
+        cert_url || '',
+        typeof display_name === 'string' ? display_name : '',
+        id
+      )
+      .run();
 
     // 2. 인증서 파일이 Base64 형태로 전달된 경우 R2 버킷에 저장
     let certFilePath = `certificates/${serial_number}_cert.pdf`;

@@ -39,6 +39,7 @@ VALUES ('NFC_X92K4_001', 1);
 CREATE TABLE IF NOT EXISTS goldbars (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     serial_number TEXT UNIQUE NOT NULL,
+    display_name TEXT,
     weight TEXT NOT NULL,
     purity TEXT DEFAULT '99.99%',
     minted_at TEXT,
