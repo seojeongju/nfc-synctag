@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Tag, Package, Plus, Bell, ArrowUpRight, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Link2Off, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut, Eye, ChevronDown, ChevronUp, RefreshCw, Download } from 'lucide-react';
+import { LayoutDashboard, Tag, Package, Plus, Bell, ArrowUpRight, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Link2Off, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut, Eye, ChevronDown, ChevronUp, RefreshCw, Download, Box } from 'lucide-react';
 import { ImeTextInput } from '../components/ImeTextInput';
 import { GuaranteePdfHost } from '../components/ProductGuaranteeCertificate';
+import { GuaranteeCertificatePreviewModal } from '../components/GuaranteeCertificatePreviewModal';
 import { mapProductToGuaranteeData } from '../lib/guaranteeCertificateData';
 import type { GuaranteeCertificateData } from '../lib/guaranteeCertificateData';
 
@@ -385,6 +386,8 @@ export default function AdminDashboard() {
   const [unmapSoldModalTag, setUnmapSoldModalTag] = useState<any | null>(null);
   /** 제품 보증서 PDF 생성 (화면 밖 렌더 → html2canvas) */
   const [guaranteePdfPayload, setGuaranteePdfPayload] = useState<GuaranteeCertificateData | null>(null);
+  /** 제품 보증서 미리보기 모달 */
+  const [guaranteePreviewData, setGuaranteePreviewData] = useState<GuaranteeCertificateData | null>(null);
 
   const nfcProductTags = useMemo(() => allTags.filter((t: any) => t.target_type === 'product'), [allTags]);
   const nfcUnlinkedList = useMemo(
@@ -406,6 +409,8 @@ export default function AdminDashboard() {
     setNfcExistingSnapshot(null);
     setUnmapSoldModalTag(null);
     setExpandedUnlinkedTagUid(null);
+    setGuaranteePreviewData(null);
+    setGuaranteePdfPayload(null);
   }, []);
 
   const adminAuthHeaders = (): HeadersInit => {
@@ -1609,6 +1614,15 @@ export default function AdminDashboard() {
                       <div className="shrink-0 flex flex-col sm:flex-row items-end sm:items-start gap-0.5 pt-0.5">
                         <button
                           type="button"
+                          onClick={() => setGuaranteePreviewData(mapProductToGuaranteeData(p as Record<string, unknown>))}
+                          className="p-2 rounded-lg sm:rounded-xl hover:bg-slate-100 text-slate-400 hover:text-amber-600 transition-all"
+                          aria-label="보증서 미리보기"
+                          title="보증서 미리보기"
+                        >
+                          <Eye className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => setGuaranteePdfPayload(mapProductToGuaranteeData(p as Record<string, unknown>))}
                           className="p-2 rounded-lg sm:rounded-xl hover:bg-amber-50 text-slate-400 hover:text-amber-700 transition-all"
                           aria-label="제품 보증서 PDF"
@@ -1679,9 +1693,15 @@ export default function AdminDashboard() {
 
           {/* 3. NFC 태그 관리 탭 */}
           {currentTab === 'nfc' && (
-            <div className="space-y-6 sm:space-y-8 w-full min-w-0">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full min-w-0">
-                <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 shrink min-w-0">NFC 태그 관리</h2>
+            <div className="space-y-8 sm:space-y-10 w-full min-w-0">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between w-full min-w-0 bg-white/40 p-4 rounded-3xl backdrop-blur-xl border border-slate-200/40">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-6 bg-gradient-to-b from-emerald-400 to-teal-600 rounded-full"></div>
+                    <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">NFC 태그 관리</h2>
+                  </div>
+                  <p className="text-[11px] sm:text-xs font-bold text-slate-400 mt-1 leading-relaxed pl-3.5">자산 태그를 조회하고, 제품의 출고 정보를 손쉽게 매핑하거나 해제합니다.</p>
+                </div>
                 <button
                   type="button"
                   onClick={() => {
@@ -1690,93 +1710,112 @@ export default function AdminDashboard() {
                     setNfcExistingSnapshot(null);
                     setIsNfcModalOpen(true);
                   }}
-                  className="bg-emerald-600 text-white font-black py-3 px-5 sm:px-6 rounded-2xl shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 shrink-0 w-full sm:w-auto text-sm"
+                  className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-[0.98] text-white font-black py-3.5 px-6 sm:px-8 rounded-2xl shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-2.5 shrink-0 w-full sm:w-auto text-sm transition-all duration-300"
                 >
-                  <Smartphone className="w-5 h-5 shrink-0" /> 새 태그 발행
+                  <Smartphone className="w-5 h-5 shrink-0" />
+                  <span>새 태그 발행</span>
                 </button>
               </div>
 
               {/* UID만 등록 (제품 미연결) */}
-              <div className="bg-white rounded-2xl sm:rounded-[2.5rem] p-4 sm:p-8 border border-amber-100/80 shadow-sm overflow-hidden w-full min-w-0 max-w-full">
-                <div className="flex flex-wrap items-end justify-between gap-2 mb-4">
-                  <div>
-                    <h3 className="text-lg sm:text-xl font-black text-slate-900">① UID만 등록된 태그 (자산)</h3>
-                    <p className="text-xs font-bold text-slate-500 mt-1">
-                      출고 전 재고 자산으로만 관리됩니다.{' '}
-                      <span className="text-amber-800">태그 UID를 누르면</span> 출고 연결(제품 선택)이 펼쳐지며, 발행·덮어쓰기는 오른쪽 버튼을
-                      사용합니다.
-                    </p>
+              <div className="bg-white rounded-3xl p-5 sm:p-8 border border-slate-200/60 shadow-xl shadow-slate-100/50 overflow-hidden w-full min-w-0 max-w-full hover:border-slate-300/60 transition-all duration-300">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-2xl bg-amber-50 flex items-center justify-center border border-amber-100 text-amber-600">
+                      <Hash className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base sm:text-lg lg:text-xl font-black text-slate-900 flex items-center gap-2">① UID만 등록된 태그 <span className="text-xs font-black text-amber-700 bg-amber-50/80 px-2 py-0.5 rounded-lg border border-amber-200/50">(자산)</span></h3>
+                      <p className="text-xs font-bold text-slate-400 mt-0.5 leading-relaxed">
+                        출고 전 재고 자산입니다. <span className="text-amber-700">태그 UID를 클릭하면</span> 출고 연결(제품 선택)이 열립니다.
+                      </p>
+                    </div>
                   </div>
-                  <span className="text-xs font-black text-amber-800 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
-                    {nfcUnlinkedList.length}건
+                  <span className="text-xs font-black text-amber-800 bg-amber-50 px-3.5 py-1.5 rounded-2xl border border-amber-200/80 shadow-sm shrink-0">
+                    총 {nfcUnlinkedList.length}건
                   </span>
                 </div>
+
                 <div className="space-y-4">
                   {nfcUnlinkedList
                     .slice((currentPageNfcAsset - 1) * ITEMS_PER_PAGE, currentPageNfcAsset * ITEMS_PER_PAGE)
                     .map((t: any) => (
                       <div
                         key={`un-${t.id}-${t.tag_uid}`}
-                        className={`flex flex-col gap-3 py-3 sm:py-4 px-4 sm:px-6 rounded-xl sm:rounded-2xl border min-w-0 max-w-full transition-colors ${
+                        className={`flex flex-col gap-4 py-4 px-4 sm:px-6 rounded-2xl border min-w-0 max-w-full transition-all duration-300 select-none ${
                           expandedUnlinkedTagUid === t.tag_uid
-                            ? 'bg-amber-50/90 border-amber-300/80 ring-1 ring-amber-200/60'
-                            : 'bg-amber-50/40 border-amber-100/60'
+                            ? 'bg-amber-50/40 border-amber-300 ring-4 ring-amber-50 shadow-md'
+                            : 'bg-slate-50/40 border-slate-100 hover:border-slate-200 hover:bg-slate-50/80'
                         }`}
                       >
-                        <div className="flex items-start gap-3 sm:gap-4 min-w-0">
-                          <div className="w-10 h-10 shrink-0 rounded-xl bg-white flex items-center justify-center text-amber-700 border border-amber-100">
-                            <Hash className="w-5 h-5" />
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 min-w-0">
+                          <div className="flex items-start gap-3.5 min-w-0 flex-1">
+                            <div className={`w-11 h-11 shrink-0 rounded-2xl bg-white flex items-center justify-center text-amber-600 border border-amber-100/80 shadow-sm transition-transform ${expandedUnlinkedTagUid === t.tag_uid ? 'scale-105' : ''}`}>
+                              <Smartphone className="w-5 h-5" />
+                            </div>
+                            <div className="flex-1 min-w-0 pt-0.5">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setExpandedUnlinkedTagUid((cur) => (cur === t.tag_uid ? null : t.tag_uid))
+                                }
+                                className="text-left w-full group select-none outline-none"
+                              >
+                                <p className="font-black text-slate-800 text-sm sm:text-base break-all group-hover:text-amber-800 transition-colors duration-200 leading-snug">
+                                  {t.tag_uid}
+                                </p>
+                                <p className="text-[11px] font-bold text-slate-400 mt-1 flex flex-wrap items-center gap-1.5">
+                                  <span>등록일</span>
+                                  <span className="font-mono bg-white px-1.5 py-0.5 border border-slate-100 rounded text-slate-500 text-[10px]">
+                                    {t.created_at
+                                      ? new Date(t.created_at).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' })
+                                      : '-'}
+                                  </span>
+                                  {expandedUnlinkedTagUid === t.tag_uid ? (
+                                    <span className="text-amber-800 font-black flex items-center gap-0.5">
+                                      <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></span> 출고 연결 대기 중
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400 font-bold">· 눌러서 출고할 제품 선택</span>
+                                  )}
+                                </p>
+                              </button>
+                            </div>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setExpandedUnlinkedTagUid((cur) => (cur === t.tag_uid ? null : t.tag_uid))
-                              }
-                              className="text-left w-full group"
-                            >
-                              <p className="font-black text-slate-800 text-sm break-all group-hover:text-amber-900 group-hover:underline decoration-amber-300 underline-offset-2">
-                                {t.tag_uid}
-                              </p>
-                              <p className="text-[11px] font-bold text-slate-500 mt-1">
-                                등록일{' '}
-                                {t.created_at
-                                  ? new Date(t.created_at).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' })
-                                  : '-'}
-                                {expandedUnlinkedTagUid === t.tag_uid ? (
-                                  <span className="text-amber-800 font-black"> · 출고 연결 열림</span>
-                                ) : (
-                                  <span className="text-slate-400 font-bold"> · 눌러 출고 연결</span>
-                                )}
-                              </p>
-                            </button>
-                          </div>
+                          
                           <button
                             type="button"
                             onClick={() => openNfcModalFromTag(t)}
-                            className="shrink-0 h-9 px-3 rounded-xl border border-amber-200 bg-white text-amber-900 text-[11px] font-black hover:bg-amber-50 transition-all flex items-center gap-1"
+                            className="shrink-0 h-10 px-4 rounded-xl border border-amber-200 bg-white text-amber-900 text-xs font-black hover:bg-amber-50 hover:border-amber-300 transition-all duration-200 flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98]"
                           >
-                            <Edit3 className="w-3.5 h-3.5" /> 발행·덮어쓰기
+                            <Edit3 className="w-4 h-4" /> 발행 · 덮어쓰기
                           </button>
                         </div>
+
                         {expandedUnlinkedTagUid === t.tag_uid && (
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-2 pl-0 sm:pl-[3.25rem] w-full min-w-0 pt-1 border-t border-amber-200/50">
-                            <select
-                              value={linkPick[t.tag_uid] ?? ''}
-                              onChange={(e) => setLinkPick((prev) => ({ ...prev, [t.tag_uid]: e.target.value }))}
-                              className="w-full sm:flex-1 min-w-0 h-11 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold outline-none focus:border-emerald-400"
-                            >
-                              <option value="">출고 연결할 제품 선택</option>
-                              {products.map((p: any) => (
-                                <option key={p.id} value={String(p.id)}>
-                                  {p.name}
-                                </option>
-                              ))}
-                            </select>
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-3 pl-0 sm:pl-[3.5rem] w-full min-w-0 pt-3.5 border-t border-amber-200/60 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <div className="flex-1 min-w-0 relative">
+                              <select
+                                value={linkPick[t.tag_uid] ?? ''}
+                                onChange={(e) => setLinkPick((prev) => ({ ...prev, [t.tag_uid]: e.target.value }))}
+                                className="w-full h-12 rounded-xl border border-slate-200 hover:border-slate-300 bg-white pl-4 pr-10 text-xs sm:text-sm font-bold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-50 shadow-sm appearance-none cursor-pointer transition-all duration-200 select-none text-slate-800"
+                              >
+                                <option value="">출고 연결할 제품 선택</option>
+                                {products.map((p: any) => (
+                                  <option key={p.id} value={String(p.id)}>
+                                    {p.name}
+                                  </option>
+                                ))}
+                              </select>
+                              <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                <ChevronDown className="w-4 h-4" />
+                              </div>
+                            </div>
                             <button
                               type="button"
                               onClick={() => handleLinkTagProduct(t.tag_uid)}
-                              className="shrink-0 h-11 px-4 rounded-xl bg-emerald-600 text-white text-xs font-black shadow-sm hover:bg-emerald-700 transition-all"
+                              disabled={!linkPick[t.tag_uid]}
+                              className="shrink-0 h-12 px-6 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-black shadow-lg shadow-emerald-500/15 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-40 hover:shadow-xl transition-all duration-300 active:scale-[0.98]"
                             >
                               제품 연결 (출고)
                             </button>
@@ -1785,17 +1824,19 @@ export default function AdminDashboard() {
                       </div>
                     ))}
                   {nfcUnlinkedList.length === 0 && (
-                    <p className="text-xs font-bold text-slate-400 text-center py-8 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
-                      UID만 등록된 태그가 없습니다.
-                    </p>
+                    <div className="flex flex-col items-center justify-center p-12 bg-slate-50/50 rounded-3xl border border-dashed border-slate-200/80">
+                      <Smartphone className="w-12 h-12 text-slate-200 mb-2" />
+                      <p className="text-xs sm:text-sm font-black text-slate-400">등록된 빈 자산 태그가 없습니다.</p>
+                    </div>
                   )}
                 </div>
+
                 {nfcUnlinkedList.length > ITEMS_PER_PAGE && (
                   <div className="flex justify-center items-center gap-2 mt-6 flex-wrap max-w-full overflow-x-auto pb-1 [scrollbar-width:thin]">
                     <button
                       disabled={currentPageNfcAsset === 1}
                       onClick={() => setCurrentPageNfcAsset((p) => p - 1)}
-                      className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm shrink-0"
+                      className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 hover:border-slate-200 transition-all shadow-sm shrink-0"
                     >
                       이전
                     </button>
@@ -1806,7 +1847,7 @@ export default function AdminDashboard() {
                         onClick={() => setCurrentPageNfcAsset(i + 1)}
                         className={`w-10 h-10 text-xs font-black rounded-xl border transition-all shrink-0 ${
                           currentPageNfcAsset === i + 1
-                            ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-transparent shadow-md'
+                            ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-transparent shadow-md font-black scale-105'
                             : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'
                         }`}
                       >
@@ -1816,7 +1857,7 @@ export default function AdminDashboard() {
                     <button
                       disabled={currentPageNfcAsset === Math.ceil(nfcUnlinkedList.length / ITEMS_PER_PAGE)}
                       onClick={() => setCurrentPageNfcAsset((p) => p + 1)}
-                      className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm shrink-0"
+                      className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 hover:border-slate-200 transition-all shadow-sm shrink-0"
                     >
                       다음
                     </button>
@@ -1825,74 +1866,89 @@ export default function AdminDashboard() {
               </div>
 
               {/* 제품 매칭 완료 */}
-              <div className="bg-white rounded-2xl sm:rounded-[2.5rem] p-4 sm:p-8 border border-emerald-100/80 shadow-sm overflow-hidden w-full min-w-0 max-w-full">
-                <div className="flex flex-wrap items-end justify-between gap-2 mb-4">
-                  <div>
-                    <h3 className="text-lg sm:text-xl font-black text-slate-900">② 제품과 매칭된 태그</h3>
-                    <p className="text-xs font-bold text-slate-500 mt-1">
-                      출고·스캔 연동이 완료된 태그입니다. 발행 화면에서 제품 변경·URL 재기록(덮어쓰기)이 가능합니다.{' '}
-                      <span className="text-emerald-700">판매 완료</span>로 표시된 제품에 붙은 태그는 실제 NFC 스캔 인증 후에만
-                      매칭 해제됩니다.
-                    </p>
+              <div className="bg-white rounded-3xl p-5 sm:p-8 border border-slate-200/60 shadow-xl shadow-slate-100/50 overflow-hidden w-full min-w-0 max-w-full hover:border-slate-300/60 transition-all duration-300">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-2xl bg-emerald-50 flex items-center justify-center border border-emerald-100 text-emerald-600">
+                      <LinkIcon className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base sm:text-lg lg:text-xl font-black text-slate-900 flex items-center gap-2">② 제품과 매칭된 태그 <span className="text-xs font-black text-emerald-700 bg-emerald-50/80 px-2 py-0.5 rounded-lg border border-emerald-200/50">(매칭 완료)</span></h3>
+                      <p className="text-xs font-bold text-slate-400 mt-0.5 leading-relaxed">
+                        출고 완료된 태그입니다. 필요시 제품을 변경하거나 URL을 덮어써 재발행할 수 있습니다.
+                      </p>
+                    </div>
                   </div>
-                  <span className="text-xs font-black text-emerald-800 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
-                    {nfcLinkedList.length}건
+                  <span className="text-xs font-black text-emerald-800 bg-emerald-50 px-3.5 py-1.5 rounded-2xl border border-emerald-200/80 shadow-sm shrink-0">
+                    총 {nfcLinkedList.length}건
                   </span>
                 </div>
+
                 <div className="space-y-4">
                   {nfcLinkedList
                     .slice((currentPageNfcLinked - 1) * ITEMS_PER_PAGE, currentPageNfcLinked * ITEMS_PER_PAGE)
                     .map((t: any) => (
                       <div
                         key={`lk-${t.id}-${t.tag_uid}`}
-                        className="flex flex-col sm:flex-row sm:items-center gap-3 py-3 sm:py-4 px-4 sm:px-6 bg-emerald-50/35 rounded-xl sm:rounded-2xl border border-emerald-100/50 min-w-0 max-w-full"
+                        className="flex flex-col lg:flex-row lg:items-center gap-4 py-4 px-4 sm:px-6 bg-slate-50/40 hover:bg-white hover:border-emerald-200 border border-slate-100/80 rounded-2xl transition-all duration-300 hover:shadow-lg hover:shadow-emerald-50/20"
                       >
-                        <div className="w-10 h-10 shrink-0 rounded-xl bg-white flex items-center justify-center text-emerald-700 border border-emerald-100">
-                          <LinkIcon className="w-5 h-5" />
+                        <div className="flex items-start gap-3.5 flex-1 min-w-0 select-none">
+                          <div className="w-11 h-11 shrink-0 rounded-2xl bg-white flex items-center justify-center text-emerald-600 border border-emerald-100/60 shadow-sm">
+                            <LinkIcon className="w-5 h-5" />
+                          </div>
+                          <div className="flex-1 min-w-0 pt-0.5">
+                            <p className="font-black text-slate-800 text-sm sm:text-base break-all leading-snug">{t.tag_uid}</p>
+                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                              <span className="text-[10px] font-black tracking-wider uppercase bg-emerald-50 border border-emerald-100 text-emerald-800 px-2.5 py-1 rounded-xl">
+                                {t.target_name || '(알 수 없음)'}
+                              </span>
+                              <span className="text-[10px] font-bold bg-white text-slate-500 border border-slate-100 px-2 py-0.5 rounded-xl flex items-center gap-1">
+                                <span>등록</span>
+                                {t.created_at ? new Date(t.created_at).toLocaleDateString() : '-'}
+                              </span>
+                              {t.product_sold_at ? (
+                                <span className="text-[10px] font-black uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-100 px-2 py-0.5 rounded-xl flex items-center gap-1 animate-pulse">
+                                  판매완료
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-black text-slate-800 text-sm break-all">{t.tag_uid}</p>
-                          <p className="text-xs font-bold text-emerald-800 mt-0.5">연결 제품: {t.target_name || '(알 수 없음)'}</p>
-                          <p className="text-[11px] font-bold text-slate-500 mt-1">
-                            등록일{' '}
-                            {t.created_at
-                              ? new Date(t.created_at).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' })
-                              : '-'}
-                            {t.product_sold_at ? (
-                              <span className="ml-2 text-rose-700 font-black">· 판매완료 제품</span>
-                            ) : null}
-                          </p>
-                        </div>
-                        <div className="flex flex-col gap-2 shrink-0 self-start sm:self-center w-full sm:w-auto">
+
+                        <div className="flex flex-row sm:items-center gap-2 shrink-0 self-start lg:self-center w-full lg:w-auto">
                           <button
                             type="button"
                             onClick={() => openNfcModalFromTag(t)}
-                            className="h-10 px-4 rounded-xl bg-emerald-600 text-white text-xs font-black shadow-sm hover:bg-emerald-700 transition-all flex items-center justify-center gap-1.5 w-full sm:w-auto"
+                            className="h-10 flex-1 lg:flex-initial lg:px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-black shadow-md hover:from-emerald-700 hover:to-teal-700 transition-all duration-200 flex items-center justify-center gap-1.5 active:scale-[0.98] select-none"
                           >
-                            <Edit3 className="w-4 h-4" /> 재매핑·재발행
+                            <Edit3 className="w-4 h-4" />
+                            <span>재매핑 · 재발행</span>
                           </button>
                           <button
                             type="button"
                             onClick={() => handleUnmapTagClick(t)}
-                            className="h-10 px-4 rounded-xl border border-slate-200 bg-white text-slate-800 text-xs font-black hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5 w-full sm:w-auto"
+                            className="h-10 flex-1 lg:flex-initial lg:px-4 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs font-black hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 flex items-center justify-center gap-1.5 active:scale-[0.98] shadow-sm select-none"
                           >
-                            <Link2Off className="w-4 h-4" /> 매칭 해제
+                            <Link2Off className="w-4 h-4" />
+                            <span>매칭 해제</span>
                           </button>
                         </div>
                       </div>
                     ))}
                   {nfcLinkedList.length === 0 && (
-                    <p className="text-xs font-bold text-slate-400 text-center py-8 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
-                      제품과 연결된 태그가 없습니다.
-                    </p>
+                    <div className="flex flex-col items-center justify-center p-12 bg-slate-50/50 rounded-3xl border border-dashed border-slate-200/80">
+                      <LinkIcon className="w-12 h-12 text-slate-200 mb-2" />
+                      <p className="text-xs sm:text-sm font-black text-slate-400">매칭된 태그 데이터가 없습니다.</p>
+                    </div>
                   )}
                 </div>
+
                 {nfcLinkedList.length > ITEMS_PER_PAGE && (
                   <div className="flex justify-center items-center gap-2 mt-6 flex-wrap max-w-full overflow-x-auto pb-1 [scrollbar-width:thin]">
                     <button
                       disabled={currentPageNfcLinked === 1}
                       onClick={() => setCurrentPageNfcLinked((p) => p - 1)}
-                      className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm shrink-0"
+                      className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 hover:border-slate-200 transition-all shadow-sm shrink-0"
                     >
                       이전
                     </button>
@@ -1903,7 +1959,7 @@ export default function AdminDashboard() {
                         onClick={() => setCurrentPageNfcLinked(i + 1)}
                         className={`w-10 h-10 text-xs font-black rounded-xl border transition-all shrink-0 ${
                           currentPageNfcLinked === i + 1
-                            ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-transparent shadow-md'
+                            ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-transparent shadow-md font-black scale-105'
                             : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'
                         }`}
                       >
@@ -1913,7 +1969,7 @@ export default function AdminDashboard() {
                     <button
                       disabled={currentPageNfcLinked === Math.ceil(nfcLinkedList.length / ITEMS_PER_PAGE)}
                       onClick={() => setCurrentPageNfcLinked((p) => p + 1)}
-                      className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm shrink-0"
+                      className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 hover:border-slate-200 transition-all shadow-sm shrink-0"
                     >
                       다음
                     </button>
@@ -2703,20 +2759,35 @@ export default function AdminDashboard() {
         <GuaranteePdfHost data={guaranteePdfPayload} onDone={() => setGuaranteePdfPayload(null)} />
       )}
 
+      <GuaranteeCertificatePreviewModal data={guaranteePreviewData} onClose={() => setGuaranteePreviewData(null)} />
+
       {/* NFC 태그 관리 모달 (NFC 전용 도구) */}
       {isNfcModalOpen && (
         <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 lg:p-4">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setIsNfcModalOpen(false)}></div>
-          <div className="relative w-full max-w-lg bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh]">
-            <header className="p-8 border-b border-slate-50 flex justify-between items-center bg-emerald-50/50">
-               <div>
-                 <h3 className="text-2xl font-black text-emerald-800">NFC 태그 발행</h3>
-                 <p className="text-xs font-bold text-emerald-600 mt-1">자산만 등록하거나, 출고 전까지 제품 연결을 미룰 수 있습니다.</p>
+          <div className="relative w-full max-w-lg bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh] border border-slate-200/50">
+            <header className="p-6 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-emerald-50 via-emerald-50/40 to-teal-50/50 select-none">
+               <div className="flex items-center gap-3">
+                 <div className="w-12 h-12 rounded-2xl bg-emerald-100/60 border border-emerald-200/60 flex items-center justify-center text-emerald-700 shadow-sm">
+                   <Tag className="w-6 h-6" />
+                 </div>
+                 <div>
+                   <h3 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">NFC 태그 발행</h3>
+                   <p className="text-xs font-bold text-emerald-600/90 mt-0.5 leading-relaxed">
+                     자산으로 등록하거나, 출고와 함께 제품에 매핑합니다.
+                   </p>
+                 </div>
                </div>
-               <button type="button" onClick={() => setIsNfcModalOpen(false)} className="p-2 bg-white rounded-xl text-slate-400 shadow-sm"><X className="w-6 h-6" /></button>
+               <button
+                 type="button"
+                 onClick={() => setIsNfcModalOpen(false)}
+                 className="p-2.5 bg-white hover:bg-slate-50 border border-slate-100 rounded-2xl text-slate-400 hover:text-slate-600 transition-all shadow-sm active:scale-[0.96] outline-none"
+               >
+                 <X className="w-5 h-5" />
+               </button>
             </header>
-            <form onSubmit={handleNfcMappingSubmit} className="p-8 space-y-8 overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-12">
-               <div className="flex rounded-2xl border border-slate-100 p-1 bg-slate-50 gap-1">
+            <form onSubmit={handleNfcMappingSubmit} className="p-6 sm:p-8 space-y-6 sm:space-y-7 overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-8 flex-1 [scrollbar-width:thin]">
+               <div className="flex bg-slate-50 border border-slate-100/80 rounded-2xl p-1.5 gap-1.5 shadow-inner">
                  <button
                    type="button"
                    disabled={!!nfcExistingSnapshot?.hasProduct}
@@ -2726,94 +2797,139 @@ export default function AdminDashboard() {
                        : undefined
                    }
                    onClick={() => setNfcRegisterMode('asset')}
-                   className={`flex-1 py-3 rounded-xl text-xs font-black transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
-                     nfcRegisterMode === 'asset' ? 'bg-white text-emerald-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                   className={`flex-1 py-3 px-2 rounded-xl text-xs sm:text-sm font-black transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed select-none outline-none ${
+                     nfcRegisterMode === 'asset'
+                       ? 'bg-white text-emerald-800 shadow-md font-black'
+                       : 'text-slate-400 hover:text-slate-600 hover:bg-white/40'
                    }`}
                  >
-                   빈 태그 자산 등록
+                   <Box className="w-4 h-4 shrink-0" />
+                   <span>빈 태그 자산 등록</span>
                  </button>
                  <button
                    type="button"
                    onClick={() => setNfcRegisterMode('product')}
-                   className={`flex-1 py-3 rounded-xl text-xs font-black transition-all ${nfcRegisterMode === 'product' ? 'bg-white text-emerald-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                   className={`flex-1 py-3 px-2 rounded-xl text-xs sm:text-sm font-black transition-all duration-300 flex items-center justify-center gap-2 select-none outline-none ${
+                     nfcRegisterMode === 'product'
+                       ? 'bg-white text-emerald-800 shadow-md font-black'
+                       : 'text-slate-400 hover:text-slate-600 hover:bg-white/40'
+                   }`}
                  >
-                   제품과 함께 매핑
+                   <LinkIcon className="w-4 h-4 shrink-0" />
+                   <span>제품과 함께 매핑</span>
                  </button>
                </div>
 
                {nfcExistingSnapshot && nfcFormData.tag_uid && (
-                 <div className="rounded-2xl border border-blue-100 bg-blue-50/90 p-4 space-y-2 shadow-sm">
-                   <p className="text-[10px] font-black uppercase tracking-wider text-blue-800">현재 시스템 등록 정보</p>
-                   <p className="text-xs font-bold text-blue-950 break-all">UID: {nfcFormData.tag_uid}</p>
-                   {nfcExistingSnapshot.hasProduct ? (
-                     <p className="text-xs font-bold text-blue-900">
-                       연결 제품: {nfcExistingSnapshot.productName || '—'}
+                 <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4.5 space-y-3 shadow-sm select-none animate-in fade-in-50 duration-200">
+                   <div className="flex items-center gap-1.5">
+                     <span className="w-1.5 h-4 bg-blue-500 rounded-full"></span>
+                     <p className="text-[11px] font-black uppercase tracking-wider text-blue-800">현재 시스템 등록 정보</p>
+                   </div>
+                   <div className="space-y-1 pl-3 border-l-2 border-blue-200/60">
+                     <p className="text-xs font-bold text-blue-950 break-all flex items-center gap-1.5 leading-snug">
+                       <span className="text-blue-500/80 font-black shrink-0">UID</span>
+                       <span className="font-mono bg-white px-2 py-0.5 rounded border border-blue-100/80 text-blue-900 text-[11px] font-black">
+                         {nfcFormData.tag_uid}
+                       </span>
                      </p>
-                   ) : (
-                     <p className="text-xs font-bold text-blue-900">상태: 자산만 등록 (제품 미연결)</p>
-                   )}
-                   {nfcExistingSnapshot.createdAt && (
-                     <p className="text-[11px] font-bold text-blue-800/80">
-                       등록일: {new Date(nfcExistingSnapshot.createdAt).toLocaleString('ko-KR')}
-                     </p>
-                   )}
-                   <p className="text-[11px] font-bold text-blue-800/90 leading-relaxed pt-1 border-t border-blue-100/80">
-                     하단에서 모드·제품을 바꾼 뒤 확정하면 위 내용이 새 설정으로 갱신(덮어쓰기)됩니다. 제품이 연결된 태그는 자산만 모드로 되돌리지 못합니다(API 정책).
+                     {nfcExistingSnapshot.hasProduct ? (
+                       <p className="text-xs font-bold text-blue-900 leading-snug">
+                         연결 제품: <span className="font-black text-blue-950">{nfcExistingSnapshot.productName || '—'}</span>
+                       </p>
+                     ) : (
+                       <p className="text-xs font-bold text-blue-900 leading-snug">
+                         상태: <span className="font-black text-blue-950">자산만 등록 (제품 미연결)</span>
+                       </p>
+                     )}
+                     {nfcExistingSnapshot.createdAt && (
+                       <p className="text-[11px] font-bold text-blue-800/80 leading-snug">
+                         등록일: {new Date(nfcExistingSnapshot.createdAt).toLocaleString('ko-KR')}
+                       </p>
+                     )}
+                   </div>
+                   <p className="text-[10px] sm:text-[11px] font-bold text-blue-800/80 leading-relaxed pt-2 border-t border-blue-100/80">
+                     * 하단에서 모드·제품을 바꾼 뒤 확정하면 위 내용이 새 설정으로 갱신(덮어쓰기)됩니다.
                    </p>
                  </div>
                )}
 
                {/* 1. 태그 읽기 */}
-               <div className="space-y-4">
+               <div className="space-y-3">
                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">1단계: 태그 스캔</label>
-                 <div className="flex gap-4">
-                    <div className="flex-1 h-16 bg-slate-100 rounded-2xl flex items-center px-6 font-mono font-black text-lg text-emerald-700 shadow-inner">
-                      {nfcFormData.tag_uid || 'UID 대기 중...'}
+                 <div className="flex gap-3">
+                    <div className="flex-1 h-14 bg-slate-50 border border-slate-200/60 rounded-2xl flex items-center px-5 font-mono font-black text-base sm:text-lg text-emerald-800 shadow-inner select-none transition-all">
+                      {nfcFormData.tag_uid || <span className="text-slate-300 font-sans">UID 대기 중...</span>}
                     </div>
-                    <button type="button" onClick={() => handleNFCScan('nfc')} className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all ${nfcScanning ? 'bg-amber-100 text-amber-600 animate-pulse' : 'bg-white border-2 border-slate-100 text-slate-400 hover:text-emerald-500 hover:border-emerald-500 shadow-sm'}`}>
-                      {nfcScanning ? <Loader2 className="w-7 h-7 animate-spin" /> : <Smartphone className="w-7 h-7" />}
+                    <button
+                      type="button"
+                      onClick={() => handleNFCScan('nfc')}
+                      className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300 active:scale-[0.96] shadow-sm shrink-0 border select-none outline-none ${
+                        nfcScanning
+                          ? 'bg-amber-50 text-amber-600 border-amber-200 animate-pulse ring-4 ring-amber-50'
+                          : 'bg-white border-slate-200 hover:border-emerald-500 hover:text-emerald-600 text-slate-400 hover:bg-slate-50'
+                      }`}
+                    >
+                      {nfcScanning ? <Loader2 className="w-6 h-6 animate-spin" /> : <Smartphone className="w-6 h-6" />}
                     </button>
                  </div>
                </div>
 
                {/* 2. 제품 선택 — 제품 모드에서만 */}
                {nfcRegisterMode === 'product' ? (
-                 <div className="space-y-4">
+                 <div className="space-y-3">
                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">2단계: 제품 연결</label>
-                   <select 
-                     required={nfcRegisterMode === 'product'}
-                     value={nfcFormData.product_id}
-                     onChange={(e) => setNfcFormData({...nfcFormData, product_id: e.target.value})}
-                     className="w-full h-16 bg-slate-50 border-none rounded-2xl px-5 font-bold outline-none ring-4 ring-slate-100/50 appearance-none"
-                   >
-                     <option value="">제품을 선택하세요</option>
-                     {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                   </select>
+                   <div className="relative">
+                     <select 
+                       required={nfcRegisterMode === 'product'}
+                       value={nfcFormData.product_id}
+                       onChange={(e) => setNfcFormData({...nfcFormData, product_id: e.target.value})}
+                       className="w-full h-14 bg-slate-50 border border-slate-200/60 hover:border-slate-300 rounded-2xl pl-5 pr-12 font-bold outline-none ring-slate-100/50 appearance-none transition-all duration-200 text-slate-800 cursor-pointer text-sm"
+                     >
+                       <option value="">출고할 제품을 선택하세요</option>
+                       {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                     </select>
+                     <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                       <ChevronDown className="w-4 h-4" />
+                     </div>
+                   </div>
                  </div>
                ) : (
-                 <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4 space-y-2">
+                 <div className="rounded-2xl border border-amber-100/80 bg-amber-50/40 p-4.5 space-y-1.5 select-none animate-in fade-in-50 duration-200">
                    <p className="text-xs font-black text-amber-900 uppercase tracking-wider">2단계: 제품 연결 없음</p>
-                   <p className="text-xs font-bold text-amber-800/90 leading-relaxed">
-                     상품에 연결되지 않은 NFC만 자산으로 등록됩니다. 출고 시 「NFC 태그 관리」 목록에서 제품 연결(출고)을 진행해 주세요.
+                   <p className="text-[11px] sm:text-xs font-bold text-amber-800/80 leading-relaxed">
+                     상품에 연결되지 않은 NFC만 자산으로 등록됩니다. 출고 시 「NFC 태그 관리」 목록에서 제품 연결(출고)을 진행할 수 있습니다.
                    </p>
                  </div>
                )}
 
                {/* 3. 태그 쓰기 도구 */}
-               <div className="bg-slate-50 p-6 rounded-[2rem] space-y-4 border border-slate-100">
-                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">3단계: 태그에 URL 굽기 (기록)</p>
-                  <p className="text-[11px] font-bold text-slate-500 leading-relaxed">스캔 시 앱 메인으로 안내되도록 동일한 URL을 태그에 기록합니다.</p>
-                  <button type="button" onClick={handleNFCWrite} className={`w-full h-14 rounded-2xl flex items-center justify-center gap-3 font-black text-sm transition-all ${nfcWriting ? 'bg-amber-100 text-amber-600 animate-pulse' : 'bg-white text-slate-700 hover:bg-emerald-600 hover:text-white shadow-sm'}`}>
-                    <PenTool className="w-5 h-5" /> {nfcWriting ? '기록 중...' : '태그에 정보 기록하기'}
+               <div className="bg-slate-50/50 p-5 rounded-3xl space-y-4 border border-slate-100 select-none">
+                  <div className="flex flex-col gap-0.5">
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest">3단계: 태그에 URL 굽기 (기록)</p>
+                    <p className="text-[11px] font-bold text-slate-400 leading-relaxed">스캔 시 앱 메인으로 연동되도록 고유 URL 정보를 태그에 씁니다.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleNFCWrite}
+                    className={`w-full h-13 rounded-xl flex items-center justify-center gap-2.5 font-black text-sm transition-all duration-300 active:scale-[0.98] outline-none ${
+                      nfcWriting
+                        ? 'bg-amber-50 border border-amber-200 text-amber-600 animate-pulse shadow-sm'
+                        : 'bg-white border border-slate-200 hover:border-emerald-200 hover:bg-emerald-50/30 text-slate-700 hover:text-emerald-700 shadow-sm'
+                    }`}
+                  >
+                    <PenTool className="w-4.5 h-4.5 shrink-0" />
+                    <span>{nfcWriting ? '태그 정보 기록 중...' : '태그에 정보 기록하기'}</span>
                   </button>
                </div>
 
                <button
                  type="submit"
                  disabled={submitting || !nfcFormData.tag_uid || (nfcRegisterMode === 'product' && !nfcFormData.product_id)}
-                 className="w-full h-16 bg-emerald-600 text-white text-lg font-black shadow-xl shadow-emerald-500/30 disabled:opacity-30"
+                 className="w-full h-15 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-base sm:text-lg rounded-2xl shadow-xl shadow-emerald-500/25 hover:shadow-emerald-500/35 hover:shadow-2xl disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-300 select-none outline-none flex items-center justify-center gap-2 active:scale-[0.98]"
                >
-                 {nfcRegisterMode === 'asset' ? '자산 등록 완료' : '태그 매핑 최종 확정'}
+                 {submitting && <Loader2 className="w-5 h-5 animate-spin" />}
+                 <span>{nfcRegisterMode === 'asset' ? '자산 등록 완료' : '태그 매핑 최종 확정'}</span>
                </button>
             </form>
           </div>
