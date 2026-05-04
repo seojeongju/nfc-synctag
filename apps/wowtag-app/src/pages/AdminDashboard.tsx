@@ -152,6 +152,8 @@ export default function AdminDashboard() {
   const [nfcRegisterMode, setNfcRegisterMode] = useState<'asset' | 'product'>('asset');
   const [allTags, setAllTags] = useState<any[]>([]);
   const [linkPick, setLinkPick] = useState<Record<string, string>>({});
+  /** ① 자산 태그: UID 클릭 시에만 출고 연결(제품 선택) 패널 표시 */
+  const [expandedUnlinkedTagUid, setExpandedUnlinkedTagUid] = useState<string | null>(null);
   /** 스캔/목록에서 기존 태그를 열 때 서버 등록 스냅샷 (덮어쓰기 안내) */
   const [nfcExistingSnapshot, setNfcExistingSnapshot] = useState<{
     hasProduct: boolean;
@@ -180,6 +182,7 @@ export default function AdminDashboard() {
     setIsAdminGuideOpen(false);
     setNfcExistingSnapshot(null);
     setUnmapSoldModalTag(null);
+    setExpandedUnlinkedTagUid(null);
   }, []);
 
   const adminAuthHeaders = (): HeadersInit => {
@@ -246,6 +249,10 @@ export default function AdminDashboard() {
   useEffect(() => {
     closeAllAdminModals();
   }, [currentTab, closeAllAdminModals]);
+
+  useEffect(() => {
+    setExpandedUnlinkedTagUid(null);
+  }, [currentPageNfcAsset]);
 
   const fetchProducts = async () => {
     try {
@@ -690,6 +697,7 @@ export default function AdminDashboard() {
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
         alert('출고 시 제품 연동이 완료되었습니다.');
+        setExpandedUnlinkedTagUid(null);
         fetchTags();
         fetchProducts();
       } else {
@@ -1332,7 +1340,9 @@ export default function AdminDashboard() {
                   <div>
                     <h3 className="text-lg sm:text-xl font-black text-slate-900">① UID만 등록된 태그 (자산)</h3>
                     <p className="text-xs font-bold text-slate-500 mt-1">
-                      출고 전 재고 자산으로만 관리됩니다. 출고 시 제품 연결 또는 발행 화면에서 매핑을 덮어쓸 수 있습니다.
+                      출고 전 재고 자산으로만 관리됩니다.{' '}
+                      <span className="text-amber-800">태그 UID를 누르면</span> 출고 연결(제품 선택)이 펼쳐지며, 발행·덮어쓰기는 오른쪽 버튼을
+                      사용합니다.
                     </p>
                   </div>
                   <span className="text-xs font-black text-amber-800 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
@@ -1345,20 +1355,39 @@ export default function AdminDashboard() {
                     .map((t: any) => (
                       <div
                         key={`un-${t.id}-${t.tag_uid}`}
-                        className="flex flex-col gap-3 py-3 sm:py-4 px-4 sm:px-6 bg-amber-50/40 rounded-xl sm:rounded-2xl border border-amber-100/60 min-w-0 max-w-full"
+                        className={`flex flex-col gap-3 py-3 sm:py-4 px-4 sm:px-6 rounded-xl sm:rounded-2xl border min-w-0 max-w-full transition-colors ${
+                          expandedUnlinkedTagUid === t.tag_uid
+                            ? 'bg-amber-50/90 border-amber-300/80 ring-1 ring-amber-200/60'
+                            : 'bg-amber-50/40 border-amber-100/60'
+                        }`}
                       >
                         <div className="flex items-start gap-3 sm:gap-4 min-w-0">
                           <div className="w-10 h-10 shrink-0 rounded-xl bg-white flex items-center justify-center text-amber-700 border border-amber-100">
                             <Hash className="w-5 h-5" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-black text-slate-800 text-sm break-all">{t.tag_uid}</p>
-                            <p className="text-[11px] font-bold text-slate-500 mt-1">
-                              등록일{' '}
-                              {t.created_at
-                                ? new Date(t.created_at).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' })
-                                : '-'}
-                            </p>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedUnlinkedTagUid((cur) => (cur === t.tag_uid ? null : t.tag_uid))
+                              }
+                              className="text-left w-full group"
+                            >
+                              <p className="font-black text-slate-800 text-sm break-all group-hover:text-amber-900 group-hover:underline decoration-amber-300 underline-offset-2">
+                                {t.tag_uid}
+                              </p>
+                              <p className="text-[11px] font-bold text-slate-500 mt-1">
+                                등록일{' '}
+                                {t.created_at
+                                  ? new Date(t.created_at).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' })
+                                  : '-'}
+                                {expandedUnlinkedTagUid === t.tag_uid ? (
+                                  <span className="text-amber-800 font-black"> · 출고 연결 열림</span>
+                                ) : (
+                                  <span className="text-slate-400 font-bold"> · 눌러 출고 연결</span>
+                                )}
+                              </p>
+                            </button>
                           </div>
                           <button
                             type="button"
@@ -1368,27 +1397,29 @@ export default function AdminDashboard() {
                             <Edit3 className="w-3.5 h-3.5" /> 발행·덮어쓰기
                           </button>
                         </div>
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 pl-0 sm:pl-[3.25rem] w-full min-w-0">
-                          <select
-                            value={linkPick[t.tag_uid] ?? ''}
-                            onChange={(e) => setLinkPick((prev) => ({ ...prev, [t.tag_uid]: e.target.value }))}
-                            className="w-full sm:flex-1 min-w-0 h-11 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold outline-none focus:border-emerald-400"
-                          >
-                            <option value="">출고 연결할 제품 선택</option>
-                            {products.map((p: any) => (
-                              <option key={p.id} value={String(p.id)}>
-                                {p.name}
-                              </option>
-                            ))}
-                          </select>
-                          <button
-                            type="button"
-                            onClick={() => handleLinkTagProduct(t.tag_uid)}
-                            className="shrink-0 h-11 px-4 rounded-xl bg-emerald-600 text-white text-xs font-black shadow-sm hover:bg-emerald-700 transition-all"
-                          >
-                            제품 연결 (출고)
-                          </button>
-                        </div>
+                        {expandedUnlinkedTagUid === t.tag_uid && (
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2 pl-0 sm:pl-[3.25rem] w-full min-w-0 pt-1 border-t border-amber-200/50">
+                            <select
+                              value={linkPick[t.tag_uid] ?? ''}
+                              onChange={(e) => setLinkPick((prev) => ({ ...prev, [t.tag_uid]: e.target.value }))}
+                              className="w-full sm:flex-1 min-w-0 h-11 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold outline-none focus:border-emerald-400"
+                            >
+                              <option value="">출고 연결할 제품 선택</option>
+                              {products.map((p: any) => (
+                                <option key={p.id} value={String(p.id)}>
+                                  {p.name}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => handleLinkTagProduct(t.tag_uid)}
+                              className="shrink-0 h-11 px-4 rounded-xl bg-emerald-600 text-white text-xs font-black shadow-sm hover:bg-emerald-700 transition-all"
+                            >
+                              제품 연결 (출고)
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   {nfcUnlinkedList.length === 0 && (
