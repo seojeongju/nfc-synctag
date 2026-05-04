@@ -359,6 +359,12 @@ app.get('/goldbars/t/:tagId', async (c) => {
       return c.json({
         id: `product_${pid}`,
         wallet_source: 'catalog_product',
+        name: (productRow.name as string) || '',
+        description: (productRow.description as string) || '',
+        options: (productRow.options as string) || '',
+        material: (productRow.material as string) || '',
+        video_url: (productRow.video_url as string) || '',
+        manual_url: (productRow.manual_url as string) || '',
         serial_number: (productRow.name as string) || String(matchedUid),
         weight: (productRow.weight as string) || '',
         purity: (productRow.purity as string) || '',

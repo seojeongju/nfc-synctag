@@ -3,7 +3,11 @@ import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { Download, Play, ChevronRight, Bookmark, Loader2, Award, ShieldCheck, ShoppingCart, Info, CheckCircle2, MessageSquare, X, BookOpen, Smartphone, Eye } from 'lucide-react';
 import { GuaranteePdfHost } from '../components/ProductGuaranteeCertificate';
 import { GuaranteeCertificatePreviewModal } from '../components/GuaranteeCertificatePreviewModal';
-import { mapProductToGuaranteeData } from '../lib/guaranteeCertificateData';
+import {
+  mapProductToGuaranteeData,
+  mapGoldbarWalletToGuaranteeData,
+  catalogWalletRowToProductRecord
+} from '../lib/guaranteeCertificateData';
 import type { GuaranteeCertificateData } from '../lib/guaranteeCertificateData';
 import {
   readTagSession,
@@ -63,6 +67,8 @@ export default function UserLanding() {
   const [showGuideModal, setShowGuideModal] = useState(false);
   const [userGuaranteePdf, setUserGuaranteePdf] = useState<GuaranteeCertificateData | null>(null);
   const [userGuaranteePreview, setUserGuaranteePreview] = useState<GuaranteeCertificateData | null>(null);
+  /** 내 지갑 카드에서 연 제품/골드바 상세 모달 */
+  const [walletDetailItem, setWalletDetailItem] = useState<any>(null);
 
   // 전자 앨범 관련 상태
   const [isAlbumModalOpen, setIsAlbumModalOpen] = useState(false);
@@ -106,6 +112,7 @@ export default function UserLanding() {
     setShowGuideModal(false);
     setIsAlbumModalOpen(false);
     setCurrentGoldbarForAlbum(null);
+    setWalletDetailItem(null);
   }, []);
 
   const goToUserTab = useCallback(
@@ -716,7 +723,7 @@ export default function UserLanding() {
               {myGoldbars.map((g, index) => {
                 const isCatalog = g.wallet_source === 'catalog_product';
                 return (
-                <div key={`${String(g.id)}-${index}`} className="bg-white p-5 rounded-3xl border border-slate-100/60 hover:border-amber-400/50 hover:shadow-md cursor-pointer group transition-all flex flex-col gap-4 shadow-sm relative overflow-hidden">
+                <div key={`${String(g.id)}-${index}`} className="bg-white p-5 rounded-3xl border border-slate-100/60 hover:border-amber-400/50 hover:shadow-md group transition-all flex flex-col gap-4 shadow-sm relative overflow-hidden">
                   <div className="absolute -right-4 -bottom-4 text-7xl font-black text-slate-100/50 select-none">0{index + 1}</div>
                   <div className="flex justify-between items-start">
                     <div className="flex items-center gap-3.5 min-w-0">
@@ -754,6 +761,49 @@ export default function UserLanding() {
                     <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400">중량</span><span className="text-xs font-black text-slate-700">{g.weight || '-'}</span></div>
                     <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400">순도</span><span className="text-xs font-black text-slate-700">{g.purity || '-'}</span></div>
                     <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400">{isCatalog ? '유형' : '제조일자'}</span><span className="text-xs font-black text-slate-700">{isCatalog ? '카탈로그 매칭' : g.minted_at || '-'}</span></div>
+                  </div>
+
+                  <div className="relative z-10 grid grid-cols-3 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setWalletDetailItem(g);
+                      }}
+                      className="h-10 rounded-xl border border-slate-200 bg-white text-slate-700 font-black text-[10px] sm:text-[11px] flex items-center justify-center gap-1 hover:bg-slate-50 transition-all shadow-sm"
+                    >
+                      {isCatalog ? '상세' : '정보'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setUserGuaranteePreview(
+                          isCatalog
+                            ? mapProductToGuaranteeData(catalogWalletRowToProductRecord(g as Record<string, unknown>))
+                            : mapGoldbarWalletToGuaranteeData(g as Record<string, unknown>)
+                        );
+                      }}
+                      className="h-10 rounded-xl border border-slate-200 bg-white text-slate-700 font-black text-[10px] sm:text-[11px] flex items-center justify-center gap-1 hover:bg-slate-50 transition-all shadow-sm"
+                    >
+                      <Eye className="w-3.5 h-3.5 shrink-0 text-amber-600" />
+                      미리보기
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setUserGuaranteePdf(
+                          isCatalog
+                            ? mapProductToGuaranteeData(catalogWalletRowToProductRecord(g as Record<string, unknown>))
+                            : mapGoldbarWalletToGuaranteeData(g as Record<string, unknown>)
+                        );
+                      }}
+                      className="h-10 rounded-xl border border-amber-200/80 bg-amber-50 text-amber-900 font-black text-[10px] sm:text-[11px] flex items-center justify-center gap-1 hover:bg-amber-100 transition-all shadow-sm"
+                    >
+                      <Download className="w-3.5 h-3.5 shrink-0" />
+                      PDF
+                    </button>
                   </div>
 
                   {/* 골드바 인증 연결 시에만 전자앨범 (카탈로그만 매칭된 제품은 앨범 미지원) */}
@@ -1086,6 +1136,189 @@ export default function UserLanding() {
                 <button onClick={() => setShowGuideModal(false)} className="w-full h-14 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black rounded-xl text-sm shadow-xl shadow-amber-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2">
                   가이드 확인 완료
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 내 지갑 카드 — 상세 보기 */}
+        {walletDetailItem && (
+          <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center p-0 lg:p-4">
+            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setWalletDetailItem(null)}></div>
+            <div className="relative w-full max-w-md bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh] min-h-0 overflow-hidden">
+              <header className="shrink-0 p-5 sm:p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/40 gap-2">
+                <h4 className="text-lg font-black text-slate-800 tracking-tight min-w-0">
+                  {walletDetailItem.wallet_source === 'catalog_product' ? '제품 상세' : '정품 골드바 정보'}
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => setWalletDetailItem(null)}
+                  className="p-2 bg-white rounded-xl text-slate-400 hover:text-rose-600 transition-colors shadow-sm shrink-0"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </header>
+              <div className="p-6 overflow-y-auto overflow-x-hidden min-h-0 flex-1 space-y-5 pb-10">
+                {walletDetailItem.wallet_source === 'catalog_product' ? (
+                  <>
+                    <div className="flex items-start gap-4">
+                      <div className="w-24 h-24 sm:w-28 sm:h-28 bg-slate-50 border border-slate-100 rounded-3xl overflow-hidden shadow-sm flex-shrink-0">
+                        {walletDetailItem.image_url ? (
+                          <img src={walletDetailItem.image_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-amber-200">
+                            <Award className="w-10 h-10" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <span className="text-[10px] font-black bg-amber-100 text-amber-800 px-2.5 py-1 rounded-xl uppercase tracking-wider">
+                          등록 제품
+                        </span>
+                        <h5 className="font-black text-slate-800 text-lg mt-1 break-words">
+                          {walletDetailItem.name || walletDetailItem.serial_number}
+                        </h5>
+                        <p className="text-xs font-bold text-slate-500 leading-relaxed mt-1 break-words">
+                          {walletDetailItem.description?.trim()
+                            ? walletDetailItem.description
+                            : '등록된 설명이 없습니다.'}
+                        </p>
+                      </div>
+                    </div>
+                    {walletDetailItem.options && String(walletDetailItem.options).trim() !== '' && (
+                      <div className="border-t border-slate-50 pt-3 flex flex-wrap gap-1.5">
+                        {String(walletDetailItem.options)
+                          .split(',')
+                          .map((opt: string, i: number) => (
+                            <span
+                              key={i}
+                              className="text-[10px] font-black tracking-wider bg-slate-100 text-slate-600 px-2.5 py-1 rounded-xl"
+                            >
+                              {opt.trim()}
+                            </span>
+                          ))}
+                      </div>
+                    )}
+                    <div className="space-y-2 text-xs">
+                      {walletDetailItem.weight != null && String(walletDetailItem.weight).trim() !== '' && (
+                        <div className="flex justify-between gap-2 border-b border-slate-100 pb-2">
+                          <span className="font-bold text-slate-400">중량</span>
+                          <span className="font-black text-slate-800">{walletDetailItem.weight}</span>
+                        </div>
+                      )}
+                      {walletDetailItem.purity != null && String(walletDetailItem.purity).trim() !== '' && (
+                        <div className="flex justify-between gap-2 border-b border-slate-100 pb-2">
+                          <span className="font-bold text-slate-400">순도</span>
+                          <span className="font-black text-slate-800">{walletDetailItem.purity}</span>
+                        </div>
+                      )}
+                      {walletDetailItem.material != null && String(walletDetailItem.material).trim() !== '' && (
+                        <div className="flex justify-between gap-2 border-b border-slate-100 pb-2">
+                          <span className="font-bold text-slate-400">재질</span>
+                          <span className="font-black text-slate-800">{walletDetailItem.material}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      {walletDetailItem.video_url && (
+                        <a
+                          href={walletDetailItem.video_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="w-full py-3.5 bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-black rounded-2xl flex items-center justify-center gap-2 shadow-lg text-sm no-underline"
+                        >
+                          <Play className="w-4 h-4 fill-white" /> 사용 설명 영상
+                        </a>
+                      )}
+                      {walletDetailItem.manual_url && (
+                        <a
+                          href={walletDetailItem.manual_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="w-full py-3.5 bg-slate-100 text-slate-700 font-black rounded-2xl flex items-center justify-center gap-2 hover:bg-slate-200 text-sm no-underline"
+                        >
+                          <Download className="w-4 h-4" /> 제품 설명서
+                        </a>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 text-sm space-y-2">
+                      <div className="flex justify-between gap-2">
+                        <span className="text-slate-400 font-bold">일련번호</span>
+                        <span className="font-black font-mono text-slate-800 text-right break-all">
+                          {String(walletDetailItem.serial_number ?? '—')}
+                        </span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-slate-400 font-bold">중량</span>
+                        <span className="font-black text-slate-800">{walletDetailItem.weight || '—'}</span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-slate-400 font-bold">순도</span>
+                        <span className="font-black text-amber-600">{walletDetailItem.purity || '—'}</span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-slate-400 font-bold">제조일자</span>
+                        <span className="font-black text-slate-800">{walletDetailItem.minted_at || '—'}</span>
+                      </div>
+                    </div>
+                    {walletDetailItem.download_token != null &&
+                      walletDetailItem.id != null &&
+                      typeof walletDetailItem.id === 'number' && (
+                        <a
+                          href={`/api/goldbars/download/${walletDetailItem.id}?token=${encodeURIComponent(String(walletDetailItem.download_token))}`}
+                          download
+                          className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-black rounded-2xl flex items-center justify-center gap-2 shadow-lg text-sm no-underline"
+                        >
+                          <Download className="w-5 h-5" /> 원본 보증서 PDF 받기
+                        </a>
+                      )}
+                    {walletDetailItem.cert_url && (
+                      <a
+                        href={walletDetailItem.cert_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="w-full h-11 bg-slate-50 border border-slate-100 hover:bg-amber-50 rounded-xl flex items-center justify-center text-xs font-black text-slate-600 hover:text-amber-700 no-underline"
+                      >
+                        <ShieldCheck className="w-4 h-4" /> 정품인증서 URL
+                      </a>
+                    )}
+                  </>
+                )}
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setUserGuaranteePreview(
+                        walletDetailItem.wallet_source === 'catalog_product'
+                          ? mapProductToGuaranteeData(
+                              catalogWalletRowToProductRecord(walletDetailItem as Record<string, unknown>)
+                            )
+                          : mapGoldbarWalletToGuaranteeData(walletDetailItem as Record<string, unknown>)
+                      )
+                    }
+                    className="h-12 rounded-2xl border border-slate-200 bg-white text-slate-700 font-black text-[11px] sm:text-xs flex items-center justify-center gap-1.5 hover:bg-slate-50 shadow-sm"
+                  >
+                    <Eye className="w-4 h-4 shrink-0 text-amber-600" /> 보증서 미리보기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setUserGuaranteePdf(
+                        walletDetailItem.wallet_source === 'catalog_product'
+                          ? mapProductToGuaranteeData(
+                              catalogWalletRowToProductRecord(walletDetailItem as Record<string, unknown>)
+                            )
+                          : mapGoldbarWalletToGuaranteeData(walletDetailItem as Record<string, unknown>)
+                      )
+                    }
+                    className="h-12 rounded-2xl border border-amber-200/80 bg-amber-50 text-amber-900 font-black text-[11px] sm:text-xs flex items-center justify-center gap-1.5 hover:bg-amber-100 shadow-sm"
+                  >
+                    <Download className="w-4 h-4 shrink-0" /> 보증서 PDF 저장
+                  </button>
+                </div>
               </div>
             </div>
           </div>

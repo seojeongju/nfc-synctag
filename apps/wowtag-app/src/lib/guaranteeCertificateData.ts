@@ -67,6 +67,41 @@ export function mapProductToGuaranteeData(p: Record<string, unknown>): Guarantee
   };
 }
 
+/** 내 지갑 등록 골드바(인증서 연결) — 카탈로그 제품과 동일 스타일 보증서 미리보기/PDF 생성용 */
+export function mapGoldbarWalletToGuaranteeData(g: Record<string, unknown>): GuaranteeCertificateData {
+  const name =
+    String(g.display_name ?? g.serial_number ?? '골드바').trim() || '골드바';
+  const serial = String(g.serial_number ?? '—').trim() || '—';
+  return {
+    productName: name,
+    weightLine: formatWeightDonLine(g.weight),
+    purityLine: formatPurityLine(g.material, g.purity),
+    serialNo: serial,
+    issueDateLine: formatIssueDate(),
+    issuerName: DEFAULT_GUARANTEE_ISSUER,
+  };
+}
+
+/** 카탈로그 매칭 지갑 행(API `wallet_source: catalog_product`) → mapProductToGuaranteeData 입력 */
+export function catalogWalletRowToProductRecord(g: Record<string, unknown>): Record<string, unknown> {
+  const pid = g.product_id;
+  const fallbackSerial =
+    pid != null && String(pid).trim() !== '' ? `P-${String(pid)}` : undefined;
+  return {
+    name: g.name ?? g.serial_number ?? '제품',
+    description: g.description ?? '',
+    weight: g.weight,
+    material: g.material,
+    purity: g.purity,
+    options: g.options,
+    image_url: g.image_url,
+    cert_serial_number:
+      g.cert_serial_number != null && String(g.cert_serial_number).trim() !== ''
+        ? g.cert_serial_number
+        : fallbackSerial,
+  };
+}
+
 export function sanitizeGuaranteeFileBase(name: string): string {
   return name.replace(/[/\\?%*:|"<>]/g, '_').trim().slice(0, 72) || '제품';
 }
