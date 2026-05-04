@@ -72,12 +72,33 @@ app.get('/goldbars', async (c) => {
     } catch (_) {}
 
     const { results } = await c.env.DB.prepare(`
-      SELECT g.*, c.tag_uid, c.cert_file_path 
+      SELECT g.*,
+        (SELECT c2.tag_uid FROM certificates c2 WHERE c2.goldbar_id = g.id ORDER BY c2.issued_at DESC, c2.id DESC LIMIT 1) AS tag_uid,
+        (SELECT c2f.cert_file_path FROM certificates c2f WHERE c2f.goldbar_id = g.id ORDER BY c2f.issued_at DESC, c2f.id DESC LIMIT 1) AS cert_file_path,
+        (SELECT COUNT(*) FROM certificates c3 WHERE c3.goldbar_id = g.id) AS cert_count
       FROM goldbars g
-      LEFT JOIN certificates c ON g.id = c.goldbar_id
       ORDER BY g.created_at DESC
     `).all();
     return c.json(results);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// 골드바별 인증서(보증서)에 매칭된 NFC UID 전체 목록 (관리자)
+app.get('/goldbars/:id/tag-uids', async (c) => {
+  try {
+    if (!verifyAdminToken(c)) {
+      return c.json({ error: '관리자 인증이 필요합니다.' }, 401);
+    }
+    const id = c.req.param('id');
+    const { results } = await c.env.DB.prepare(
+      `SELECT tag_uid FROM certificates WHERE goldbar_id = ? ORDER BY issued_at DESC, id DESC`
+    )
+      .bind(id)
+      .all();
+    const tag_uids = (results as { tag_uid: string }[]).map((r) => r.tag_uid);
+    return c.json({ tag_uids });
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
   }

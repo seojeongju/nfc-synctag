@@ -144,6 +144,12 @@ export default function AdminDashboard() {
   const [currentPageNfcLinked, setCurrentPageNfcLinked] = useState(1);
   const [currentPageGoldbars, setCurrentPageGoldbars] = useState(1);
   const ITEMS_PER_PAGE = 5;
+  /** 골드바 카드 펼침: 인증서 기준 UID 목록 페이지 크기 */
+  const GOLDBAR_TAG_UID_PAGE_SIZE = 5;
+  const [expandedGoldbarId, setExpandedGoldbarId] = useState<number | null>(null);
+  const [goldbarTagUidsMap, setGoldbarTagUidsMap] = useState<Record<number, string[]>>({});
+  const [goldbarTagUidsLoadingId, setGoldbarTagUidsLoadingId] = useState<number | null>(null);
+  const [goldbarTagUidPage, setGoldbarTagUidPage] = useState<Record<number, number>>({});
 
   const [activeGuide, setActiveGuide] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -173,11 +179,6 @@ export default function AdminDashboard() {
     () => nfcProductTags.filter((t: any) => t.target_id != null && t.target_id !== ''),
     [nfcProductTags]
   );
-  const goldbarPoolList = useMemo(
-    () => allTags.filter((t: any) => t.target_type === 'goldbar_pool'),
-    [allTags]
-  );
-  const [goldbarPoolUidInput, setGoldbarPoolUidInput] = useState('');
 
   const closeAllAdminModals = useCallback(() => {
     setIsProductModalOpen(false);
@@ -234,28 +235,6 @@ export default function AdminDashboard() {
     void executeTagUnmap(t.tag_uid);
   };
 
-  const handleGoldbarPoolRegister = async () => {
-    const uid = goldbarPoolUidInput.trim();
-    if (!uid) return alert('NFC 태그 UID를 입력하세요.');
-    try {
-      const res = await fetch('/api/goldbar-tag-pool', {
-        method: 'POST',
-        headers: adminAuthHeaders(),
-        body: JSON.stringify({ tag_uid: uid }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        alert('골드바 자산 풀에 등록되었습니다. 인증서 연결 후 정품 스캔 화면으로 연결됩니다.');
-        setGoldbarPoolUidInput('');
-        fetchTags();
-      } else {
-        alert(typeof data.error === 'string' ? data.error : '등록에 실패했습니다.');
-      }
-    } catch (e: any) {
-      alert(e?.message || '요청 실패');
-    }
-  };
-
   const copyUnmapScanUrl = async (tagUid: string) => {
     const url = `${window.location.origin}/t/${encodeURIComponent(tagUid)}?unmap=1`;
     try {
@@ -309,9 +288,41 @@ export default function AdminDashboard() {
       const data = await res.json();
       if (Array.isArray(data)) {
         setGoldbars(data);
+        setGoldbarTagUidsMap({});
+        setExpandedGoldbarId(null);
+        setGoldbarTagUidPage({});
       }
     } catch (err) {
       console.error('Failed to fetch goldbars', err);
+    }
+  };
+
+  const toggleGoldbarUidPanel = async (g: { id: number }) => {
+    const id = g.id;
+    if (expandedGoldbarId === id) {
+      setExpandedGoldbarId(null);
+      return;
+    }
+    setExpandedGoldbarId(id);
+    setGoldbarTagUidPage((prev) => ({ ...prev, [id]: prev[id] ?? 1 }));
+    if (goldbarTagUidsMap[id]) return;
+    setGoldbarTagUidsLoadingId(id);
+    try {
+      const res = await fetch(`/api/goldbars/${id}/tag-uids`, { headers: adminAuthHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && Array.isArray(data?.tag_uids)) {
+        setGoldbarTagUidsMap((m) => ({ ...m, [id]: data.tag_uids }));
+      } else {
+        setGoldbarTagUidsMap((m) => ({ ...m, [id]: [] }));
+        if (!res.ok && data?.error) {
+          console.error(data.error);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      setGoldbarTagUidsMap((m) => ({ ...m, [id]: [] }));
+    } finally {
+      setGoldbarTagUidsLoadingId(null);
     }
   };
 
@@ -1601,39 +1612,9 @@ export default function AdminDashboard() {
               <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
                 <div>
                   <h2 className="text-2xl lg:text-3xl font-black text-slate-900">골드바 정품인증 관리</h2>
-                  <p className="text-xs font-bold text-slate-400 mt-1">골드바의 정보를 편집하고 정품인증서를 통합 관리합니다.</p>
+                  <p className="text-xs font-bold text-slate-400 mt-1">정품인증서(보증서)를 등록·수정·삭제합니다.</p>
                 </div>
                 <button onClick={() => setIsGoldbarModalOpen(true)} className="bg-amber-600 hover:bg-amber-700 text-white font-black py-3.5 px-6 rounded-2xl shadow-lg shadow-amber-500/20 flex items-center gap-2 transition-all"><Award className="w-5 h-5" /> 골드바 & 보증서 등록</button>
-              </div>
-
-              <div className="bg-amber-50/50 border border-amber-100 rounded-2xl p-4 sm:p-5 w-full">
-                <h3 className="text-sm font-black text-amber-900">골드바 NFC 자산 (인증서 연결 전)</h3>
-                <p className="text-[11px] font-bold text-amber-800/80 mt-1 mb-3 leading-relaxed">
-                  출고·인증서 매칭 전 UID만 등록합니다. 고객이 태그 시 앱 홈이 열리며, 인증서 연결 후에는 정품 인증 화면으로 연결됩니다.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-2 max-w-2xl">
-                  <input
-                    type="text"
-                    value={goldbarPoolUidInput}
-                    onChange={(e) => setGoldbarPoolUidInput(e.target.value)}
-                    placeholder="NFC 태그 UID"
-                    className="flex-1 h-11 rounded-xl border border-amber-200/80 bg-white px-3 text-xs font-bold outline-none focus:border-amber-400"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void handleGoldbarPoolRegister()}
-                    className="h-11 px-5 rounded-xl bg-amber-900 text-white text-xs font-black hover:bg-amber-950 shrink-0"
-                  >
-                    자산 풀에 등록
-                  </button>
-                </div>
-                {goldbarPoolList.length > 0 && (
-                  <ul className="mt-3 space-y-1 text-[11px] font-mono font-bold text-slate-600 max-h-28 overflow-y-auto border-t border-amber-100/80 pt-3">
-                    {goldbarPoolList.map((t: any) => (
-                      <li key={`pool-${t.tag_uid}`}>· {t.tag_uid}</li>
-                    ))}
-                  </ul>
-                )}
               </div>
 
               {/* 검색 및 필터 패널 */}
@@ -1692,12 +1673,114 @@ export default function AdminDashboard() {
                         <span className="text-slate-400 font-bold block text-[11px]">제조일자</span>
                         <span className="font-black text-slate-700 break-words">{g.minted_at || '-'}</span>
                       </div>
-                      <div className="col-span-2 border-t border-slate-100 pt-2 mt-1 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 min-w-0">
-                        <div className="min-w-0 flex-1">
-                          <span className="text-slate-400 font-bold block text-[11px]">연결된 NFC 태그 UID</span>
-                          <span className="font-mono font-black text-amber-700 text-xs sm:text-sm break-all">{g.tag_uid || '미매핑'}</span>
+                      <div className="col-span-2 border-t border-slate-100 pt-2 mt-1 flex flex-col gap-2 min-w-0">
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleGoldbarUidPanel(g)}
+                            className="flex-1 min-w-0 text-left rounded-xl bg-white/80 hover:bg-amber-50/80 border border-slate-100 hover:border-amber-200/80 px-3 py-2.5 transition-all group/uid"
+                          >
+                            <span className="text-slate-400 font-bold block text-[11px] flex items-center gap-1.5 justify-between">
+                              <span>인증서 연결 NFC UID</span>
+                              <ChevronDown
+                                className={`w-4 h-4 shrink-0 text-amber-600 transition-transform ${expandedGoldbarId === g.id ? 'rotate-180' : ''}`}
+                              />
+                            </span>
+                            <span className="font-mono font-black text-amber-700 text-xs sm:text-sm break-all block mt-1">
+                              {(g.cert_count ?? 0) > 0
+                                ? `총 ${g.cert_count}건 · 최근 ${g.tag_uid}`
+                                : '미매핑'}
+                            </span>
+                          </button>
+                          <span className="text-xs bg-amber-50 text-amber-700 px-2.5 py-1 rounded-xl font-black shrink-0 self-start sm:self-center">{g.purity}</span>
                         </div>
-                        <span className="text-xs bg-amber-50 text-amber-700 px-2.5 py-1 rounded-xl font-black shrink-0 self-start">{g.purity}</span>
+                        {expandedGoldbarId === g.id && (
+                          <div className="rounded-xl border border-amber-100 bg-amber-50/40 p-3 space-y-3">
+                            {goldbarTagUidsLoadingId === g.id ? (
+                              <div className="flex items-center gap-2 text-amber-800 text-xs font-bold">
+                                <Loader2 className="w-4 h-4 animate-spin" /> UID 목록 불러오는 중…
+                              </div>
+                            ) : (
+                              <>
+                                {(goldbarTagUidsMap[g.id]?.length ?? 0) === 0 ? (
+                                  <p className="text-xs font-bold text-slate-500">인증서에 연결된 NFC UID가 없습니다.</p>
+                                ) : (
+                                  <ul className="space-y-1.5">
+                                    {(goldbarTagUidsMap[g.id] ?? [])
+                                      .slice(
+                                        ((goldbarTagUidPage[g.id] ?? 1) - 1) * GOLDBAR_TAG_UID_PAGE_SIZE,
+                                        (goldbarTagUidPage[g.id] ?? 1) * GOLDBAR_TAG_UID_PAGE_SIZE
+                                      )
+                                      .map((uid) => (
+                                        <li
+                                          key={uid}
+                                          className="font-mono text-xs font-black text-slate-800 bg-white border border-slate-100 rounded-lg px-2.5 py-2 break-all"
+                                        >
+                                          {uid}
+                                        </li>
+                                      ))}
+                                  </ul>
+                                )}
+                                {(goldbarTagUidsMap[g.id]?.length ?? 0) > GOLDBAR_TAG_UID_PAGE_SIZE && (
+                                  <div className="flex justify-center items-center gap-2 flex-wrap pt-1">
+                                    <button
+                                      type="button"
+                                      disabled={(goldbarTagUidPage[g.id] ?? 1) <= 1}
+                                      onClick={() =>
+                                        setGoldbarTagUidPage((p) => ({
+                                          ...p,
+                                          [g.id]: Math.max(1, (p[g.id] ?? 1) - 1),
+                                        }))
+                                      }
+                                      className="h-9 px-3 text-[11px] font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50"
+                                    >
+                                      이전
+                                    </button>
+                                    {Array.from({
+                                      length: Math.ceil(
+                                        (goldbarTagUidsMap[g.id]?.length ?? 0) / GOLDBAR_TAG_UID_PAGE_SIZE
+                                      ),
+                                    }).map((_, i) => (
+                                      <button
+                                        key={i}
+                                        type="button"
+                                        onClick={() => setGoldbarTagUidPage((p) => ({ ...p, [g.id]: i + 1 }))}
+                                        className={`w-9 h-9 text-[11px] font-black rounded-xl border shrink-0 ${
+                                          (goldbarTagUidPage[g.id] ?? 1) === i + 1
+                                            ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-transparent shadow-sm'
+                                            : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'
+                                        }`}
+                                      >
+                                        {i + 1}
+                                      </button>
+                                    ))}
+                                    <button
+                                      type="button"
+                                      disabled={
+                                        (goldbarTagUidPage[g.id] ?? 1) >=
+                                        Math.ceil((goldbarTagUidsMap[g.id]?.length ?? 0) / GOLDBAR_TAG_UID_PAGE_SIZE)
+                                      }
+                                      onClick={() =>
+                                        setGoldbarTagUidPage((p) => ({
+                                          ...p,
+                                          [g.id]: Math.min(
+                                            Math.ceil(
+                                              (goldbarTagUidsMap[g.id]?.length ?? 0) / GOLDBAR_TAG_UID_PAGE_SIZE
+                                            ),
+                                            (p[g.id] ?? 1) + 1
+                                          ),
+                                        }))
+                                      }
+                                      className="h-9 px-3 text-[11px] font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50"
+                                    >
+                                      다음
+                                    </button>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
