@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { LayoutDashboard, Tag, Package, Plus, Bell, ArrowUpRight, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut, Eye, ChevronDown, ChevronUp } from 'lucide-react';
 
 export default function AdminDashboard() {
-  const [currentTab, setCurrentTab] = useState<'dashboard' | 'products' | 'nfc' | 'goldbars'>('dashboard');
+  const [currentTab, setCurrentTab] = useState<'dashboard' | 'products' | 'nfc' | 'goldbars' | 'userGoldbars'>('dashboard');
   const [isAdminGuideOpen, setIsAdminGuideOpen] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
   const [goldbars, setGoldbars] = useState<any[]>([]);
@@ -575,6 +575,7 @@ export default function AdminDashboard() {
             { id: 'products', icon: Package, label: '제품 정보 관리' },
             { id: 'nfc', icon: Tag, label: 'NFC 태그 관리' },
             { id: 'goldbars', icon: Award, label: '골드바 정품인증 관리' },
+            { id: 'userGoldbars', icon: Hash, label: '골드바 시세 및 유저 관리' },
           ].map((item) => (
             <button 
               key={item.id}
@@ -1126,17 +1127,28 @@ export default function AdminDashboard() {
                   </button>
                 </div>
               )}
+            </>
+          )}
 
-              {/* 고객별 오늘의 시세 노출 관리 섹션 */}
-              <div className="bg-white rounded-[2.5rem] p-6 lg:p-8 border border-slate-50 shadow-sm space-y-6 mt-10">
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-6 bg-amber-500 rounded-full"></div>
-                  <h3 className="text-lg font-black text-slate-800">고객별 오늘의 시세 노출 관리</h3>
+          {/* 5. 골드바 시세 및 유저 관리 탭 (신설) */}
+          {currentTab === 'userGoldbars' && (
+            <>
+              <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+                <div>
+                  <h2 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">골드바 시세 및 유저 관리</h2>
+                  <p className="text-xs font-bold text-slate-400 mt-1">
+                    각 골드바를 구매한 사용자에게 오늘의 시세를 노출할지 여부와 1g당 매입 시세를 직접 설정할 수 있습니다.
+                  </p>
                 </div>
-                <p className="text-xs font-bold text-slate-400">
-                  각 골드바를 구매한 사용자에게 오늘의 시세를 노출할지 여부와 1g당 매입 시세를 직접 설정할 수 있습니다.
-                </p>
+                <button
+                  onClick={fetchUserGoldbars}
+                  className="px-4 py-2.5 bg-white border border-slate-200 text-slate-600 font-black text-xs rounded-xl hover:bg-slate-50 transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                >
+                  🔄 새로고침
+                </button>
+              </div>
 
+              <div className="bg-white rounded-[2.5rem] p-6 lg:p-8 border border-slate-50 shadow-sm space-y-6">
                 <div className="overflow-x-auto rounded-2xl border border-slate-100">
                   <table className="w-full border-collapse text-left text-sm bg-white">
                     <thead>
