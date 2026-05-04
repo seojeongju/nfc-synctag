@@ -1,6 +1,6 @@
 /** 제품 보증서 PDF에 채울 데이터 */
 
-export const DEFAULT_GUARANTEE_ISSUER = 'GOLDEN PHOENIX Co., Ltd.';
+export const DEFAULT_GUARANTEE_ISSUER = '제이에로스';
 
 export type GuaranteeCertificateData = {
   productName: string;
