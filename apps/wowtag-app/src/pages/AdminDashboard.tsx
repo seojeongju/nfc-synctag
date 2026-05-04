@@ -1,8 +1,26 @@
 import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Tag, Package, Plus, Bell, ArrowUpRight, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut, Eye, ChevronDown, ChevronUp } from 'lucide-react';
 
+const ADMIN_TAB_IDS = ['dashboard', 'products', 'nfc', 'goldbars', 'userGoldbars'] as const;
+type AdminTabId = (typeof ADMIN_TAB_IDS)[number];
+
 export default function AdminDashboard() {
-  const [currentTab, setCurrentTab] = useState<'dashboard' | 'products' | 'nfc' | 'goldbars' | 'userGoldbars'>('dashboard');
+  const { tab: tabParam } = useParams<{ tab: string }>();
+  const navigate = useNavigate();
+
+  const currentTab: AdminTabId =
+    tabParam && ADMIN_TAB_IDS.includes(tabParam as AdminTabId) ? (tabParam as AdminTabId) : 'dashboard';
+
+  useEffect(() => {
+    if (tabParam && !ADMIN_TAB_IDS.includes(tabParam as AdminTabId)) {
+      navigate('/admin/dashboard', { replace: true });
+    }
+  }, [tabParam, navigate]);
+
+  const goToTab = (id: AdminTabId) => {
+    navigate(`/admin/${id}`);
+  };
   const [isAdminGuideOpen, setIsAdminGuideOpen] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
   const [goldbars, setGoldbars] = useState<any[]>([]);
@@ -98,36 +116,6 @@ export default function AdminDashboard() {
   const [submitting, setSubmitting] = useState(false);
   const [nfcScanning, setNfcScanning] = useState(false);
   const [nfcWriting, setNfcWriting] = useState(false);
-
-  // 모바일 뒤로가기 해시 연동
-  useEffect(() => {
-    const handleHashChange = () => {
-      const hash = window.location.hash;
-      if (hash && hash.startsWith('#tab=')) {
-        const tab = hash.replace('#tab=', '') as any;
-        if (['dashboard', 'products', 'nfc', 'goldbars', 'userGoldbars'].includes(tab)) {
-          setCurrentTab(tab);
-        }
-      } else {
-        setCurrentTab('dashboard');
-      }
-    };
-
-    if (!window.location.hash) {
-      window.history.replaceState(null, '', '#tab=' + currentTab);
-    } else {
-      handleHashChange();
-    }
-
-    window.addEventListener('popstate', handleHashChange);
-    return () => window.removeEventListener('popstate', handleHashChange);
-  }, []);
-
-  useEffect(() => {
-    if (window.location.hash !== '#tab=' + currentTab) {
-      window.history.pushState(null, '', '#tab=' + currentTab);
-    }
-  }, [currentTab]);
 
   const fetchProducts = async () => {
     try {
@@ -609,7 +597,7 @@ export default function AdminDashboard() {
           ].map((item) => (
             <button 
               key={item.id}
-              onClick={() => setCurrentTab(item.id as any)}
+              onClick={() => goToTab(item.id as AdminTabId)}
               className={`flex items-center gap-4 px-4 py-4 rounded-2xl transition-all duration-300 group ${
                 currentTab === item.id ? 'bg-primary text-white shadow-xl shadow-primary/30' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
               }`}
@@ -643,7 +631,7 @@ export default function AdminDashboard() {
       <main className="flex-1 lg:ml-72 flex flex-col min-h-screen">
         {/* 헤더 */}
         <header className="h-16 lg:h-20 bg-white/80 backdrop-blur-xl border-b border-slate-50 px-4 lg:px-10 flex items-center justify-between sticky top-0 z-10 transition-all">
-          <div className="flex items-center gap-2.5 lg:hidden select-none cursor-pointer" onClick={() => setCurrentTab('dashboard')}>
+          <div className="flex items-center gap-2.5 lg:hidden select-none cursor-pointer" onClick={() => goToTab('dashboard')}>
             <img src="/gold_synctag_logo_v2.png" alt="Logo" className="w-7 h-7 object-contain rounded-lg" />
             <span className="font-black text-slate-800">Gold SyncTag</span>
           </div>
@@ -708,7 +696,7 @@ export default function AdminDashboard() {
                 ].map((stat, i) => (
                   <div 
                     key={i} 
-                    onClick={() => stat.tab && setCurrentTab(stat.tab as any)}
+                    onClick={() => stat.tab && goToTab(stat.tab as AdminTabId)}
                     className="bg-white p-5 lg:p-8 rounded-[2rem] shadow-sm border border-slate-50 hover:border-slate-200/60 hover:shadow-xl transition-all cursor-pointer group hover:scale-[1.02] active:scale-[0.98] flex flex-col justify-between min-h-[160px]"
                   >
                     <div className={`w-12 h-12 rounded-2xl ${stat.bg} ${stat.color} flex items-center justify-center mb-4 transition-transform group-hover:scale-105`}><stat.icon className="w-6 h-6" /></div>
@@ -1603,7 +1591,7 @@ export default function AdminDashboard() {
            { id: 'userGoldbars', icon: Hash, label: '시세' },
          ].map((nav) => (
            <button 
-             key={nav.id} onClick={() => { setCurrentTab(nav.id as any); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+             key={nav.id} onClick={() => { goToTab(nav.id as AdminTabId); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
              className={`flex flex-col items-center justify-center w-14 h-12 rounded-xl transition-all cursor-pointer ${currentTab === nav.id ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/25 scale-105 font-black' : 'text-slate-400 hover:text-slate-600'}`}
            >
              <nav.icon className="w-5 h-5" />

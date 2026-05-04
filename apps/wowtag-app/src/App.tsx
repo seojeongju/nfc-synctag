@@ -36,7 +36,7 @@ function LoginPage() {
       if (res.ok) {
         const data = await res.json();
         localStorage.setItem('admin_token', data.token);
-        navigate('/admin');
+        navigate('/admin/dashboard');
       } else {
         const data = await res.json();
         setError(data.error || '로그인에 실패했습니다.');
@@ -121,14 +121,22 @@ function App() {
       <Route path="/" element={<UserLanding />} />
       <Route path="/t/:tagId" element={<UserLanding />} />
       
-      {/* 관리자용 경로 (Protected) */}
-      <Route 
-        path="/admin/*" 
+      {/* 관리자용 경로: 탭을 경로로 두어 모바일 시스템 뒤로가기 = 이전 탭/페이지 */}
+      <Route
+        path="/admin"
+        element={
+          <PrivateRoute>
+            <Navigate to="/admin/dashboard" replace />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/admin/:tab"
         element={
           <PrivateRoute>
             <AdminDashboard />
           </PrivateRoute>
-        } 
+        }
       />
       
       {/* 로그인 페이지 */}
