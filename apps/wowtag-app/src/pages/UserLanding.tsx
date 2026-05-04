@@ -387,8 +387,8 @@ export default function UserLanding() {
           }
         }
 
-        // 2. 골드바 제품 조회
-        const goldbarRes = await fetch(`/api/goldbars/t/${tagId}`);
+        // 2. 골드바 / 카탈로그 제품 조회 (UID에 콜론 등이 있으면 경로 인코딩 필수)
+        const goldbarRes = await fetch(`/api/goldbars/t/${encodeURIComponent(tagId)}`);
         if (goldbarRes.ok) {
           const data = await goldbarRes.json();
           setGoldbar(data);

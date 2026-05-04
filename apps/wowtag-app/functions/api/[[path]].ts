@@ -44,6 +44,27 @@ function pendingCertificateTagUid(goldbarId: number): string {
   return `__PENDING_GB_${goldbarId}__`;
 }
 
+/** 휴대폰/라우터마다 UID 표기(콜론·대소문자)가 달라 DB `tag_uid`와 불일치할 수 있어 후보 생성 */
+function nfcTagUidLookupVariants(param: string): string[] {
+  const raw = decodeURIComponent(String(param || '')).trim();
+  if (!raw) return [];
+  const out = new Set<string>();
+  out.add(raw);
+  out.add(raw.toLowerCase());
+  out.add(raw.toUpperCase());
+  const hex = raw.replace(/[^0-9a-fA-F]/g, '');
+  if (hex.length >= 8) {
+    out.add(hex.toLowerCase());
+    out.add(hex.toUpperCase());
+    const pairs = hex.match(/.{1,2}/g);
+    if (pairs) {
+      out.add(pairs.join(':'));
+      out.add(pairs.join(':').toLowerCase());
+    }
+  }
+  return [...out].filter(Boolean);
+}
+
 async function ensureGoldbarsDisplayNameColumn(db: D1Database) {
   try {
     await db.prepare('ALTER TABLE goldbars ADD COLUMN display_name TEXT').run();
@@ -267,37 +288,92 @@ app.post('/goldbar-tag-pool', async (c) => {
   }
 });
 
-// 특정 NFC 태그로 골드바 정품인증 정보 조회
+// 특정 NFC 태그로 골드바 정품인증 정보 조회 — (1) 인증서 연결 골드바 (2) tags·카탈로그 제품 매칭
 app.get('/goldbars/t/:tagId', async (c) => {
   try {
-    const tagId = c.req.param('tagId');
-    const query = `
-      SELECT g.*, c.tag_uid, c.cert_file_path 
+    const param = c.req.param('tagId');
+    const variants = nfcTagUidLookupVariants(param);
+    if (variants.length === 0) {
+      return c.json({ error: 'not_found' }, 404);
+    }
+
+    const certQuery = `
+      SELECT g.*, c.tag_uid, c.cert_file_path
       FROM goldbars g
       JOIN certificates c ON g.id = c.goldbar_id
       WHERE c.tag_uid = ?
     `;
-    const goldbar = await c.env.DB.prepare(query).bind(tagId).first();
 
-    if (!goldbar) {
-      return c.json({ error: 'not_found' }, 404);
+    let matchedUid: string | null = null;
+    let goldbar: Record<string, unknown> | null = null;
+
+    for (const v of variants) {
+      const row = await c.env.DB.prepare(certQuery).bind(v).first();
+      if (row) {
+        goldbar = row as Record<string, unknown>;
+        matchedUid = v;
+        break;
+      }
     }
 
-    // 스캔 로그 기록
-    c.executionCtx.waitUntil(
-      c.env.DB.prepare('INSERT INTO verification_logs (tag_uid, scanned_at, is_valid) VALUES (?, ?, ?)')
-        .bind(tagId, new Date().toISOString(), 1)
-        .run()
-    );
+    if (goldbar && matchedUid) {
+      c.executionCtx.waitUntil(
+        c.env.DB
+          .prepare('INSERT INTO verification_logs (tag_uid, scanned_at, is_valid) VALUES (?, ?, ?)')
+          .bind(matchedUid, new Date().toISOString(), 1)
+          .run()
+      );
+      const expiry = Date.now() + 10 * 60 * 1000;
+      const downloadToken = btoa(`${matchedUid}:${expiry}`);
+      return c.json({
+        ...goldbar,
+        wallet_source: 'goldbar_cert',
+        download_token: downloadToken
+      });
+    }
 
-    // 10분간 유효한 단기 다운로드 토큰 발행
-    const expiry = Date.now() + 10 * 60 * 1000;
-    const downloadToken = btoa(`${tagId}:${expiry}`);
+    const productQuery = `
+      SELECT p.*, t.tag_uid AS mapped_tag_uid
+      FROM tags t
+      INNER JOIN products p ON p.id = t.product_id
+      WHERE t.tag_uid = ?
+    `;
+    let productRow: Record<string, unknown> | null = null;
+    for (const v of variants) {
+      const row = await c.env.DB.prepare(productQuery).bind(v).first();
+      if (row) {
+        productRow = row as Record<string, unknown>;
+        matchedUid = v;
+        break;
+      }
+    }
 
-    return c.json({
-      ...goldbar,
-      download_token: downloadToken
-    });
+    if (productRow && matchedUid) {
+      const pid = Number(productRow.id);
+      c.executionCtx.waitUntil(
+        c.env.DB
+          .prepare('INSERT INTO verification_logs (tag_uid, scanned_at, is_valid) VALUES (?, ?, ?)')
+          .bind(matchedUid, new Date().toISOString(), 1)
+          .run()
+      );
+      return c.json({
+        id: `product_${pid}`,
+        wallet_source: 'catalog_product',
+        serial_number: (productRow.name as string) || String(matchedUid),
+        weight: (productRow.weight as string) || '',
+        purity: (productRow.purity as string) || '',
+        minted_at: '',
+        image_url: (productRow.image_url as string) || '',
+        product_id: pid,
+        mapped_tag_uid: matchedUid,
+        tag_uid: matchedUid,
+        show_market_price: 0,
+        cert_url: null,
+        download_token: null
+      });
+    }
+
+    return c.json({ error: 'not_found' }, 404);
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
   }
@@ -1037,11 +1113,30 @@ app.get('/t/:tagId', async (c) => {
     }
   }
 
+  /** tags/풀에 없고 골드바 인증서(certificates)에만 연결된 실제 NFC UID */
+  let certOnlyUid: string | null = null;
   if (!row && !poolRow) {
+    for (const v of variants) {
+      const cr = await c.env.DB
+        .prepare(
+          `SELECT c.tag_uid FROM certificates c
+           WHERE c.tag_uid = ? AND c.tag_uid NOT LIKE '__PENDING%'
+           LIMIT 1`
+        )
+        .bind(v)
+        .first();
+      if (cr && (cr as { tag_uid: string }).tag_uid) {
+        certOnlyUid = (cr as { tag_uid: string }).tag_uid;
+        break;
+      }
+    }
+  }
+
+  if (!row && !poolRow && !certOnlyUid) {
     return c.json({ error: 'not_found' }, 404);
   }
 
-  const canonicalUid = row?.tag_uid ?? poolRow?.tag_uid ?? param;
+  const canonicalUid = row?.tag_uid ?? poolRow?.tag_uid ?? certOnlyUid ?? param;
 
   c.executionCtx.waitUntil(
     c.env.DB
@@ -1068,6 +1163,15 @@ app.get('/t/:tagId', async (c) => {
   }
 
   if (!row) {
+    if (certOnlyUid) {
+      return c.json({
+        nfc_mode: 'home',
+        tag_uid: canonicalUid,
+        message: 'Gold SyncTag 정품 NFC 태그입니다.',
+        goldbar_cert_linked: true,
+        ...(unmapVerify ? { unmap_proof_recorded: true } : {})
+      });
+    }
     return c.json({ error: 'not_found' }, 404);
   }
 
@@ -1239,36 +1343,119 @@ app.delete('/goldbars/:id', async (c) => {
 
 app.get('/admin/stats', async (c) => {
   try {
-    // 1. 누적 스캔 수
+    try {
+      await c.env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS verification_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          tag_uid TEXT NOT NULL,
+          scanned_at TEXT NOT NULL,
+          is_valid INTEGER DEFAULT 1
+        )
+      `).run();
+    } catch (_) {}
+
     const scanCount = await c.env.DB.prepare('SELECT COUNT(*) as cnt FROM verification_logs').first();
-    
-    // 2. 활성 태그 수 (중복 제거)
+
+    const scanToday = await c.env.DB.prepare(
+      `SELECT COUNT(*) as cnt FROM verification_logs WHERE date(scanned_at) = date('now')`
+    ).first();
+
     const activeTags = await c.env.DB.prepare('SELECT COUNT(DISTINCT tag_uid) as cnt FROM verification_logs').first();
 
-    // 3. 최근 스캔 로그 리스트
-    const { results: recentLogs } = await c.env.DB.prepare(`
-      SELECT l.*, g.serial_number 
+    let tagsRegistered: { cnt?: number } = { cnt: 0 };
+    let tagsLinked: { cnt?: number } = { cnt: 0 };
+    try {
+      tagsRegistered =
+        (await c.env.DB.prepare('SELECT COUNT(*) as cnt FROM tags').first()) || tagsRegistered;
+      tagsLinked =
+        (await c.env.DB.prepare('SELECT COUNT(*) as cnt FROM tags WHERE product_id IS NOT NULL').first()) ||
+        tagsLinked;
+    } catch (_) {
+      /* tags 미마이그레이션 */
+    }
+
+    let userCount: { cnt?: number } = { cnt: 0 };
+    try {
+      await c.env.DB
+        .prepare(
+          `CREATE TABLE IF NOT EXISTS users (
+          id TEXT PRIMARY KEY,
+          email TEXT UNIQUE NOT NULL,
+          name TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`
+        )
+        .run();
+      userCount = (await c.env.DB.prepare('SELECT COUNT(*) as cnt FROM users').first()) || userCount;
+    } catch (_) {
+      /* users 테이블 없음 */
+    }
+
+    const recentLogsRaw = await c.env.DB.prepare(`
+      SELECT
+        l.id,
+        l.tag_uid,
+        l.scanned_at,
+        l.is_valid,
+        COALESCE(
+          (SELECT g.serial_number FROM certificates c
+           INNER JOIN goldbars g ON g.id = c.goldbar_id
+           WHERE c.tag_uid = l.tag_uid LIMIT 1),
+          (SELECT p.name FROM tags t
+           INNER JOIN products p ON p.id = t.product_id
+           WHERE t.tag_uid = l.tag_uid LIMIT 1),
+          l.tag_uid
+        ) AS display_label
       FROM verification_logs l
-      LEFT JOIN certificates c ON l.tag_uid = c.tag_uid
-      LEFT JOIN goldbars g ON c.goldbar_id = g.id
-      ORDER BY l.scanned_at DESC LIMIT 5
+      ORDER BY l.scanned_at DESC
+      LIMIT 12
     `).all();
 
-    // 4. 가장 많이 스캔된 인기 골드바 Top 3 조회
-    const { results: topGoldbars } = await c.env.DB.prepare(`
-      SELECT g.serial_number, COUNT(l.id) as scan_count
-      FROM goldbars g
-      JOIN certificates c ON g.id = c.goldbar_id
-      JOIN verification_logs l ON c.tag_uid = l.tag_uid
-      GROUP BY g.id, g.serial_number
-      ORDER BY scan_count DESC LIMIT 3
+    const topScanned = await c.env.DB.prepare(`
+      WITH tag_cnt AS (
+        SELECT tag_uid, COUNT(*) AS scan_count
+        FROM verification_logs
+        GROUP BY tag_uid
+      )
+      SELECT
+        tag_cnt.tag_uid AS tag_uid,
+        tag_cnt.scan_count AS scan_count,
+        COALESCE(
+          (SELECT g.serial_number FROM certificates c
+           INNER JOIN goldbars g ON g.id = c.goldbar_id
+           WHERE c.tag_uid = tag_cnt.tag_uid LIMIT 1),
+          (SELECT p.name FROM tags t
+           INNER JOIN products p ON p.id = t.product_id
+           WHERE t.tag_uid = tag_cnt.tag_uid LIMIT 1),
+          tag_cnt.tag_uid
+        ) AS display_label
+      FROM tag_cnt
+      ORDER BY tag_cnt.scan_count DESC
+      LIMIT 5
     `).all();
+
+    const recentLogs = (recentLogsRaw.results || []).map((row: Record<string, unknown>) => ({
+      ...row,
+      serial_number: row.display_label
+    }));
+
+    const topRows = topScanned.results || [];
+    const topGoldbars = topRows.map((r: Record<string, unknown>) => ({
+      serial_number: r.display_label,
+      scan_count: r.scan_count,
+      tag_uid: r.tag_uid
+    }));
 
     return c.json({
-      scanCount: (scanCount as any)?.cnt || 0,
-      activeTags: (activeTags as any)?.cnt || 0,
+      scanCount: Number((scanCount as any)?.cnt || 0),
+      scanCountToday: Number((scanToday as any)?.cnt || 0),
+      activeTags: Number((activeTags as any)?.cnt || 0),
+      tagsRegistered: Number((tagsRegistered as any)?.cnt || 0),
+      tagsLinked: Number((tagsLinked as any)?.cnt || 0),
+      userCount: Number((userCount as any)?.cnt ?? 0),
       recentLogs,
-      topGoldbars
+      topGoldbars,
+      topScanned: topRows
     });
   } catch (err: any) {
     return c.json({ error: err.message }, 500);

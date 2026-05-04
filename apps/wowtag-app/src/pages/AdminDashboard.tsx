@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Tag, Package, Plus, Bell, ArrowUpRight, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Link2Off, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut, Eye, ChevronDown, ChevronUp, RefreshCw, Download, Box } from 'lucide-react';
+import { LayoutDashboard, Tag, Package, Plus, Bell, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Link2Off, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut, Eye, ChevronDown, ChevronUp, RefreshCw, Download, Box, User, Activity, Users, ScanLine } from 'lucide-react';
 import { ImeTextInput } from '../components/ImeTextInput';
 import { GuaranteePdfHost } from '../components/ProductGuaranteeCertificate';
 import { GuaranteeCertificatePreviewModal } from '../components/GuaranteeCertificatePreviewModal';
@@ -252,7 +252,17 @@ export default function AdminDashboard() {
   const [bulkShowMarket, setBulkShowMarket] = useState(true);
   const [bulkUserId, setBulkUserId] = useState('');
   const [bulkGoldbarId, setBulkGoldbarId] = useState<number | ''>('');
-  const [stats, setStats] = useState<any>({ scanCount: 0, activeTags: 0, recentLogs: [], topGoldbars: [] });
+  const [stats, setStats] = useState<any>({
+    scanCount: 0,
+    scanCountToday: 0,
+    activeTags: 0,
+    tagsRegistered: 0,
+    tagsLinked: 0,
+    userCount: 0,
+    recentLogs: [],
+    topGoldbars: []
+  });
+  const [statsLoading, setStatsLoading] = useState(true);
   
   // 검색 및 필터 상태
   const [searchTerm, setSearchTerm] = useState('');
@@ -561,6 +571,7 @@ export default function AdminDashboard() {
   };
 
   const fetchStats = async () => {
+    setStatsLoading(true);
     try {
       const res = await fetch('/api/admin/stats');
       if (res.ok) {
@@ -569,6 +580,8 @@ export default function AdminDashboard() {
       }
     } catch (err) {
       console.error('Failed to fetch stats', err);
+    } finally {
+      setStatsLoading(false);
     }
   };
 
@@ -705,6 +718,12 @@ export default function AdminDashboard() {
     fetchAdminUsers();
     fetchTags();
   }, []);
+
+  useEffect(() => {
+    if (currentTab !== 'dashboard') return;
+    fetchStats();
+    fetchTags();
+  }, [currentTab]);
 
   useEffect(() => {
     if (!isProductModalOpen && !isEditProductModalOpen) {
@@ -1178,9 +1197,12 @@ export default function AdminDashboard() {
     window.location.href = '/login';
   };
 
-  const usageRate = goldbars.length > 0 
-    ? ((stats.activeTags / goldbars.length) * 100).toFixed(0) + '%' 
-    : '0%';
+  /** NFC 탭 기준 제품(카탈로그)용 태그 중 출고(제품) 매칭 완료 비율 */
+  const nfcProductMatchRate = useMemo(() => {
+    const total = nfcProductTags.length;
+    if (total === 0) return null;
+    return Math.min(100, Math.round((nfcLinkedList.length / total) * 100));
+  }, [nfcProductTags, nfcLinkedList]);
 
   // 검색 및 필터링된 골드바 리스트
   const filteredGoldbars = goldbars.filter(g => {
@@ -1270,11 +1292,25 @@ export default function AdminDashboard() {
             >
               <Eye className="w-5 h-5" />
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                void fetchStats();
+                void fetchTags();
+                void fetchProducts();
+                void fetchGoldbars();
+              }}
+              title="대시보드 데이터 새로고침"
+              className="p-2.5 rounded-2xl text-slate-400 hover:bg-slate-50 hover:text-amber-600 transition-colors"
+              aria-label="새로고침"
+            >
+              <RefreshCw className={`w-5 h-5 ${statsLoading ? 'animate-spin' : ''}`} />
+            </button>
             <button type="button" className="p-2.5 rounded-2xl text-slate-400 hover:bg-slate-50 transition-colors relative" aria-label="알림">
               <Bell className="w-5 h-5" />
             </button>
-            <div className="w-9 h-9 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden shrink-0">
-              <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Jay" alt="" />
+            <div className="w-9 h-9 rounded-2xl bg-amber-100 border border-amber-200 flex items-center justify-center text-amber-700 shrink-0" title="관리자">
+              <User className="w-5 h-5" />
             </div>
           </div>
         </header>
@@ -1317,33 +1353,128 @@ export default function AdminDashboard() {
                 )}
               </div>
 
-              <div className="flex items-end justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
                 <div>
-                  <h2 className="text-2xl lg:text-4xl font-black text-slate-900 tracking-tight">현황 요약</h2>
-                  <p className="text-sm font-bold text-slate-400 mt-1">플랫폼의 전반적인 데이터를 한눈에 확인하세요.</p>
+                  <h2 className="text-2xl lg:text-4xl font-black text-slate-900 tracking-tight">운영 현황</h2>
+                  <p className="text-sm font-bold text-slate-400 mt-1">
+                    카탈로그·골드바·NFC 태그·스캔 로그를 실시간 집계합니다. 카드 클릭 시 해당 메뉴로 이동합니다.
+                  </p>
                 </div>
               </div>
 
-              {/* 통계 카드 */}
+              {/* 핵심 KPI */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 min-w-0 w-full">
                 {[
-                  { label: '전체 제품', value: products.length, icon: Package, color: 'text-blue-600', bg: 'bg-blue-50', tab: 'products' },
-                  { label: '골드바 개수', value: goldbars.length, icon: Award, color: 'text-amber-600', bg: 'bg-amber-50', tab: 'goldbars' },
-                  { label: '활성 태그', value: stats.activeTags, icon: Tag, color: 'text-emerald-600', bg: 'bg-emerald-50', tab: 'nfc' },
-                  { label: '가동률', value: usageRate, icon: ArrowUpRight, color: 'text-rose-600', bg: 'bg-rose-50', tab: 'nfc' },
+                  {
+                    label: '카탈로그 제품',
+                    sub: '판매용 제품 등록',
+                    value: products.length,
+                    icon: Package,
+                    color: 'text-blue-600',
+                    bg: 'bg-blue-50',
+                    tab: 'products' as AdminTabId
+                  },
+                  {
+                    label: '골드바 인증',
+                    sub: '정품 골드바 행',
+                    value: goldbars.length,
+                    icon: Award,
+                    color: 'text-amber-600',
+                    bg: 'bg-amber-50',
+                    tab: 'goldbars' as AdminTabId
+                  },
+                  {
+                    label: '누적 NFC 스캔',
+                    sub: `오늘 ${statsLoading ? '…' : Number(stats.scanCountToday ?? 0).toLocaleString()}건`,
+                    value: statsLoading ? '…' : Number(stats.scanCount ?? 0).toLocaleString(),
+                    icon: ScanLine,
+                    color: 'text-emerald-600',
+                    bg: 'bg-emerald-50',
+                    tab: 'dashboard' as AdminTabId
+                  },
+                  {
+                    label: '제품 매칭률',
+                    sub: '출고 완료 / 제품용 태그',
+                    value:
+                      nfcProductMatchRate === null
+                        ? '—'
+                        : `${nfcProductMatchRate}%`,
+                    icon: Tag,
+                    color: 'text-violet-600',
+                    bg: 'bg-violet-50',
+                    tab: 'nfc' as AdminTabId
+                  }
                 ].map((stat, i) => (
-                  <div 
-                    key={i} 
-                    onClick={() => stat.tab && goToTab(stat.tab as AdminTabId)}
-                    className="bg-white p-4 sm:p-5 lg:p-8 rounded-2xl sm:rounded-[2rem] shadow-sm border border-slate-50 hover:border-slate-200/60 hover:shadow-xl transition-all cursor-pointer group hover:scale-[1.02] active:scale-[0.98] flex flex-col justify-between min-h-[140px] sm:min-h-[160px] min-w-0 max-w-full"
+                  <button
+                    type="button"
+                    key={i}
+                    onClick={() => stat.tab && goToTab(stat.tab)}
+                    className="text-left bg-white p-4 sm:p-5 lg:p-8 rounded-2xl sm:rounded-[2rem] shadow-sm border border-slate-50 hover:border-slate-200/60 hover:shadow-xl transition-all cursor-pointer group hover:scale-[1.02] active:scale-[0.98] flex flex-col justify-between min-h-[140px] sm:min-h-[160px] min-w-0 max-w-full"
                   >
-                    <div className={`w-12 h-12 rounded-2xl ${stat.bg} ${stat.color} flex items-center justify-center mb-4 transition-transform group-hover:scale-105`}><stat.icon className="w-6 h-6" /></div>
-                    <div>
-                      <p className="text-slate-400 text-xs font-black uppercase tracking-widest">{stat.label}</p>
-                      <h3 className="text-2xl lg:text-3xl font-black text-slate-900 mt-1">{stat.value}</h3>
+                    <div
+                      className={`w-12 h-12 rounded-2xl ${stat.bg} ${stat.color} flex items-center justify-center mb-4 transition-transform group-hover:scale-105`}
+                    >
+                      <stat.icon className="w-6 h-6" />
                     </div>
-                  </div>
+                    <div>
+                      <p className="text-slate-400 text-[10px] sm:text-xs font-black uppercase tracking-widest">{stat.label}</p>
+                      <h3 className="text-2xl lg:text-3xl font-black text-slate-900 mt-1 tabular-nums">{stat.value}</h3>
+                      <p className="text-[10px] font-bold text-slate-400 mt-1 leading-snug">{stat.sub}</p>
+                    </div>
+                  </button>
                 ))}
+              </div>
+
+              {/* 부가 지표 — 출고·유저 */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                <button
+                  type="button"
+                  onClick={() => goToTab('nfc')}
+                  className="bg-white rounded-2xl border border-amber-100 p-4 sm:p-5 shadow-sm hover:border-amber-300 hover:shadow-md transition-all text-left"
+                >
+                  <div className="flex items-center gap-2 text-amber-700 mb-2">
+                    <Box className="w-4 h-4 shrink-0" />
+                    <span className="text-[10px] font-black uppercase tracking-wider">출고 대기</span>
+                  </div>
+                  <p className="text-2xl font-black text-slate-900 tabular-nums">{nfcUnlinkedList.length}</p>
+                  <p className="text-[10px] font-bold text-slate-400 mt-1">제품 미연결 NFC (자산 태그)</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => goToTab('nfc')}
+                  className="bg-white rounded-2xl border border-emerald-100 p-4 sm:p-5 shadow-sm hover:border-emerald-300 hover:shadow-md transition-all text-left"
+                >
+                  <div className="flex items-center gap-2 text-emerald-700 mb-2">
+                    <LinkIcon className="w-4 h-4 shrink-0" />
+                    <span className="text-[10px] font-black uppercase tracking-wider">출고 완료</span>
+                  </div>
+                  <p className="text-2xl font-black text-slate-900 tabular-nums">{nfcLinkedList.length}</p>
+                  <p className="text-[10px] font-bold text-slate-400 mt-1">제품과 매칭된 태그</p>
+                </button>
+                <div className="bg-white rounded-2xl border border-slate-100 p-4 sm:p-5 shadow-sm">
+                  <div className="flex items-center gap-2 text-slate-500 mb-2">
+                    <Activity className="w-4 h-4 shrink-0" />
+                    <span className="text-[10px] font-black uppercase tracking-wider">스캔한 UID 수</span>
+                  </div>
+                  <p className="text-2xl font-black text-slate-900 tabular-nums">
+                    {statsLoading ? '…' : Number(stats.activeTags ?? 0).toLocaleString()}
+                  </p>
+                  <p className="text-[10px] font-bold text-slate-400 mt-1">누적 고유 태그(verification_logs)</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => goToTab('userGoldbars')}
+                  className="bg-white rounded-2xl border border-slate-100 p-4 sm:p-5 shadow-sm hover:border-purple-200 hover:shadow-md transition-all text-left"
+                >
+                  <div className="flex items-center gap-2 text-purple-600 mb-2">
+                    <Users className="w-4 h-4 shrink-0" />
+                    <span className="text-[10px] font-black uppercase tracking-wider">가입 회원</span>
+                  </div>
+                  <p className="text-2xl font-black text-slate-900 tabular-nums">
+                    {statsLoading ? '…' : Number(stats.userCount ?? adminUsers.length).toLocaleString()}
+                  </p>
+                  <p className="text-[10px] font-bold text-slate-400 mt-1">간편가입 등록 사용자</p>
+                </button>
               </div>
 
               {/* 정품인증 태그 등록 가이드 섹션 */}
@@ -1470,19 +1601,24 @@ export default function AdminDashboard() {
                 <div className="lg:col-span-1 bg-white rounded-[2.5rem] p-6 lg:p-8 border border-slate-50 shadow-sm flex flex-col h-full">
                   <div className="flex items-center gap-2 mb-6">
                     <div className="w-1.5 h-6 bg-amber-500 rounded-full"></div>
-                    <h3 className="text-lg font-black text-slate-800">인기 골드바 (스캔량 순위)</h3>
+                    <h3 className="text-lg font-black text-slate-800">스캔 Top (태그·제품·골드바)</h3>
                   </div>
 
                   <div className="space-y-3 flex-1 flex flex-col justify-start">
                     {stats.topGoldbars && stats.topGoldbars.map((g: any, i: number) => (
-                      <div key={i} className="p-4 bg-amber-50/40 rounded-2xl border border-amber-100 flex items-center justify-between">
-                        <div>
-                          <p className="text-xs font-black text-amber-700 uppercase tracking-widest">RANK 0{i + 1}</p>
-                          <p className="text-sm font-black text-slate-800 mt-0.5">{g.serial_number}</p>
+                      <div key={`${g.tag_uid ?? i}-${i}`} className="p-4 bg-amber-50/40 rounded-2xl border border-amber-100 flex items-center justify-between gap-2 min-w-0">
+                        <div className="min-w-0">
+                          <p className="text-xs font-black text-amber-700 uppercase tracking-widest">#{i + 1}</p>
+                          <p className="text-sm font-black text-slate-800 mt-0.5 break-words line-clamp-2">{g.serial_number}</p>
+                          {g.tag_uid ? (
+                            <p className="text-[10px] font-mono font-bold text-slate-400 mt-0.5 truncate" title={g.tag_uid}>
+                              {g.tag_uid}
+                            </p>
+                          ) : null}
                         </div>
-                        <div className="text-right">
-                          <p className="text-xs font-bold text-slate-400">누적 스캔</p>
-                          <p className="text-lg font-black text-amber-600">{g.scan_count}회</p>
+                        <div className="text-right shrink-0">
+                          <p className="text-xs font-bold text-slate-400">누적</p>
+                          <p className="text-lg font-black text-amber-600 tabular-nums">{g.scan_count}회</p>
                         </div>
                       </div>
                     ))}
@@ -1496,7 +1632,7 @@ export default function AdminDashboard() {
                 <div className="lg:col-span-2 bg-white rounded-[2.5rem] p-6 lg:p-8 border border-slate-50 shadow-sm flex flex-col h-full">
                   <div className="flex items-center gap-2 mb-6">
                     <div className="w-1.5 h-6 bg-emerald-500 rounded-full"></div>
-                    <h3 className="text-lg font-black text-slate-800">최근 정품인증 스캔 기록 (실시간)</h3>
+                    <h3 className="text-lg font-black text-slate-800">최근 스캔 기록</h3>
                   </div>
 
                   <div className="space-y-3 flex-1">
@@ -1507,8 +1643,10 @@ export default function AdminDashboard() {
                             <Award className="w-5 h-5" />
                           </div>
                           <div>
-                            <p className="text-sm font-black text-slate-800">일련번호: {log.serial_number || '미지정 골드바'}</p>
-                            <p className="text-xs font-bold text-slate-400 font-mono mt-0.5">UID: {log.tag_uid}</p>
+                            <p className="text-sm font-black text-slate-800 line-clamp-2">
+                              {log.display_label || log.serial_number || '이름 없음'}
+                            </p>
+                            <p className="text-xs font-bold text-slate-400 font-mono mt-0.5 break-all">UID: {log.tag_uid}</p>
                           </div>
                         </div>
 
