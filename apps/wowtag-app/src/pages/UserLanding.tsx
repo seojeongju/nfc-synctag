@@ -143,7 +143,7 @@ export default function UserLanding() {
         {/* 헤더 */}
         <header className="w-full max-w-md flex justify-between items-center h-16 px-2 mb-2">
           <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center border border-slate-100 shadow-sm opacity-0"></div>
-          <span className="text-xl font-extrabold text-slate-800 tracking-tight">syncTag</span>
+          <span className="text-xl font-extrabold text-slate-800 tracking-tight">Gold SyncTag</span>
           <Link to="/login" className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center border border-slate-100 shadow-sm text-slate-400 hover:text-primary hover:border-primary/40 transition-all">
             <Bookmark className="w-5 h-5" />
           </Link>
@@ -581,7 +581,7 @@ export default function UserLanding() {
         </div>
 
         <p className="text-[11px] font-bold text-slate-400 text-center max-w-xs leading-relaxed">
-          본 제품은 syncTag 블록체인 및 Edge Runtime 시스템을 통해 안전하게 무결성 및 정품 확인이 완료되었습니다.
+          본 제품은 Gold SyncTag 블록체인 및 Edge Runtime 시스템을 통해 안전하게 무결성 및 정품 확인이 완료되었습니다.
         </p>
       </div>
     );
