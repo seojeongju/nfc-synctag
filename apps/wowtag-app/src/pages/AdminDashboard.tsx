@@ -77,6 +77,11 @@ export default function AdminDashboard() {
     cert_url: ''
   });
 
+  const [currentPageProducts, setCurrentPageProducts] = useState(1);
+  const [currentPageTags, setCurrentPageTags] = useState(1);
+  const [currentPageGoldbars, setCurrentPageGoldbars] = useState(1);
+  const ITEMS_PER_PAGE = 5;
+
   const [activeGuide, setActiveGuide] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [nfcScanning, setNfcScanning] = useState(false);
@@ -774,7 +779,7 @@ export default function AdminDashboard() {
               </div>
 
               <div className="grid gap-4 lg:grid-cols-2">
-                {filteredProducts.map((p) => (
+                {filteredProducts.slice((currentPageProducts - 1) * ITEMS_PER_PAGE, currentPageProducts * ITEMS_PER_PAGE).map((p) => (
                   <div key={p.id} className="bg-white p-5 rounded-[2rem] border border-slate-100 flex flex-col gap-4 hover:border-primary/30 transition-all group shadow-sm">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-5">
@@ -818,6 +823,35 @@ export default function AdminDashboard() {
                   </div>
                 )}
               </div>
+
+              {/* 제품 페이지네이션 */}
+              {filteredProducts.length > ITEMS_PER_PAGE && (
+                <div className="flex justify-center items-center gap-2 mt-6">
+                  <button
+                    disabled={currentPageProducts === 1}
+                    onClick={() => setCurrentPageProducts(p => p - 1)}
+                    className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm"
+                  >
+                    이전
+                  </button>
+                  {Array.from({ length: Math.ceil(filteredProducts.length / ITEMS_PER_PAGE) }).map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setCurrentPageProducts(i + 1)}
+                      className={`w-10 h-10 text-xs font-black rounded-xl border transition-all ${currentPageProducts === i + 1 ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white border-transparent shadow-md' : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'}`}
+                    >
+                      {i + 1}
+                    </button>
+                  ))}
+                  <button
+                    disabled={currentPageProducts === Math.ceil(filteredProducts.length / ITEMS_PER_PAGE)}
+                    onClick={() => setCurrentPageProducts(p => p + 1)}
+                    className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm"
+                  >
+                    다음
+                  </button>
+                </div>
+              )}
             </>
           )}
 
@@ -832,7 +866,7 @@ export default function AdminDashboard() {
               <div className="bg-white rounded-[2.5rem] p-8 border border-slate-50 shadow-sm overflow-hidden">
                  <h3 className="text-xl font-black mb-6">최근 태그 작업</h3>
                  <div className="space-y-4">
-                   {products.filter(p => p.tag_uid).slice(0, 5).map(p => (
+                   {products.filter(p => p.tag_uid).slice((currentPageTags - 1) * ITEMS_PER_PAGE, currentPageTags * ITEMS_PER_PAGE).map(p => (
                      <div key={p.id} className="flex items-center gap-4 py-4 px-6 bg-slate-50 rounded-2xl">
                        <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-primary border border-slate-100"><Hash className="w-5 h-5" /></div>
                        <div className="flex-1">
@@ -842,7 +876,40 @@ export default function AdminDashboard() {
                        <LinkIcon className="w-4 h-4 text-slate-300" />
                      </div>
                    ))}
+
+                   {products.filter(p => p.tag_uid).length === 0 && (
+                     <p className="text-xs font-bold text-slate-400 text-center py-6">아직 등록된 NFC 태그가 없습니다.</p>
+                   )}
                  </div>
+
+                 {/* NFC 태그 페이지네이션 */}
+                 {products.filter(p => p.tag_uid).length > ITEMS_PER_PAGE && (
+                   <div className="flex justify-center items-center gap-2 mt-6">
+                     <button
+                       disabled={currentPageTags === 1}
+                       onClick={() => setCurrentPageTags(p => p - 1)}
+                       className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm"
+                     >
+                       이전
+                     </button>
+                     {Array.from({ length: Math.ceil(products.filter(p => p.tag_uid).length / ITEMS_PER_PAGE) }).map((_, i) => (
+                       <button
+                         key={i}
+                         onClick={() => setCurrentPageTags(i + 1)}
+                         className={`w-10 h-10 text-xs font-black rounded-xl border transition-all ${currentPageTags === i + 1 ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-transparent shadow-md' : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'}`}
+                       >
+                         {i + 1}
+                       </button>
+                     ))}
+                     <button
+                       disabled={currentPageTags === Math.ceil(products.filter(p => p.tag_uid).length / ITEMS_PER_PAGE)}
+                       onClick={() => setCurrentPageTags(p => p + 1)}
+                       className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm"
+                     >
+                       다음
+                     </button>
+                   </div>
+                 )}
               </div>
             </div>
           )}
@@ -887,7 +954,7 @@ export default function AdminDashboard() {
 
               {/* 골드바 리스트 */}
               <div className="grid gap-4 lg:grid-cols-2">
-                {filteredGoldbars.map((g) => (
+                {filteredGoldbars.slice((currentPageGoldbars - 1) * ITEMS_PER_PAGE, currentPageGoldbars * ITEMS_PER_PAGE).map((g) => (
                   <div key={g.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 flex flex-col gap-4 hover:border-amber-400/50 hover:shadow-xl transition-all group">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
@@ -935,6 +1002,35 @@ export default function AdminDashboard() {
                   </div>
                 )}
               </div>
+
+              {/* 골드바 페이지네이션 */}
+              {filteredGoldbars.length > ITEMS_PER_PAGE && (
+                <div className="flex justify-center items-center gap-2 mt-6">
+                  <button
+                    disabled={currentPageGoldbars === 1}
+                    onClick={() => setCurrentPageGoldbars(p => p - 1)}
+                    className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm"
+                  >
+                    이전
+                  </button>
+                  {Array.from({ length: Math.ceil(filteredGoldbars.length / ITEMS_PER_PAGE) }).map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setCurrentPageGoldbars(i + 1)}
+                      className={`w-10 h-10 text-xs font-black rounded-xl border transition-all ${currentPageGoldbars === i + 1 ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-transparent shadow-md' : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'}`}
+                    >
+                      {i + 1}
+                    </button>
+                  ))}
+                  <button
+                    disabled={currentPageGoldbars === Math.ceil(filteredGoldbars.length / ITEMS_PER_PAGE)}
+                    onClick={() => setCurrentPageGoldbars(p => p + 1)}
+                    className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm"
+                  >
+                    다음
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>
