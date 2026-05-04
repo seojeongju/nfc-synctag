@@ -85,3 +85,19 @@ CREATE TABLE IF NOT EXISTS album_images (
     caption TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Users & User Goldbars Tables
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    name TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS user_goldbars (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    goldbar_id INTEGER NOT NULL REFERENCES goldbars(id) ON DELETE CASCADE,
+    added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, goldbar_id)
+);

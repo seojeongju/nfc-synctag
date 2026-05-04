@@ -662,6 +662,84 @@ app.delete('/albums/images/:imageId', async (c) => {
   }
 });
 
+// --- 일반 사용자 인증 및 동기화 API ---
+
+// 1. 간편 회원 가입 (또는 로그인)
+app.post('/user/auth', async (c) => {
+  try {
+    const { email, name } = await c.req.json();
+    if (!email) return c.json({ error: '이메일 정보가 필요합니다.' }, 400);
+
+    // 자동 마이그레이션
+    try {
+      await c.env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS users (
+          id TEXT PRIMARY KEY,
+          email TEXT UNIQUE NOT NULL,
+          name TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `).run();
+      await c.env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS user_goldbars (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          goldbar_id INTEGER NOT NULL REFERENCES goldbars(id) ON DELETE CASCADE,
+          added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(user_id, goldbar_id)
+        )
+      `).run();
+    } catch (_) {}
+
+    // 유저 존재 여부 확인
+    let user = await c.env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(email).first();
+    if (!user) {
+      const userId = `user_${Date.now()}`;
+      await c.env.DB.prepare('INSERT INTO users (id, email, name) VALUES (?, ?, ?)')
+        .bind(userId, email, name || '')
+        .run();
+      user = await c.env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(email).first();
+    }
+
+    return c.json({ success: true, user });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// 2. 사용자의 소유 골드바 목록 조회 및 동기화
+app.post('/user/sync', async (c) => {
+  try {
+    const { userId, goldbarIds } = await c.req.json();
+    if (!userId) return c.json({ error: '인증이 필요합니다.' }, 401);
+
+    // 로컬 스토리지에 담긴 골드바 ID를 서버에 동기화 (Insert Ignore)
+    if (goldbarIds && Array.isArray(goldbarIds)) {
+      for (const id of goldbarIds) {
+        try {
+          await c.env.DB.prepare('INSERT OR IGNORE INTO user_goldbars (user_id, goldbar_id) VALUES (?, ?)')
+            .bind(userId, id)
+            .run();
+        } catch (_) {}
+      }
+    }
+
+    // 최종 동기화된 모든 골드바 목록 반환
+    const { results } = await c.env.DB.prepare(`
+      SELECT g.*, c.tag_uid, c.cert_file_path 
+      FROM user_goldbars ug
+      JOIN goldbars g ON ug.goldbar_id = g.id
+      LEFT JOIN certificates c ON g.id = c.goldbar_id
+      WHERE ug.user_id = ?
+      ORDER BY ug.added_at DESC
+    `).bind(userId).all();
+
+    return c.json({ success: true, syncGoldbars: results });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 app.get('/hello', (c) => {
   return c.json({
     message: 'Hello from Integrated WowTag API!',
