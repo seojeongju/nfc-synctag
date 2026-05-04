@@ -793,7 +793,7 @@ export default function AdminDashboard() {
 
   const handleLogout = () => {
     localStorage.removeItem('admin_token');
-    window.location.href = '/admin/login';
+    window.location.href = '/login';
   };
 
   const usageRate = goldbars.length > 0 

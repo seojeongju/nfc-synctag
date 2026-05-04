@@ -2,7 +2,6 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import UserLanding from './pages/UserLanding';
 import AdminDashboard from './pages/AdminDashboard';
 import ConsumerLogin from './pages/ConsumerLogin';
-import AdminLogin from './pages/AdminLogin';
 
 // Auth Check (localStorage 기반)
 const isAuthenticated = () => {
@@ -10,7 +9,7 @@ const isAuthenticated = () => {
 };
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
-  return isAuthenticated() ? <>{children}</> : <Navigate to="/admin/login" replace />;
+  return isAuthenticated() ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
 function App() {
@@ -20,13 +19,11 @@ function App() {
       <Route path="/" element={<UserLanding />} />
       <Route path="/t/:tagId" element={<UserLanding />} />
 
-      {/* 소비자 로그인·회원가입 */}
+      {/* 통합 로그인 (일반·관리자) */}
       <Route path="/login" element={<ConsumerLogin />} />
+      <Route path="/admin/login" element={<Navigate to="/login" replace />} />
 
-      {/* 관리자 로그인은 /admin/:tab 보다 먼저 매칭되어야 함 */}
-      <Route path="/admin/login" element={<AdminLogin />} />
-
-      {/* 관리자용 경로: 탭을 경로로 두어 모바일 시스템 뒤로가기 = 이전 탭/페이지 */}
+      {/* 관리자 콘솔 */}
       <Route
         path="/admin"
         element={

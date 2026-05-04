@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
+
+const ADMIN_EMAIL = 'admin@wowtag.com';
 
 type Tab = 'login' | 'signup';
 
@@ -35,8 +37,10 @@ function KakaoMark() {
   );
 }
 
+/** 소비자·관리자 공통 로그인 (/login) — 관리자는 admin@wowtag.com + 관리자 비밀번호 */
 export default function ConsumerLogin() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [tab, setTab] = useState<Tab>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -47,6 +51,13 @@ export default function ConsumerLogin() {
     google: false,
     kakao: false
   });
+
+  useEffect(() => {
+    const pre = searchParams.get('email');
+    if (pre && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(pre)) {
+      setEmail(pre);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,28 +88,21 @@ export default function ConsumerLogin() {
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password) return;
-    setLoading(true);
-    setError('');
 
-    try {
-      if (tab === 'login') {
-        const res = await fetch('/api/user/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: email.trim(), password })
-        });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data.user) {
-          persistUser(data.user);
-          navigate('/', { replace: true });
-          return;
-        }
-        setError(typeof data.error === 'string' ? data.error : '로그인에 실패했습니다.');
-      } else {
+    const em = email.trim().toLowerCase();
+
+    if (tab === 'signup') {
+      if (em === ADMIN_EMAIL) {
+        setError('관리자 이메일로는 회원가입할 수 없습니다.');
+        return;
+      }
+      setLoading(true);
+      setError('');
+      try {
         const res = await fetch('/api/user/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: email.trim(), password, name: name.trim() || undefined })
+          body: JSON.stringify({ email: em, password, name: name.trim() || undefined })
         });
         const data = await res.json().catch(() => ({}));
         if (res.ok && data.user) {
@@ -107,7 +111,47 @@ export default function ConsumerLogin() {
           return;
         }
         setError(typeof data.error === 'string' ? data.error : '회원가입에 실패했습니다.');
+      } catch {
+        setError('네트워크 오류가 발생했습니다.');
+      } finally {
+        setLoading(false);
       }
+      return;
+    }
+
+    // 로그인 탭
+    setLoading(true);
+    setError('');
+
+    try {
+      if (em === ADMIN_EMAIL) {
+        const res = await fetch('/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: em, password })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.token) {
+          localStorage.setItem('admin_token', data.token);
+          navigate('/admin/dashboard', { replace: true });
+          return;
+        }
+        setError(typeof data.error === 'string' ? data.error : '관리자 로그인에 실패했습니다.');
+        return;
+      }
+
+      const res = await fetch('/api/user/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: em, password })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.user) {
+        persistUser(data.user);
+        navigate('/', { replace: true });
+        return;
+      }
+      setError(typeof data.error === 'string' ? data.error : '로그인에 실패했습니다.');
     } catch {
       setError('네트워크 오류가 발생했습니다.');
     } finally {
@@ -133,9 +177,9 @@ export default function ConsumerLogin() {
           <div className="inline-flex items-center justify-center mb-5">
             <img src="/gold_synctag_logo_v2.png" alt="" className="w-12 h-12 object-contain rounded-xl shadow-sm" />
           </div>
-          <h1 className="text-2xl sm:text-[1.65rem] font-black text-slate-900 tracking-tight">간편 로그인</h1>
+          <h1 className="text-2xl sm:text-[1.65rem] font-black text-slate-900 tracking-tight">로그인</h1>
           <p className="text-sm font-bold text-slate-500 mt-2 leading-relaxed px-1">
-            이메일·비밀번호 또는 소셜 계정으로 Gold SyncTag를 시작하세요.
+            일반 회원·관리자 모두 이 화면에서 이메일로 로그인합니다. 관리자는 {ADMIN_EMAIL} 과 관리자 비밀번호를 입력하세요.
           </p>
         </div>
 
@@ -147,7 +191,7 @@ export default function ConsumerLogin() {
               tab === 'login' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            간편 로그인
+            로그인
           </button>
           <button
             type="button"
@@ -254,12 +298,9 @@ export default function ConsumerLogin() {
           최초 로그인 시 필요한 동의는 계정 상태에 따라 자동 처리됩니다.
         </p>
 
-        <div className="mt-8 pt-6 border-t border-slate-100 text-center space-y-3">
-          <Link to="/" className="block text-xs font-black text-slate-500 hover:text-slate-800 transition-colors">
+        <div className="mt-8 pt-6 border-t border-slate-100 text-center">
+          <Link to="/" className="text-xs font-black text-slate-500 hover:text-slate-800 transition-colors">
             ← 메인으로 돌아가기
-          </Link>
-          <Link to="/admin/login" className="block text-[10px] font-bold text-slate-400 hover:text-slate-600 transition-colors">
-            관리자 로그인
           </Link>
         </div>
       </div>
