@@ -743,13 +743,16 @@ app.get('/admin/user-goldbars', async (c) => {
     try {
       await c.env.DB.prepare("ALTER TABLE user_goldbars ADD COLUMN market_price_per_gram REAL DEFAULT 110000").run();
     } catch (_) {}
+    try {
+      await c.env.DB.prepare("ALTER TABLE user_goldbars ADD COLUMN added_at DATETIME DEFAULT CURRENT_TIMESTAMP").run();
+    } catch (_) {}
 
     const { results } = await c.env.DB.prepare(`
       SELECT ug.id, ug.user_id, ug.goldbar_id, ug.show_market_price, ug.market_price_per_gram, u.email as user_email, u.name as user_name, g.serial_number, g.weight, g.purity
       FROM user_goldbars ug
       JOIN users u ON ug.user_id = u.id
       JOIN goldbars g ON ug.goldbar_id = g.id
-      ORDER BY ug.added_at DESC
+      ORDER BY ug.id DESC
     `).all();
     return c.json(results);
   } catch (err: any) {
@@ -789,7 +792,7 @@ app.post('/user/sync', async (c) => {
       JOIN goldbars g ON ug.goldbar_id = g.id
       LEFT JOIN certificates c ON g.id = c.goldbar_id
       WHERE ug.user_id = ?
-      ORDER BY ug.added_at DESC
+      ORDER BY ug.id DESC
     `).bind(userId).all();
 
     return c.json({ success: true, syncGoldbars: results });
