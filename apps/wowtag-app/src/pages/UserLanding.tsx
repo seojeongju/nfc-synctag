@@ -10,8 +10,10 @@ export default function UserLanding() {
   const [error, setError] = useState<string | null>(null);
 
   // 소비자 탭 (태그 없을 때)
-  const [activeTab, setActiveTab] = useState<'home' | 'products'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'products' | 'myWallet'>('home');
   const [allProducts, setAllProducts] = useState<any[]>([]);
+  const [myGoldbars, setMyGoldbars] = useState<any[]>([]);
+  const [scanningToWallet, setScanningToWallet] = useState(false);
 
   // 상세 모달 상태
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
@@ -24,6 +26,15 @@ export default function UserLanding() {
   const [showGuideModal, setShowGuideModal] = useState(false);
 
   useEffect(() => {
+    try {
+      const stored = localStorage.getItem('my_scanned_goldbars');
+      if (stored) {
+        setMyGoldbars(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
     async function fetchData() {
       if (!tagId) {
         setLoading(false);
@@ -78,6 +89,42 @@ export default function UserLanding() {
     setPurchaseSuccess(true);
   };
 
+  const handleScanToWallet = async () => {
+    if (!('NDEFReader' in window)) {
+      alert('이 브라우저는 Web NFC를 지원하지 않습니다. 삼성폰 크롬 브라우저를 이용해 주세요.');
+      return;
+    }
+    try {
+      setScanningToWallet(true);
+      const ndef = new (window as any).NDEFReader();
+      await ndef.scan();
+      ndef.onreading = async ({ serialNumber }: { serialNumber: string }) => {
+        if ('vibrate' in navigator) navigator.vibrate(200);
+
+        // API를 통해 정품 데이터 조회
+        const res = await fetch(`/api/goldbars/t/${serialNumber}`);
+        if (res.ok) {
+          const goldbarData = await res.json();
+          // 중복 확인
+          if (myGoldbars.some((g) => g.id === goldbarData.id)) {
+            alert('이미 내 지갑에 등록된 골드바입니다.');
+          } else {
+            const updated = [...myGoldbars, { ...goldbarData, scanned_at: new Date().toLocaleDateString() }];
+            setMyGoldbars(updated);
+            localStorage.setItem('my_scanned_goldbars', JSON.stringify(updated));
+            alert('나의 소지 골드바 목록에 추가되었습니다!');
+          }
+        } else {
+          alert('등록되지 않은 정품인증 태그입니다.');
+        }
+        setScanningToWallet(false);
+      };
+    } catch (err: any) {
+      alert('스캔에 실패했습니다. 다시 시도해 주세요.');
+      setScanningToWallet(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
@@ -106,17 +153,24 @@ export default function UserLanding() {
         <div className="w-full max-w-md bg-white p-1.5 rounded-2xl border border-slate-100/80 flex gap-1 mb-5 shadow-sm">
           <button 
             onClick={() => setActiveTab('home')} 
-            className={`flex-1 h-12 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 ${activeTab === 'home' ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-md shadow-purple-500/20' : 'text-slate-400 hover:bg-slate-50'}`}
+            className={`flex-1 h-12 rounded-xl text-[11px] font-black transition-all flex items-center justify-center gap-1.5 ${activeTab === 'home' ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-md shadow-purple-500/20' : 'text-slate-400 hover:bg-slate-50'}`}
           >
             <Info className="w-4 h-4" />
             홈
           </button>
           <button 
             onClick={() => setActiveTab('products')} 
-            className={`flex-1 h-12 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 ${activeTab === 'products' ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-md shadow-purple-500/20' : 'text-slate-400 hover:bg-slate-50'}`}
+            className={`flex-1 h-12 rounded-xl text-[11px] font-black transition-all flex items-center justify-center gap-1.5 ${activeTab === 'products' ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-md shadow-purple-500/20' : 'text-slate-400 hover:bg-slate-50'}`}
           >
             <ShoppingCart className="w-4 h-4" />
-            제품 둘러보기
+            전체 상품
+          </button>
+          <button 
+            onClick={() => setActiveTab('myWallet')} 
+            className={`flex-1 h-12 rounded-xl text-[11px] font-black transition-all flex items-center justify-center gap-1.5 ${activeTab === 'myWallet' ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-md shadow-purple-500/20' : 'text-slate-400 hover:bg-slate-50'}`}
+          >
+            <Award className="w-4 h-4" />
+            내 소지품
           </button>
         </div>
 
@@ -221,6 +275,82 @@ export default function UserLanding() {
                 <div className="bg-white rounded-[2rem] border border-slate-100/80 p-12 flex flex-col items-center justify-center text-center shadow-sm">
                   <ShoppingCart className="w-12 h-12 text-slate-200 mb-4" />
                   <p className="font-black text-slate-400">등록된 제품이 없습니다.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* 탭 3: 내 소지품 (지갑 목록) */}
+        {activeTab === 'myWallet' && (
+          <div className="w-full max-w-md space-y-5 flex-1 flex flex-col h-full animate-in fade-in duration-300">
+            <div className="flex items-end justify-between px-1">
+              <div>
+                <h3 className="text-xl font-black tracking-tight text-slate-800">나의 소지품 목록</h3>
+                <p className="text-xs font-bold text-slate-400 mt-0.5">내가 스캔하고 보유한 골드바입니다.</p>
+              </div>
+            </div>
+
+            {/* 새로운 골드바 스캔 버튼 */}
+            <button
+              onClick={handleScanToWallet}
+              disabled={scanningToWallet}
+              className="w-full h-16 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-sm rounded-3xl flex items-center justify-center gap-3 shadow-lg shadow-amber-500/20 active:scale-[0.98] transition-all cursor-pointer select-none"
+            >
+              {scanningToWallet ? <Loader2 className="w-5 h-5 animate-spin" /> : <Smartphone className="w-5 h-5" />}
+              {scanningToWallet ? 'NFC 태그 스캔 중...' : '새로운 골드바 스캔하여 추가'}
+            </button>
+
+            {/* 지갑에 저장된 상품 카드 리스트 */}
+            <div className="grid gap-4">
+              {myGoldbars.map((g, index) => (
+                <div key={index} className="bg-white p-5 rounded-3xl border border-slate-100/60 hover:border-amber-400/50 hover:shadow-md cursor-pointer group transition-all flex flex-col gap-4 shadow-sm relative overflow-hidden">
+                  <div className="absolute -right-4 -bottom-4 text-7xl font-black text-slate-100/50 select-none">0{index + 1}</div>
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center border border-amber-200/40 shrink-0">
+                        <Award className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">CERTIFIED GOLDBAR</span>
+                        <h4 className="font-black text-slate-800 text-base mt-0.5">{g.serial_number}</h4>
+                      </div>
+                    </div>
+                    {/* 삭제 기능 제공 */}
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm('정말 내 지갑에서 이 골드바를 제거하시겠습니까?')) {
+                          const updated = myGoldbars.filter((_, i) => i !== index);
+                          setMyGoldbars(updated);
+                          localStorage.setItem('my_scanned_goldbars', JSON.stringify(updated));
+                        }
+                      }}
+                      className="p-2 bg-slate-50 text-slate-400 hover:text-rose-500 hover:bg-rose-50 border border-slate-100 rounded-xl transition-all shadow-sm"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="border-t border-slate-50 pt-3 flex flex-wrap gap-x-6 gap-y-2">
+                    <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400">중량</span><span className="text-xs font-black text-slate-700">{g.weight}</span></div>
+                    <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400">순도</span><span className="text-xs font-black text-slate-700">{g.purity}</span></div>
+                    <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400">제조일자</span><span className="text-xs font-black text-slate-700">{g.minted_at || '-'}</span></div>
+                  </div>
+
+                  {g.cert_url && (
+                    <a href={g.cert_url} target="_blank" rel="noreferrer" className="w-full h-11 bg-slate-50 border border-slate-100 hover:bg-amber-50 hover:border-amber-200/60 rounded-xl flex items-center justify-center text-xs font-black text-slate-600 hover:text-amber-700 transition-all gap-1.5 no-underline mt-1">
+                      <ShieldCheck className="w-4 h-4" /> 정품인증서 확인 (URL)
+                    </a>
+                  )}
+                </div>
+              ))}
+
+              {myGoldbars.length === 0 && (
+                <div className="bg-white rounded-3xl border border-slate-100 p-12 flex flex-col items-center justify-center text-center shadow-sm">
+                  <Award className="w-12 h-12 text-slate-200 mb-4" />
+                  <p className="font-black text-slate-400 text-sm">소지하고 계신 골드바가 없습니다.</p>
+                  <p className="text-xs font-bold text-slate-400/80 mt-1">NFC 스캔 버튼을 눌러 골드바를 내 소지품에 추가해 보세요.</p>
                 </div>
               )}
             </div>
