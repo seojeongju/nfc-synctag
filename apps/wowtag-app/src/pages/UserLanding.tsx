@@ -757,7 +757,10 @@ export default function UserLanding() {
             <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setShowGuideModal(false)}></div>
             <div className="relative w-full max-w-md bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh] overflow-hidden">
               <header className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/40">
-                <h4 className="text-lg font-black text-slate-800 tracking-tight">프로그램 사용방법 가이드</h4>
+                <div>
+                  <h4 className="text-lg font-black text-slate-800 tracking-tight">📜 프로그램 사용방법 가이드</h4>
+                  <p className="text-[10px] font-bold text-slate-400 mt-0.5">Gold SyncTag의 쾌속 정품 인증을 경험해 보세요</p>
+                </div>
                 <button onClick={() => setShowGuideModal(false)} className="p-2 bg-white rounded-xl text-slate-400 hover:text-rose-600 transition-colors shadow-sm">
                   <X className="w-5 h-5" />
                 </button>
@@ -768,46 +771,46 @@ export default function UserLanding() {
                   {[
                     {
                       step: '01',
-                      title: 'NFC 기능 활성화',
-                      desc: '스마트폰의 NFC 기능을 "기본 모드" 또는 "읽기/쓰기 모드"로 켭니다.',
+                      title: 'NFC 칩 가볍게 스캔',
+                      desc: '스마트폰의 NFC 기능을 켜고, 제품에 동봉된 Gold SyncTag 칩에 스마트폰 뒷면을 가볍게 터치(스캔)합니다.',
                       icon: Smartphone
                     },
                     {
                       step: '02',
-                      title: 'NFC 태그 스캔',
-                      desc: '골드바/주얼리와 함께 동봉된 syncTag 칩에 스마트폰 뒷면을 가볍게 터치(스캔)합니다.',
+                      title: '정품 보증서 즉시 확인',
+                      desc: '화면에 자동으로 연결된 페이지에서 제품의 고유 일련번호, 순도, 중량 정보를 3초 안에 확인합니다.',
                       icon: ShieldCheck
                     },
                     {
                       step: '03',
-                      title: '정품 정보 확인',
-                      desc: '화면에 자동으로 열린 페이지에서 제품의 고유 일련번호, 순도, 품질 정보를 완벽하게 확인합니다.',
-                      icon: Award
+                      title: '내 소지품 목록에 보관',
+                      desc: '스캔한 자산 정보를 내 지갑(My Wallet) 탭에 담아 기기 변경 시에도 언제든 간편하게 확인합니다.',
+                      icon: Bookmark
                     },
                     {
                       step: '04',
-                      title: '상담 및 구매 신청',
-                      desc: '"제품 둘러보기" 탭을 통해 다양한 상품 리스트를 확인하고 즉시 구매 상담을 요청할 수 있습니다.',
-                      icon: ShoppingCart
+                      title: '추억 전자 앨범에 기록',
+                      desc: '간편 로그인을 통해 나만의 갤러리에 소중한 추억 사진을 최대 5장까지 안전하게 클라우드에 영구 보존하세요.',
+                      icon: Award
                     }
                   ].map((item, index) => (
-                    <div key={index} className="bg-slate-50/70 border border-slate-100/80 rounded-2xl p-4 flex gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600 flex-shrink-0">
+                    <div key={index} className="bg-slate-50/70 border border-slate-100/80 rounded-2xl p-4 flex gap-4 hover:border-amber-400/40 hover:shadow-sm transition-all group">
+                      <div className="w-12 h-12 rounded-xl bg-amber-50 group-hover:bg-amber-100/60 border border-amber-200/40 flex items-center justify-center text-amber-600 flex-shrink-0 transition-colors">
                         <item.icon className="w-5 h-5" />
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center justify-between mb-1">
-                          <h5 className="font-black text-slate-800 text-sm">{item.title}</h5>
-                          <span className="text-[10px] font-black text-purple-600 tracking-widest bg-purple-50 px-2 py-0.5 rounded-lg uppercase">STEP {item.step}</span>
+                          <h5 className="font-black text-slate-800 text-sm group-hover:text-amber-800 transition-colors">{item.title}</h5>
+                          <span className="text-[10px] font-black text-amber-600 tracking-widest bg-amber-50 px-2 py-0.5 rounded-lg uppercase border border-amber-100/60">STEP {item.step}</span>
                         </div>
-                        <p className="text-slate-400 text-xs font-bold leading-relaxed">{item.desc}</p>
+                        <p className="text-slate-500 text-xs font-bold leading-relaxed">{item.desc}</p>
                       </div>
                     </div>
                   ))}
                 </div>
 
-                <button onClick={() => setShowGuideModal(false)} className="w-full h-14 bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-black rounded-xl text-sm shadow-xl shadow-purple-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2">
-                  확인 완료
+                <button onClick={() => setShowGuideModal(false)} className="w-full h-14 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black rounded-xl text-sm shadow-xl shadow-amber-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                  가이드 확인 완료
                 </button>
               </div>
             </div>
