@@ -31,6 +31,14 @@ app.post('/admin/login', async (c) => {
 // 모든 골드바 목록 조회
 app.get('/goldbars', async (c) => {
   try {
+    // 자동 마이그레이션
+    try {
+      await c.env.DB.prepare("ALTER TABLE goldbars ADD COLUMN status TEXT DEFAULT 'CATALOG'").run();
+    } catch (_) {}
+    try {
+      await c.env.DB.prepare('ALTER TABLE goldbars ADD COLUMN cert_url TEXT').run();
+    } catch (_) {}
+
     const { results } = await c.env.DB.prepare(`
       SELECT g.*, c.tag_uid, c.cert_file_path 
       FROM goldbars g
@@ -46,17 +54,25 @@ app.get('/goldbars', async (c) => {
 // 골드바 및 보증서 등록
 app.post('/goldbars', async (c) => {
   try {
-    const { serial_number, weight, purity, minted_at, tag_uid, cert_file_base64, file_name } = await c.req.json();
+    const { serial_number, weight, purity, minted_at, tag_uid, cert_file_base64, file_name, status, cert_url } = await c.req.json();
 
     if (!serial_number || !weight) {
       return c.json({ error: 'Serial number and weight are required' }, 400);
     }
 
+    // 자동 마이그레이션
+    try {
+      await c.env.DB.prepare("ALTER TABLE goldbars ADD COLUMN status TEXT DEFAULT 'CATALOG'").run();
+    } catch (_) {}
+    try {
+      await c.env.DB.prepare('ALTER TABLE goldbars ADD COLUMN cert_url TEXT').run();
+    } catch (_) {}
+
     // 1. 골드바 정보 저장
     const insertGoldbar = await c.env.DB.prepare(`
-      INSERT OR REPLACE INTO goldbars (serial_number, weight, purity, minted_at) 
-      VALUES (?, ?, ?, ?) RETURNING id
-    `).bind(serial_number, weight, purity || '99.99%', minted_at).first();
+      INSERT OR REPLACE INTO goldbars (serial_number, weight, purity, minted_at, status, cert_url) 
+      VALUES (?, ?, ?, ?, ?, ?) RETURNING id
+    `).bind(serial_number, weight, purity || '99.99%', minted_at, status || 'CATALOG', cert_url || '').first();
 
     const goldbarId = (insertGoldbar as any).id;
 
@@ -338,6 +354,47 @@ app.post('/tags', async (c) => {
   return c.json({ success: true });
 });
 
+// 모든 NFC 태그 목록 및 매핑 조회 API
+app.get('/tags', async (c) => {
+  try {
+    const { results: productTags } = await c.env.DB.prepare(`
+      SELECT t.id, t.tag_uid, t.created_at, p.id as target_id, p.name as target_name, 'product' as target_type
+      FROM tags t
+      LEFT JOIN products p ON t.product_id = p.id
+      ORDER BY t.created_at DESC
+    `).all();
+
+    const { results: goldbarTags } = await c.env.DB.prepare(`
+      SELECT c.id, c.tag_uid, c.issued_at as created_at, g.id as target_id, g.serial_number as target_name, 'goldbar' as target_type
+      FROM certificates c
+      LEFT JOIN goldbars g ON c.goldbar_id = g.id
+      ORDER BY c.issued_at DESC
+    `).all();
+
+    const allTags = [...productTags, ...goldbarTags];
+    return c.json(allTags);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// 특정 NFC 태그 매핑 해제 (삭제) API
+app.delete('/tags/:uid', async (c) => {
+  try {
+    const uid = c.req.param('uid');
+    
+    // 1. 일반 제품 매핑 테이블에서 삭제
+    await c.env.DB.prepare('DELETE FROM tags WHERE tag_uid = ?').bind(uid).run();
+
+    // 2. 골드바 인증서 매핑 테이블에서 삭제
+    await c.env.DB.prepare('DELETE FROM certificates WHERE tag_uid = ?').bind(uid).run();
+
+    return c.json({ success: true }, 200);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 // 특정 태그(NFC)로 제품 정보 조회
 app.get('/t/:tagId', async (c) => {
   const tagId = c.req.param('tagId');
@@ -366,18 +423,26 @@ app.get('/t/:tagId', async (c) => {
 app.put('/goldbars/:id', async (c) => {
   try {
     const id = c.req.param('id');
-    const { serial_number, weight, purity, minted_at, tag_uid, cert_file_base64, file_name } = await c.req.json();
+    const { serial_number, weight, purity, minted_at, tag_uid, cert_file_base64, file_name, status, cert_url } = await c.req.json();
 
     if (!serial_number || !weight) {
       return c.json({ error: 'Serial number and weight are required' }, 400);
     }
 
+    // 자동 마이그레이션
+    try {
+      await c.env.DB.prepare("ALTER TABLE goldbars ADD COLUMN status TEXT DEFAULT 'CATALOG'").run();
+    } catch (_) {}
+    try {
+      await c.env.DB.prepare('ALTER TABLE goldbars ADD COLUMN cert_url TEXT').run();
+    } catch (_) {}
+
     // 1. 골드바 정보 갱신
     await c.env.DB.prepare(`
       UPDATE goldbars 
-      SET serial_number = ?, weight = ?, purity = ?, minted_at = ? 
+      SET serial_number = ?, weight = ?, purity = ?, minted_at = ?, status = ?, cert_url = ? 
       WHERE id = ?
-    `).bind(serial_number, weight, purity || '99.99%', minted_at, id).run();
+    `).bind(serial_number, weight, purity || '99.99%', minted_at, status || 'CATALOG', cert_url || '', id).run();
 
     // 2. 인증서 파일이 Base64 형태로 전달된 경우 R2 버킷에 저장
     let certFilePath = `certificates/${serial_number}_cert.pdf`;

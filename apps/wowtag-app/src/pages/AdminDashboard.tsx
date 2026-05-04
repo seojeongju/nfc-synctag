@@ -58,7 +58,9 @@ export default function AdminDashboard() {
     minted_at: '',
     tag_uid: '',
     cert_file_base64: '',
-    file_name: ''
+    file_name: '',
+    status: 'CATALOG',
+    cert_url: ''
   });
 
   // 폼 상태 (골드바 수정용)
@@ -70,7 +72,9 @@ export default function AdminDashboard() {
     minted_at: '',
     tag_uid: '',
     cert_file_base64: '',
-    file_name: ''
+    file_name: '',
+    status: 'CATALOG',
+    cert_url: ''
   });
 
   const [submitting, setSubmitting] = useState(false);
@@ -370,7 +374,9 @@ export default function AdminDashboard() {
           minted_at: '',
           tag_uid: '',
           cert_file_base64: '',
-          file_name: ''
+          file_name: '',
+          status: 'CATALOG',
+          cert_url: ''
         });
         alert('골드바 및 정품인증서 등록 성공!');
         fetchGoldbars();
@@ -396,7 +402,9 @@ export default function AdminDashboard() {
       minted_at: g.minted_at || '',
       tag_uid: g.tag_uid || '',
       cert_file_base64: '',
-      file_name: ''
+      file_name: '',
+      status: g.status || 'CATALOG',
+      cert_url: g.cert_url || ''
     });
     setIsEditModalOpen(true);
   };
@@ -555,6 +563,61 @@ export default function AdminDashboard() {
                     <h3 className="text-2xl lg:text-3xl font-black text-slate-900 mt-1">{stat.value}</h3>
                   </div>
                 ))}
+              </div>
+
+              {/* 정품인증 태그 등록 가이드 섹션 */}
+              <div className="bg-white rounded-[2.5rem] p-6 lg:p-8 border border-slate-50 shadow-sm space-y-6">
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-6 bg-purple-600 rounded-full"></div>
+                  <h3 className="text-lg font-black text-slate-800">정품인증 태그(NFC) 등록 및 출고 프로세스 가이드</h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* 1단계 */}
+                  <div className="bg-slate-50/60 p-6 rounded-3xl border border-slate-100 flex flex-col gap-4 relative overflow-hidden hover:border-purple-200/60 hover:shadow-md transition-all group">
+                    <span className="absolute -right-4 -bottom-4 text-8xl font-black text-slate-100/60 tracking-tighter select-none">01</span>
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center border border-amber-100/60 shadow-sm"><FileText className="w-6 h-6" /></div>
+                      <div>
+                        <span className="text-xs font-black uppercase text-amber-600 tracking-widest block">STEP 01</span>
+                        <h4 className="font-black text-slate-800">카탈로그(제품) 생성</h4>
+                      </div>
+                    </div>
+                    <p className="text-xs font-bold text-slate-400 leading-relaxed pr-12">
+                      골드바의 <strong className="text-slate-600">일련번호, 중량, 순도, 제조일자</strong> 등의 제원 정보를 등록하여 정품인증서 카탈로그를 생성합니다.
+                    </p>
+                  </div>
+
+                  {/* 2단계 */}
+                  <div className="bg-slate-50/60 p-6 rounded-3xl border border-slate-100 flex flex-col gap-4 relative overflow-hidden hover:border-purple-200/60 hover:shadow-md transition-all group">
+                    <span className="absolute -right-4 -bottom-4 text-8xl font-black text-slate-100/60 tracking-tighter select-none">02</span>
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center border border-blue-100/60 shadow-sm"><Smartphone className="w-6 h-6" /></div>
+                      <div>
+                        <span className="text-xs font-black uppercase text-blue-600 tracking-widest block">STEP 02</span>
+                        <h4 className="font-black text-slate-800">신규 NFC 태그 등록</h4>
+                      </div>
+                    </div>
+                    <p className="text-xs font-bold text-slate-400 leading-relaxed pr-12">
+                      실물 NFC 태그의 고유 <strong className="text-slate-600">UID를 스캔하여 매핑</strong>하고, 카탈로그와 연결하여 데이터가 태그에 반영될 수 있도록 준비합니다.
+                    </p>
+                  </div>
+
+                  {/* 3단계 */}
+                  <div className="bg-slate-50/60 p-6 rounded-3xl border border-slate-100 flex flex-col gap-4 relative overflow-hidden hover:border-purple-200/60 hover:shadow-md transition-all group">
+                    <span className="absolute -right-4 -bottom-4 text-8xl font-black text-slate-100/60 tracking-tighter select-none">03</span>
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center border border-emerald-100/60 shadow-sm"><LinkIcon className="w-6 h-6" /></div>
+                      <div>
+                        <span className="text-xs font-black uppercase text-emerald-600 tracking-widest block">STEP 03</span>
+                        <h4 className="font-black text-slate-800">정품인증 및 출고 연동</h4>
+                      </div>
+                    </div>
+                    <p className="text-xs font-bold text-slate-400 leading-relaxed pr-12">
+                      출고 시점에 <strong className="text-slate-600">정품인증서 URL을 등록</strong>하면 최종 출고 처리가 되며, 사용자는 태그 스캔 시 웹 보증서로 바로 연결됩니다.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {/* 인기 골드바 순위 & 최근 스캔 기록 */}
@@ -1036,11 +1099,27 @@ export default function AdminDashboard() {
                     </label>
                     <span className="text-xs font-bold text-slate-400 line-clamp-1 flex-1">
                       {goldbarFormData.file_name || '선택된 파일이 없습니다.'}
-                    </span>
-                 </div>
-               </div>
+                     </span>
+                  </div>
+                </div>
 
-               <button type="submit" disabled={submitting || !goldbarFormData.serial_number || !goldbarFormData.weight} className="w-full h-16 bg-amber-600 hover:bg-amber-700 text-white text-lg font-black shadow-xl shadow-amber-500/30 disabled:opacity-30 transition-all mt-2 flex items-center justify-center gap-2">
+                {/* 출고 상태 및 보증서 URL */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">상태</label>
+                    <select value={goldbarFormData.status} onChange={(e) => setGoldbarFormData({...goldbarFormData, status: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-4 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all cursor-pointer">
+                      <option value="CATALOG">카탈로그 생성</option>
+                      <option value="TAGGED">태그 등록완료</option>
+                      <option value="SHIPPED">출고/정품인증</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">정품인증서 URL</label>
+                    <input type="url" placeholder="https://..." value={goldbarFormData.cert_url} onChange={(e) => setGoldbarFormData({...goldbarFormData, cert_url: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-4 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all" />
+                  </div>
+                </div>
+
+                <button type="submit" disabled={submitting || !goldbarFormData.serial_number || !goldbarFormData.weight} className="w-full h-16 bg-amber-600 hover:bg-amber-700 text-white text-lg font-black shadow-xl shadow-amber-500/30 disabled:opacity-30 transition-all mt-2 flex items-center justify-center gap-2">
                  {submitting && <Loader2 className="w-5 h-5 animate-spin" />} 등록 완료
                </button>
             </form>
@@ -1108,11 +1187,27 @@ export default function AdminDashboard() {
                     </label>
                     <span className="text-xs font-bold text-slate-400 line-clamp-1 flex-1">
                       {editGoldbarData.file_name || '파일을 변경하지 않으려면 비워 두세요.'}
-                    </span>
-                 </div>
-               </div>
+                     </span>
+                  </div>
+                </div>
 
-               <button type="submit" disabled={submitting || !editGoldbarData.serial_number || !editGoldbarData.weight} className="w-full h-16 bg-amber-600 hover:bg-amber-700 text-white text-lg font-black shadow-xl shadow-amber-500/30 disabled:opacity-30 transition-all mt-2 flex items-center justify-center gap-2">
+                {/* 출고 상태 및 보증서 URL */}
+                <div className="grid grid-cols-2 gap-4 mt-4 mb-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">상태</label>
+                    <select value={editGoldbarData.status} onChange={(e) => setEditGoldbarData({...editGoldbarData, status: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-4 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all cursor-pointer">
+                      <option value="CATALOG">카탈로그 생성</option>
+                      <option value="TAGGED">태그 등록완료</option>
+                      <option value="SHIPPED">출고/정품인증</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">정품인증서 URL</label>
+                    <input type="url" placeholder="https://..." value={editGoldbarData.cert_url} onChange={(e) => setEditGoldbarData({...editGoldbarData, cert_url: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-4 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all" />
+                  </div>
+                </div>
+
+                <button type="submit" disabled={submitting || !editGoldbarData.serial_number || !editGoldbarData.weight} className="w-full h-16 bg-amber-600 hover:bg-amber-700 text-white text-lg font-black shadow-xl shadow-amber-500/30 disabled:opacity-30 transition-all mt-2 flex items-center justify-center gap-2">
                  {submitting && <Loader2 className="w-5 h-5 animate-spin" />} 수정 완료
                </button>
             </form>
