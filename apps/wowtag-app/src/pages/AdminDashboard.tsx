@@ -712,9 +712,22 @@ export default function AdminDashboard() {
             <img src="/gold_synctag_logo_v2.png" alt="Logo" className="w-7 h-7 object-contain rounded-lg" />
             <span className="font-black text-slate-800">Gold SyncTag</span>
           </div>
-          <div className="flex items-center gap-4 ml-auto">
-            <button className="p-2.5 rounded-2xl text-slate-400 hover:bg-slate-50 transition-colors relative"><Bell className="w-5 h-5" /></button>
-            <div className="w-9 h-9 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden"><img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Jay" alt="" /></div>
+          <div className="flex items-center gap-1 sm:gap-2 ml-auto">
+            <button
+              type="button"
+              onClick={() => window.open('/', '_blank', 'noopener,noreferrer')}
+              title="사용자 화면 보기"
+              aria-label="사용자 화면 보기"
+              className="p-2.5 rounded-2xl text-purple-500 hover:bg-purple-50 hover:text-purple-600 transition-colors border border-transparent hover:border-purple-100"
+            >
+              <Eye className="w-5 h-5" />
+            </button>
+            <button type="button" className="p-2.5 rounded-2xl text-slate-400 hover:bg-slate-50 transition-colors relative" aria-label="알림">
+              <Bell className="w-5 h-5" />
+            </button>
+            <div className="w-9 h-9 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden shrink-0">
+              <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Jay" alt="" />
+            </div>
           </div>
         </header>
 
@@ -792,76 +805,114 @@ export default function AdminDashboard() {
                   <h3 className="text-lg font-black text-slate-800">정품인증 태그(NFC) 등록 및 출고 프로세스 가이드</h3>
                 </div>
 
-                {/* 1행×3열: 모든 뷰포트에서 가로 배치 (모바일은 컴팩트) */}
-                <div className="grid grid-cols-3 gap-2 sm:gap-4">
-                  {/* 1단계 */}
-                  <div 
-                    onClick={() => setActiveGuide(activeGuide === 1 ? null : 1)}
-                    className="bg-slate-50/60 p-3 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-100 flex flex-col gap-2 sm:gap-4 relative overflow-hidden hover:border-purple-200/60 hover:shadow-md transition-all group cursor-pointer min-h-0"
-                  >
-                    <span className="absolute -right-1 -bottom-2 sm:-right-4 sm:-bottom-4 text-5xl sm:text-7xl font-black text-slate-100/60 tracking-tighter select-none pointer-events-none">01</span>
-                    <div className="flex flex-col items-center text-center gap-1.5 sm:gap-2 relative z-[1]">
-                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center border border-amber-100/60 shadow-sm transition-transform group-hover:scale-105">
-                        <FileText className="w-5 h-5 sm:w-6 sm:h-6" />
-                      </div>
-                      <span className="text-[9px] sm:text-[10px] font-black uppercase text-amber-600 tracking-widest">STEP 01</span>
-                      <h4 className="font-black text-slate-800 text-[11px] sm:text-base leading-snug">카탈로그(제품) 생성</h4>
-                      <div className="text-slate-400 mt-0.5">
-                        {activeGuide === 1 ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 mx-auto" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 mx-auto" />}
+                {/* 1행×3열 아이콘 — 설명은 아래 전체 너비 패널 */}
+                <div className="flex flex-col gap-3 sm:gap-4">
+                  <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                    {/* 1단계 */}
+                    <div
+                      onClick={() => setActiveGuide(activeGuide === 1 ? null : 1)}
+                      className={`bg-slate-50/60 p-3 sm:p-5 rounded-2xl sm:rounded-3xl border flex flex-col gap-2 sm:gap-4 relative overflow-hidden hover:border-purple-200/60 hover:shadow-md transition-all group cursor-pointer min-h-0 ${
+                        activeGuide === 1 ? 'border-amber-300 ring-2 ring-amber-200/80 shadow-md' : 'border-slate-100'
+                      }`}
+                    >
+                      <span className="absolute -right-1 -bottom-2 sm:-right-4 sm:-bottom-4 text-5xl sm:text-7xl font-black text-slate-100/60 tracking-tighter select-none pointer-events-none">01</span>
+                      <div className="flex flex-col items-center text-center gap-1.5 sm:gap-2 relative z-[1]">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center border border-amber-100/60 shadow-sm transition-transform group-hover:scale-105">
+                          <FileText className="w-5 h-5 sm:w-6 sm:h-6" />
+                        </div>
+                        <span className="text-[9px] sm:text-[10px] font-black uppercase text-amber-600 tracking-widest">STEP 01</span>
+                        <h4 className="font-black text-slate-800 text-[11px] sm:text-base leading-snug">카탈로그(제품) 생성</h4>
+                        <div className="text-slate-400 mt-0.5">
+                          {activeGuide === 1 ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 mx-auto" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 mx-auto" />}
+                        </div>
                       </div>
                     </div>
-                    {activeGuide === 1 && (
-                      <p className="text-[10px] sm:text-xs font-bold text-slate-400 leading-relaxed pt-2 border-t border-slate-100 text-left animate-in fade-in slide-in-from-top-1 duration-300 relative z-[1]">
-                        골드바의 <strong className="text-slate-600">일련번호, 중량, 순도, 제조일자</strong> 등의 제원 정보를 등록하여 정품인증서 카탈로그를 생성합니다.
-                      </p>
-                    )}
+
+                    {/* 2단계 */}
+                    <div
+                      onClick={() => setActiveGuide(activeGuide === 2 ? null : 2)}
+                      className={`bg-slate-50/60 p-3 sm:p-5 rounded-2xl sm:rounded-3xl border flex flex-col gap-2 sm:gap-4 relative overflow-hidden hover:border-purple-200/60 hover:shadow-md transition-all group cursor-pointer min-h-0 ${
+                        activeGuide === 2 ? 'border-blue-300 ring-2 ring-blue-200/80 shadow-md' : 'border-slate-100'
+                      }`}
+                    >
+                      <span className="absolute -right-1 -bottom-2 sm:-right-4 sm:-bottom-4 text-5xl sm:text-7xl font-black text-slate-100/60 tracking-tighter select-none pointer-events-none">02</span>
+                      <div className="flex flex-col items-center text-center gap-1.5 sm:gap-2 relative z-[1]">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center border border-blue-100/60 shadow-sm transition-transform group-hover:scale-105">
+                          <Smartphone className="w-5 h-5 sm:w-6 sm:h-6" />
+                        </div>
+                        <span className="text-[9px] sm:text-[10px] font-black uppercase text-blue-600 tracking-widest">STEP 02</span>
+                        <h4 className="font-black text-slate-800 text-[11px] sm:text-base leading-snug">신규 NFC 태그 등록</h4>
+                        <div className="text-slate-400 mt-0.5">
+                          {activeGuide === 2 ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 mx-auto" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 mx-auto" />}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 3단계 */}
+                    <div
+                      onClick={() => setActiveGuide(activeGuide === 3 ? null : 3)}
+                      className={`bg-slate-50/60 p-3 sm:p-5 rounded-2xl sm:rounded-3xl border flex flex-col gap-2 sm:gap-4 relative overflow-hidden hover:border-purple-200/60 hover:shadow-md transition-all group cursor-pointer min-h-0 ${
+                        activeGuide === 3 ? 'border-emerald-300 ring-2 ring-emerald-200/80 shadow-md' : 'border-slate-100'
+                      }`}
+                    >
+                      <span className="absolute -right-1 -bottom-2 sm:-right-4 sm:-bottom-4 text-5xl sm:text-7xl font-black text-slate-100/60 tracking-tighter select-none pointer-events-none">03</span>
+                      <div className="flex flex-col items-center text-center gap-1.5 sm:gap-2 relative z-[1]">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center border border-emerald-100/60 shadow-sm transition-transform group-hover:scale-105">
+                          <LinkIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                        </div>
+                        <span className="text-[9px] sm:text-[10px] font-black uppercase text-emerald-600 tracking-widest">STEP 03</span>
+                        <h4 className="font-black text-slate-800 text-[11px] sm:text-base leading-snug">정품인증 및 출고 연동</h4>
+                        <div className="text-slate-400 mt-0.5">
+                          {activeGuide === 3 ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 mx-auto" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 mx-auto" />}
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* 2단계 */}
-                  <div 
-                    onClick={() => setActiveGuide(activeGuide === 2 ? null : 2)}
-                    className="bg-slate-50/60 p-3 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-100 flex flex-col gap-2 sm:gap-4 relative overflow-hidden hover:border-purple-200/60 hover:shadow-md transition-all group cursor-pointer min-h-0"
-                  >
-                    <span className="absolute -right-1 -bottom-2 sm:-right-4 sm:-bottom-4 text-5xl sm:text-7xl font-black text-slate-100/60 tracking-tighter select-none pointer-events-none">02</span>
-                    <div className="flex flex-col items-center text-center gap-1.5 sm:gap-2 relative z-[1]">
-                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center border border-blue-100/60 shadow-sm transition-transform group-hover:scale-105">
-                        <Smartphone className="w-5 h-5 sm:w-6 sm:h-6" />
+                  {/* 선택된 단계 설명: 카드 전체 가로 폭 */}
+                  {activeGuide !== null && (
+                    <div
+                      className={`w-full rounded-2xl sm:rounded-3xl border px-4 py-4 sm:px-6 sm:py-5 animate-in fade-in slide-in-from-top-2 duration-300 ${
+                        activeGuide === 1
+                          ? 'bg-amber-50/80 border-amber-200/70'
+                          : activeGuide === 2
+                            ? 'bg-blue-50/80 border-blue-200/70'
+                            : 'bg-emerald-50/80 border-emerald-200/70'
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mb-2">
+                        <span
+                          className={`text-[10px] sm:text-xs font-black uppercase tracking-widest ${
+                            activeGuide === 1 ? 'text-amber-700' : activeGuide === 2 ? 'text-blue-700' : 'text-emerald-700'
+                          }`}
+                        >
+                          STEP 0{activeGuide}
+                        </span>
+                        <span className="text-xs sm:text-sm font-black text-slate-800">
+                          {activeGuide === 1 && '카탈로그(제품) 생성'}
+                          {activeGuide === 2 && '신규 NFC 태그 등록'}
+                          {activeGuide === 3 && '정품인증 및 출고 연동'}
+                        </span>
                       </div>
-                      <span className="text-[9px] sm:text-[10px] font-black uppercase text-blue-600 tracking-widest">STEP 02</span>
-                      <h4 className="font-black text-slate-800 text-[11px] sm:text-base leading-snug">신규 NFC 태그 등록</h4>
-                      <div className="text-slate-400 mt-0.5">
-                        {activeGuide === 2 ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 mx-auto" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 mx-auto" />}
-                      </div>
-                    </div>
-                    {activeGuide === 2 && (
-                      <p className="text-[10px] sm:text-xs font-bold text-slate-400 leading-relaxed pt-2 border-t border-slate-100 text-left animate-in fade-in slide-in-from-top-1 duration-300 relative z-[1]">
-                        실물 NFC 태그의 고유 <strong className="text-slate-600">UID를 스캔하여 매핑</strong>하고, 카탈로그와 연결하여 데이터가 태그에 반영될 수 있도록 준비합니다.
+                      <p className="text-sm sm:text-base font-bold text-slate-600 leading-relaxed max-w-none">
+                        {activeGuide === 1 && (
+                          <>
+                            골드바의 <strong className="text-slate-800 font-black">일련번호, 중량, 순도, 제조일자</strong> 등의 제원 정보를 등록하여 정품인증서 카탈로그를 생성합니다.
+                          </>
+                        )}
+                        {activeGuide === 2 && (
+                          <>
+                            실물 NFC 태그의 고유 <strong className="text-slate-800 font-black">UID를 스캔하여 매핑</strong>하고, 카탈로그와 연결하여 데이터가 태그에 반영될 수 있도록 준비합니다.
+                          </>
+                        )}
+                        {activeGuide === 3 && (
+                          <>
+                            출고 시점에 <strong className="text-slate-800 font-black">정품인증서 URL을 등록</strong>하면 최종 출고 처리가 되며, 사용자는 태그 스캔 시 웹 보증서로 바로 연결됩니다.
+                          </>
+                        )}
                       </p>
-                    )}
-                  </div>
-
-                  {/* 3단계 */}
-                  <div 
-                    onClick={() => setActiveGuide(activeGuide === 3 ? null : 3)}
-                    className="bg-slate-50/60 p-3 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-100 flex flex-col gap-2 sm:gap-4 relative overflow-hidden hover:border-purple-200/60 hover:shadow-md transition-all group cursor-pointer min-h-0"
-                  >
-                    <span className="absolute -right-1 -bottom-2 sm:-right-4 sm:-bottom-4 text-5xl sm:text-7xl font-black text-slate-100/60 tracking-tighter select-none pointer-events-none">03</span>
-                    <div className="flex flex-col items-center text-center gap-1.5 sm:gap-2 relative z-[1]">
-                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center border border-emerald-100/60 shadow-sm transition-transform group-hover:scale-105">
-                        <LinkIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-                      </div>
-                      <span className="text-[9px] sm:text-[10px] font-black uppercase text-emerald-600 tracking-widest">STEP 03</span>
-                      <h4 className="font-black text-slate-800 text-[11px] sm:text-base leading-snug">정품인증 및 출고 연동</h4>
-                      <div className="text-slate-400 mt-0.5">
-                        {activeGuide === 3 ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 mx-auto" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 mx-auto" />}
-                      </div>
                     </div>
-                    {activeGuide === 3 && (
-                      <p className="text-[10px] sm:text-xs font-bold text-slate-400 leading-relaxed pt-2 border-t border-slate-100 text-left animate-in fade-in slide-in-from-top-1 duration-300 relative z-[1]">
-                        출고 시점에 <strong className="text-slate-600">정품인증서 URL을 등록</strong>하면 최종 출고 처리가 되며, 사용자는 태그 스캔 시 웹 보증서로 바로 연결됩니다.
-                      </p>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
 
