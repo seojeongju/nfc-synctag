@@ -924,6 +924,15 @@ export default function AdminDashboard() {
     p.name.toLowerCase().includes(productSearchTerm.toLowerCase())
   );
 
+  /** 모바일 하단 탭(z-140)이 모달(z-130)보다 위에 있어 키보드·폼이 겹침 → 모달 열릴 때 탭 숨김 */
+  const blockMobileBottomNav =
+    isProductModalOpen ||
+    isEditProductModalOpen ||
+    isNfcModalOpen ||
+    isGoldbarModalOpen ||
+    isEditModalOpen ||
+    !!unmapSoldModalTag;
+
   return (
     <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden bg-[#F8FAFC] flex font-sans leading-relaxed text-slate-900 animate-in fade-in duration-300">
       {/* 사이드바 - 데스크탑 */}
@@ -2022,7 +2031,7 @@ export default function AdminDashboard() {
 
       {/* 제품 등록 모달 (이미지 파일 업로드 및 자동 리사이징) */}
       {isProductModalOpen && (
-        <div className="fixed inset-0 z-[130] flex items-end sm:items-center justify-center p-0 lg:p-4">
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 lg:p-4">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setIsProductModalOpen(false)}></div>
           <div className="relative w-full max-w-lg bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh]">
             <header className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
@@ -2133,7 +2142,7 @@ export default function AdminDashboard() {
 
       {/* 제품 정보 수정 모달 */}
       {isEditProductModalOpen && (
-        <div className="fixed inset-0 z-[130] flex items-end sm:items-center justify-center p-0 lg:p-4">
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 lg:p-4">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setIsEditProductModalOpen(false)}></div>
           <div className="relative w-full max-w-lg bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh]">
             <header className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
@@ -2255,7 +2264,7 @@ export default function AdminDashboard() {
       )}
 
       {unmapSoldModalTag && (
-        <div className="fixed inset-0 z-[125] flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div
             className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
             onClick={() => setUnmapSoldModalTag(null)}
@@ -2312,7 +2321,7 @@ export default function AdminDashboard() {
 
       {/* NFC 태그 관리 모달 (NFC 전용 도구) */}
       {isNfcModalOpen && (
-        <div className="fixed inset-0 z-[130] flex items-end sm:items-center justify-center p-0 lg:p-4">
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 lg:p-4">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setIsNfcModalOpen(false)}></div>
           <div className="relative w-full max-w-lg bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh]">
             <header className="p-8 border-b border-slate-50 flex justify-between items-center bg-emerald-50/50">
@@ -2429,7 +2438,7 @@ export default function AdminDashboard() {
 
       {/* 골드바 & 보증서 등록 모달 */}
       {isGoldbarModalOpen && (
-        <div className="fixed inset-0 z-[130] flex items-end sm:items-center justify-center p-0 lg:p-4">
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 lg:p-4">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setIsGoldbarModalOpen(false)}></div>
           <div className="relative w-full max-w-lg bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh]">
             <header className="p-8 border-b border-slate-50 flex justify-between items-center bg-amber-50/50">
@@ -2439,7 +2448,10 @@ export default function AdminDashboard() {
                </div>
                <button onClick={() => setIsGoldbarModalOpen(false)} className="p-2 bg-white rounded-xl text-slate-400 shadow-sm"><X className="w-6 h-6" /></button>
             </header>
-            <form onSubmit={handleGoldbarSubmit} className="p-8 space-y-4 overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-12">
+            <form
+              onSubmit={handleGoldbarSubmit}
+              className="p-8 space-y-4 overflow-y-auto overflow-x-hidden overscroll-y-contain pb-[max(7rem,calc(5rem+env(safe-area-inset-bottom)))] sm:pb-8 lg:pb-12"
+            >
                 {/* 품명 */}
                 <div className="space-y-2">
                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">품명 *</label>
@@ -2448,6 +2460,7 @@ export default function AdminDashboard() {
                     type="text"
                     placeholder="예: 골드바3.75g"
                     autoComplete="off"
+                    scrollIntoViewOnFocus
                     value={goldbarFormData.serial_number}
                     onChange={(v) => setGoldbarFormData({ ...goldbarFormData, serial_number: v })}
                     className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent hover:border-amber-200/50 focus:border-amber-400/50 transition-all focus:bg-white"
@@ -2463,6 +2476,7 @@ export default function AdminDashboard() {
                       type="text"
                       placeholder="예: 999.9"
                       autoComplete="off"
+                      scrollIntoViewOnFocus
                       value={goldbarFormData.material}
                       onChange={(v) => setGoldbarFormData({ ...goldbarFormData, material: v })}
                       className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all"
@@ -2484,9 +2498,9 @@ export default function AdminDashboard() {
                   <ImeTextInput
                     required
                     type="text"
-                    inputMode="decimal"
                     placeholder="예: 3.75"
                     autoComplete="off"
+                    scrollIntoViewOnFocus
                     value={goldbarFormData.weight}
                     onChange={(v) => setGoldbarFormData({ ...goldbarFormData, weight: v })}
                     className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-12 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all"
@@ -2500,9 +2514,9 @@ export default function AdminDashboard() {
                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">가로 길이(mm)</label>
                     <ImeTextInput
                       type="text"
-                      inputMode="decimal"
                       placeholder="예: 17"
                       autoComplete="off"
+                      scrollIntoViewOnFocus
                       value={goldbarFormData.width_mm}
                       onChange={(v) => setGoldbarFormData({ ...goldbarFormData, width_mm: v })}
                       className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-14 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all"
@@ -2513,9 +2527,9 @@ export default function AdminDashboard() {
                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">세로 길이(mm)</label>
                     <ImeTextInput
                       type="text"
-                      inputMode="decimal"
                       placeholder="예: 25"
                       autoComplete="off"
+                      scrollIntoViewOnFocus
                       value={goldbarFormData.height_mm}
                       onChange={(v) => setGoldbarFormData({ ...goldbarFormData, height_mm: v })}
                       className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-14 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all"
@@ -2530,9 +2544,9 @@ export default function AdminDashboard() {
                   <ImeTextInput
                     required
                     type="text"
-                    inputMode="numeric"
                     placeholder="예: 850000"
                     autoComplete="off"
+                    scrollIntoViewOnFocus
                     value={goldbarFormData.price}
                     onChange={(v) => setGoldbarFormData({ ...goldbarFormData, price: v })}
                     className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-12 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all"
@@ -2547,6 +2561,7 @@ export default function AdminDashboard() {
                     type="text"
                     placeholder="메모를 입력해 주세요"
                     autoComplete="off"
+                    scrollIntoViewOnFocus
                     value={goldbarFormData.memo}
                     onChange={(v) => setGoldbarFormData({ ...goldbarFormData, memo: v })}
                     className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all"
@@ -2566,9 +2581,10 @@ export default function AdminDashboard() {
                   <div className="space-y-2">
                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">정품인증서 URL</label>
                     <ImeTextInput
-                      type="url"
+                      type="text"
                       placeholder="https://..."
                       autoComplete="off"
+                      scrollIntoViewOnFocus
                       value={goldbarFormData.cert_url}
                       onChange={(v) => setGoldbarFormData({ ...goldbarFormData, cert_url: v })}
                       className="w-full h-14 bg-slate-100/50 rounded-2xl px-4 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all"
@@ -2586,7 +2602,7 @@ export default function AdminDashboard() {
 
       {/* 골드바 정보 수정 모달 */}
       {isEditModalOpen && (
-        <div className="fixed inset-0 z-[130] flex items-end sm:items-center justify-center p-0 lg:p-4">
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 lg:p-4">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setIsEditModalOpen(false)}></div>
           <div className="relative w-full max-w-lg bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh]">
             <header className="p-8 border-b border-slate-50 flex justify-between items-center bg-amber-50/50">
@@ -2596,7 +2612,10 @@ export default function AdminDashboard() {
                </div>
                <button onClick={() => setIsEditModalOpen(false)} className="p-2 bg-white rounded-xl text-slate-400 shadow-sm"><X className="w-6 h-6" /></button>
             </header>
-            <form onSubmit={handleEditSubmit} className="p-8 space-y-6 overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-12">
+            <form
+              onSubmit={handleEditSubmit}
+              className="p-8 space-y-6 overflow-y-auto overflow-x-hidden overscroll-y-contain pb-[max(7rem,calc(5rem+env(safe-area-inset-bottom)))] sm:pb-8 lg:pb-12"
+            >
                {/* 일련번호 */}
                <div className="space-y-2">
                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">일련번호 *</label>
@@ -2604,6 +2623,7 @@ export default function AdminDashboard() {
                    required
                    type="text"
                    autoComplete="off"
+                   scrollIntoViewOnFocus
                    value={editGoldbarData.serial_number}
                    onChange={(v) => setEditGoldbarData({ ...editGoldbarData, serial_number: v })}
                    className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all"
@@ -2617,8 +2637,8 @@ export default function AdminDashboard() {
                    <ImeTextInput
                      required
                      type="text"
-                     inputMode="decimal"
                      autoComplete="off"
+                     scrollIntoViewOnFocus
                      value={editGoldbarData.weight}
                      onChange={(v) => setEditGoldbarData({ ...editGoldbarData, weight: v })}
                      className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all"
@@ -2630,6 +2650,7 @@ export default function AdminDashboard() {
                      required
                      type="text"
                      autoComplete="off"
+                     scrollIntoViewOnFocus
                      value={editGoldbarData.purity}
                      onChange={(v) => setEditGoldbarData({ ...editGoldbarData, purity: v })}
                      className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all"
@@ -2640,7 +2661,17 @@ export default function AdminDashboard() {
                {/* 제조일자 */}
                <div className="space-y-2">
                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">제조일자 (선택)</label>
-                 <input type="date" value={editGoldbarData.minted_at} onChange={(e) => setEditGoldbarData({...editGoldbarData, minted_at: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all" />
+                 <input
+                   type="date"
+                   value={editGoldbarData.minted_at}
+                   onChange={(e) => setEditGoldbarData({ ...editGoldbarData, minted_at: e.target.value })}
+                   onFocus={(e) => {
+                     requestAnimationFrame(() => {
+                       setTimeout(() => e.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' }), 280);
+                     });
+                   }}
+                   className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all"
+                 />
                </div>
 
                {/* NFC 태그 UID */}
@@ -2683,9 +2714,10 @@ export default function AdminDashboard() {
                   <div className="space-y-2">
                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">정품인증서 URL</label>
                     <ImeTextInput
-                      type="url"
+                      type="text"
                       placeholder="https://..."
                       autoComplete="off"
+                      scrollIntoViewOnFocus
                       value={editGoldbarData.cert_url}
                       onChange={(v) => setEditGoldbarData({ ...editGoldbarData, cert_url: v })}
                       className="w-full h-14 bg-slate-100/50 rounded-2xl px-4 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all"
@@ -2702,7 +2734,9 @@ export default function AdminDashboard() {
       )}
 
       {/* 하단 네비게이션 (모바일전용) */}
-      <div className="lg:hidden fixed left-0 right-0 bottom-0 bg-white/95 backdrop-blur-3xl border-t border-slate-100/80 z-[140] flex items-center justify-around px-2 h-[68px] pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_rgba(0,0,0,0.06)] select-none">
+      <div
+        className={`lg:hidden fixed left-0 right-0 bottom-0 bg-white/95 backdrop-blur-3xl border-t border-slate-100/80 z-[140] flex items-center justify-around px-2 h-[68px] pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_rgba(0,0,0,0.06)] select-none ${blockMobileBottomNav ? 'hidden' : ''}`}
+      >
          {[
            { id: 'dashboard', icon: LayoutDashboard, label: '통계' },
            { id: 'products', icon: Package, label: '제품' },
