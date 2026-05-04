@@ -348,7 +348,10 @@ export default function UserLanding() {
             <X className="w-4.5 h-4.5" />
           </button>
 
-          <span className="text-xl font-extrabold text-slate-800 tracking-tight">Gold SyncTag</span>
+          <div className="flex items-center gap-2 select-none">
+            <img src="/gold_synctag_logo_v2.png" alt="Logo" className="w-7 h-7 object-contain rounded-lg" />
+            <span className="text-xl font-extrabold text-slate-800 tracking-tight">Gold SyncTag</span>
+          </div>
 
           {currentUser ? (
             <button 

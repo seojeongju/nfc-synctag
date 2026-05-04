@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LayoutDashboard, Tag, Package, Plus, Scan, Bell, ArrowUpRight, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut, Eye, ChevronDown, ChevronUp } from 'lucide-react';
+import { LayoutDashboard, Tag, Package, Plus, Bell, ArrowUpRight, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut, Eye, ChevronDown, ChevronUp } from 'lucide-react';
 
 export default function AdminDashboard() {
   const [currentTab, setCurrentTab] = useState<'dashboard' | 'products' | 'nfc' | 'goldbars'>('dashboard');
@@ -544,11 +544,9 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-[#F8FAFC] flex font-sans leading-relaxed text-slate-900 animate-in fade-in duration-300">
       {/* 사이드바 - 데스크탑 */}
       <aside className="hidden lg:flex w-72 flex-col p-6 bg-white border-r border-slate-100 shadow-sm fixed h-full z-20">
-        <div className="flex items-center gap-3 mb-12 px-2">
-          <div className="w-10 h-10 rounded-2xl bg-purple-gradient flex items-center justify-center shadow-lg shadow-purple-500/20">
-            <Scan className="text-white w-5 h-5" />
-          </div>
-          <span className="text-xl font-black tracking-tight bg-clip-text text-transparent bg-purple-gradient">Gold SyncTag</span>
+        <div className="flex items-center gap-3 mb-12 px-2 select-none">
+          <img src="/gold_synctag_logo_v2.png" alt="Logo" className="w-9 h-9 object-contain rounded-lg" />
+          <span className="text-xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-amber-600 to-orange-500">Gold SyncTag</span>
         </div>
         
         <nav className="flex flex-col gap-2 flex-1">
@@ -594,10 +592,8 @@ export default function AdminDashboard() {
       <main className="flex-1 lg:ml-72 flex flex-col min-h-screen">
         {/* 헤더 */}
         <header className="h-16 lg:h-20 bg-white/80 backdrop-blur-xl border-b border-slate-50 px-4 lg:px-10 flex items-center justify-between sticky top-0 z-10 transition-all">
-          <div className="flex items-center gap-3 lg:hidden" onClick={() => setCurrentTab('dashboard')}>
-            <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
-              <Scan className="text-white w-4 h-4" />
-            </div>
+          <div className="flex items-center gap-2.5 lg:hidden select-none cursor-pointer" onClick={() => setCurrentTab('dashboard')}>
+            <img src="/gold_synctag_logo_v2.png" alt="Logo" className="w-7 h-7 object-contain rounded-lg" />
             <span className="font-black text-slate-800">Gold SyncTag</span>
           </div>
           <div className="flex items-center gap-4 ml-auto">
