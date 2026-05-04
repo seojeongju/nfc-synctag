@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Tag, Package, Plus, Bell, ArrowUpRight, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Link2Off, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut, Eye, ChevronDown, ChevronUp } from 'lucide-react';
+import { ImeTextInput } from '../components/ImeTextInput';
 
 const ADMIN_TAB_IDS = ['dashboard', 'products', 'nfc', 'goldbars', 'userGoldbars'] as const;
 type AdminTabId = (typeof ADMIN_TAB_IDS)[number];
@@ -2359,14 +2360,30 @@ export default function AdminDashboard() {
                 {/* 품명 */}
                 <div className="space-y-2">
                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">품명 *</label>
-                  <input required type="text" placeholder="예: 골드바3.75g" value={goldbarFormData.serial_number} onChange={(e) => setGoldbarFormData({...goldbarFormData, serial_number: e.target.value})} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent hover:border-amber-200/50 focus:border-amber-400/50 transition-all focus:bg-white" />
+                  <ImeTextInput
+                    required
+                    type="text"
+                    placeholder="예: 골드바3.75g"
+                    autoComplete="off"
+                    value={goldbarFormData.serial_number}
+                    onChange={(v) => setGoldbarFormData({ ...goldbarFormData, serial_number: v })}
+                    className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent hover:border-amber-200/50 focus:border-amber-400/50 transition-all focus:bg-white"
+                  />
                 </div>
 
                 {/* 소재 및 금 함량 */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">소재</label>
-                    <input required type="text" placeholder="예: 999.9" value={goldbarFormData.material} onChange={(e) => setGoldbarFormData({...goldbarFormData, material: e.target.value})} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all" />
+                    <ImeTextInput
+                      required
+                      type="text"
+                      placeholder="예: 999.9"
+                      autoComplete="off"
+                      value={goldbarFormData.material}
+                      onChange={(v) => setGoldbarFormData({ ...goldbarFormData, material: v })}
+                      className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all"
+                    />
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">금 함량</label>
@@ -2381,7 +2398,16 @@ export default function AdminDashboard() {
                 {/* 중량 */}
                 <div className="space-y-2 relative">
                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">중량(g) *</label>
-                  <input required type="text" placeholder="예: 3.75" value={goldbarFormData.weight} onChange={(e) => setGoldbarFormData({...goldbarFormData, weight: e.target.value})} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-12 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all" />
+                  <ImeTextInput
+                    required
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="예: 3.75"
+                    autoComplete="off"
+                    value={goldbarFormData.weight}
+                    onChange={(v) => setGoldbarFormData({ ...goldbarFormData, weight: v })}
+                    className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-12 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all"
+                  />
                   <span className="absolute right-4 bottom-3 font-bold text-slate-400 select-none">g</span>
                 </div>
 
@@ -2389,12 +2415,28 @@ export default function AdminDashboard() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2 relative">
                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">가로 길이(mm)</label>
-                    <input type="text" placeholder="예: 17" value={goldbarFormData.width_mm} onChange={(e) => setGoldbarFormData({...goldbarFormData, width_mm: e.target.value})} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-14 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all" />
+                    <ImeTextInput
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="예: 17"
+                      autoComplete="off"
+                      value={goldbarFormData.width_mm}
+                      onChange={(v) => setGoldbarFormData({ ...goldbarFormData, width_mm: v })}
+                      className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-14 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all"
+                    />
                     <span className="absolute right-4 bottom-3 font-bold text-slate-400 select-none">mm</span>
                   </div>
                   <div className="space-y-2 relative">
                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">세로 길이(mm)</label>
-                    <input type="text" placeholder="예: 25" value={goldbarFormData.height_mm} onChange={(e) => setGoldbarFormData({...goldbarFormData, height_mm: e.target.value})} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-14 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all" />
+                    <ImeTextInput
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="예: 25"
+                      autoComplete="off"
+                      value={goldbarFormData.height_mm}
+                      onChange={(v) => setGoldbarFormData({ ...goldbarFormData, height_mm: v })}
+                      className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-14 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all"
+                    />
                     <span className="absolute right-4 bottom-3 font-bold text-slate-400 select-none">mm</span>
                   </div>
                 </div>
@@ -2402,14 +2444,30 @@ export default function AdminDashboard() {
                 {/* 가격 */}
                 <div className="space-y-2 relative">
                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">가격 *</label>
-                  <input required type="number" placeholder="예: 850000" value={goldbarFormData.price} onChange={(e) => setGoldbarFormData({...goldbarFormData, price: e.target.value})} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-12 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all" />
+                  <ImeTextInput
+                    required
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="예: 850000"
+                    autoComplete="off"
+                    value={goldbarFormData.price}
+                    onChange={(v) => setGoldbarFormData({ ...goldbarFormData, price: v })}
+                    className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-12 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all"
+                  />
                   <span className="absolute right-4 bottom-3 font-bold text-slate-400 select-none">원</span>
                 </div>
 
                 {/* 메모 */}
                 <div className="space-y-2">
                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">메모</label>
-                  <input type="text" placeholder="메모를 입력해 주세요" value={goldbarFormData.memo} onChange={(e) => setGoldbarFormData({...goldbarFormData, memo: e.target.value})} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all" />
+                  <ImeTextInput
+                    type="text"
+                    placeholder="메모를 입력해 주세요"
+                    autoComplete="off"
+                    value={goldbarFormData.memo}
+                    onChange={(v) => setGoldbarFormData({ ...goldbarFormData, memo: v })}
+                    className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all"
+                  />
                 </div>
 
                 {/* 출고 상태 및 보증서 URL */}
@@ -2424,7 +2482,14 @@ export default function AdminDashboard() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">정품인증서 URL</label>
-                    <input type="url" placeholder="https://..." value={goldbarFormData.cert_url} onChange={(e) => setGoldbarFormData({...goldbarFormData, cert_url: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-4 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all" />
+                    <ImeTextInput
+                      type="url"
+                      placeholder="https://..."
+                      autoComplete="off"
+                      value={goldbarFormData.cert_url}
+                      onChange={(v) => setGoldbarFormData({ ...goldbarFormData, cert_url: v })}
+                      className="w-full h-14 bg-slate-100/50 rounded-2xl px-4 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all"
+                    />
                   </div>
                 </div>
 
@@ -2452,18 +2517,40 @@ export default function AdminDashboard() {
                {/* 일련번호 */}
                <div className="space-y-2">
                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">일련번호 *</label>
-                 <input required type="text" value={editGoldbarData.serial_number} onChange={(e) => setEditGoldbarData({...editGoldbarData, serial_number: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all" />
+                 <ImeTextInput
+                   required
+                   type="text"
+                   autoComplete="off"
+                   value={editGoldbarData.serial_number}
+                   onChange={(v) => setEditGoldbarData({ ...editGoldbarData, serial_number: v })}
+                   className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all"
+                 />
                </div>
 
                {/* 중량 및 순도 */}
                <div className="grid grid-cols-2 gap-4">
                  <div className="space-y-2">
                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">중량 *</label>
-                   <input required type="text" value={editGoldbarData.weight} onChange={(e) => setEditGoldbarData({...editGoldbarData, weight: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all" />
+                   <ImeTextInput
+                     required
+                     type="text"
+                     inputMode="decimal"
+                     autoComplete="off"
+                     value={editGoldbarData.weight}
+                     onChange={(v) => setEditGoldbarData({ ...editGoldbarData, weight: v })}
+                     className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all"
+                   />
                  </div>
                  <div className="space-y-2">
                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">순도</label>
-                   <input required type="text" value={editGoldbarData.purity} onChange={(e) => setEditGoldbarData({...editGoldbarData, purity: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all" />
+                   <ImeTextInput
+                     required
+                     type="text"
+                     autoComplete="off"
+                     value={editGoldbarData.purity}
+                     onChange={(v) => setEditGoldbarData({ ...editGoldbarData, purity: v })}
+                     className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all"
+                   />
                  </div>
                </div>
 
@@ -2512,7 +2599,14 @@ export default function AdminDashboard() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">정품인증서 URL</label>
-                    <input type="url" placeholder="https://..." value={editGoldbarData.cert_url} onChange={(e) => setEditGoldbarData({...editGoldbarData, cert_url: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-4 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all" />
+                    <ImeTextInput
+                      type="url"
+                      placeholder="https://..."
+                      autoComplete="off"
+                      value={editGoldbarData.cert_url}
+                      onChange={(v) => setEditGoldbarData({ ...editGoldbarData, cert_url: v })}
+                      className="w-full h-14 bg-slate-100/50 rounded-2xl px-4 font-bold outline-none border border-transparent focus:border-amber-400/50 focus:bg-white transition-all"
+                    />
                   </div>
                 </div>
 
