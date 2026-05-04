@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Share2, Download, Play, ChevronRight, Bookmark, Loader2, Award, ShieldCheck, ShoppingCart, Info, CheckCircle2, MessageSquare, X, BookOpen, Smartphone } from 'lucide-react';
+import { Download, Play, ChevronRight, Bookmark, Loader2, Award, ShieldCheck, ShoppingCart, Info, CheckCircle2, MessageSquare, X, BookOpen, Smartphone } from 'lucide-react';
 
 export default function UserLanding() {
   const { tagId } = useParams();
@@ -205,14 +205,14 @@ export default function UserLanding() {
 
             {/* 하단 화이트 카드 리스트 */}
             <div className="w-full max-w-md space-y-3.5 mb-6">
-              <div onClick={() => alert('공유하기 기능이 제공됩니다.')} className="bg-white border border-slate-100/80 rounded-2xl p-4 flex items-center justify-between hover:border-purple-300 hover:shadow-lg transition-all cursor-pointer group shadow-sm">
+              <div onClick={() => setActiveTab('myWallet')} className="bg-white border border-slate-100/80 rounded-2xl p-4 flex items-center justify-between hover:border-amber-400 hover:shadow-lg transition-all cursor-pointer group shadow-sm">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600 group-hover:scale-105 transition-all">
-                    <Share2 className="w-5 h-5" />
+                  <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 group-hover:scale-105 transition-all">
+                    <Award className="w-5 h-5" />
                   </div>
                   <div>
-                    <h5 className="font-black text-slate-800 text-sm">정품 인증서 공유</h5>
-                    <p className="text-[11px] font-bold text-slate-400 mt-0.5">디지털 원본을 전송합니다</p>
+                    <h5 className="font-black text-slate-800 text-sm">나의 소지품 목록</h5>
+                    <p className="text-[11px] font-bold text-slate-400 mt-0.5">내가 스캔하고 등록한 정품 확인</p>
                   </div>
                 </div>
                 <ChevronRight className="w-5 h-5 text-slate-300 group-hover:translate-x-1 transition-all" />
