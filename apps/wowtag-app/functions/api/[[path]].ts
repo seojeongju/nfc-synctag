@@ -282,10 +282,39 @@ app.get('/certificates/download/:tagId', async (c) => {
   }
 });
 
+// 등록된 정품인증서(보증서) 행 목록 — 제품 등록 시 선택용 (골드바 일련번호 + NFC UID)
+app.get('/certificates', async (c) => {
+  try {
+    const { results } = await c.env.DB.prepare(`
+      SELECT c.id, c.goldbar_id, c.tag_uid, c.cert_file_path, g.serial_number
+      FROM certificates c
+      JOIN goldbars g ON g.id = c.goldbar_id
+      ORDER BY c.issued_at DESC, c.id DESC
+    `).all();
+    return c.json(results);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 // 제품 목록 조회
 app.get('/products', async (c) => {
-  const { results } = await c.env.DB.prepare('SELECT * FROM products ORDER BY created_at DESC').all();
-  return c.json(results);
+  try {
+    await migrateProductsExtraColumns(c.env.DB);
+    const { results } = await c.env.DB.prepare(`
+      SELECT
+        p.*,
+        c.tag_uid AS cert_tag_uid,
+        g.serial_number AS cert_serial_number
+      FROM products p
+      LEFT JOIN certificates c ON p.certificate_id = c.id
+      LEFT JOIN goldbars g ON c.goldbar_id = g.id
+      ORDER BY p.created_at DESC
+    `).all();
+    return c.json(results);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
 });
 
 // 특정 태그 UID 정보 조회 (중복 체크용)
@@ -324,6 +353,7 @@ async function migrateProductsExtraColumns(db: D1Database) {
     'ALTER TABLE products ADD COLUMN price TEXT',
     'ALTER TABLE products ADD COLUMN memo TEXT',
     'ALTER TABLE products ADD COLUMN sold_at TEXT',
+    'ALTER TABLE products ADD COLUMN certificate_id INTEGER',
   ];
   for (const sql of stmts) {
     try {
@@ -406,9 +436,23 @@ app.post('/products', async (c) => {
       height_mm,
       price,
       memo,
+      certificate_id,
     } = body;
 
     if (!name) return c.json({ error: 'Name is required' }, 400);
+
+    let certId: number | null = null;
+    if (certificate_id !== undefined && certificate_id !== null && certificate_id !== '') {
+      const n = Number(certificate_id);
+      if (!Number.isFinite(n) || n <= 0) {
+        return c.json({ error: '유효하지 않은 certificate_id 입니다.' }, 400);
+      }
+      const row = await c.env.DB.prepare('SELECT id FROM certificates WHERE id = ?').bind(n).first();
+      if (!row) {
+        return c.json({ error: '존재하지 않는 인증서입니다.' }, 400);
+      }
+      certId = n;
+    }
 
     let savedImageUrl = image_url || '/jewelry.png';
 
@@ -435,8 +479,8 @@ app.post('/products', async (c) => {
     const productResult = await c.env.DB.prepare(
       `INSERT INTO products (
         name, description, video_url, manual_url, image_url, options,
-        material, purity, weight, width_mm, height_mm, price, memo
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
+        material, purity, weight, width_mm, height_mm, price, memo, certificate_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
     )
       .bind(
         name,
@@ -451,7 +495,8 @@ app.post('/products', async (c) => {
         width_mm ?? '',
         height_mm ?? '',
         price ?? '',
-        memo ?? ''
+        memo ?? '',
+        certId
       )
       .first();
 
@@ -500,6 +545,20 @@ app.put('/products/:id', async (c) => {
 
     const soldInBody = Object.prototype.hasOwnProperty.call(body, 'sold');
 
+    let certIdPut: number | null = null;
+    const rawCert = body.certificate_id;
+    if (rawCert !== undefined && rawCert !== null && rawCert !== '') {
+      const n = Number(rawCert);
+      if (!Number.isFinite(n) || n <= 0) {
+        return c.json({ error: '유효하지 않은 certificate_id 입니다.' }, 400);
+      }
+      const row = await c.env.DB.prepare('SELECT id FROM certificates WHERE id = ?').bind(n).first();
+      if (!row) {
+        return c.json({ error: '존재하지 않는 인증서입니다.' }, 400);
+      }
+      certIdPut = n;
+    }
+
     let savedImageUrl = image_url;
 
     if (image_file_base64) {
@@ -525,6 +584,7 @@ app.put('/products/:id', async (c) => {
       UPDATE products 
       SET name = ?, description = ?, video_url = ?, manual_url = ?, image_url = ?, options = ?,
           material = ?, purity = ?, weight = ?, width_mm = ?, height_mm = ?, price = ?, memo = ?,
+          certificate_id = ?,
           sold_at = COALESCE(sold_at, ?)
       WHERE id = ?
     `)
@@ -542,6 +602,7 @@ app.put('/products/:id', async (c) => {
           height_mm ?? '',
           price ?? '',
           memo ?? '',
+          certIdPut,
           mark,
           id
         )
@@ -551,6 +612,7 @@ app.put('/products/:id', async (c) => {
       UPDATE products 
       SET name = ?, description = ?, video_url = ?, manual_url = ?, image_url = ?, options = ?,
           material = ?, purity = ?, weight = ?, width_mm = ?, height_mm = ?, price = ?, memo = ?,
+          certificate_id = ?,
           sold_at = NULL
       WHERE id = ?
     `)
@@ -568,6 +630,7 @@ app.put('/products/:id', async (c) => {
           height_mm ?? '',
           price ?? '',
           memo ?? '',
+          certIdPut,
           id
         )
         .run();
@@ -575,7 +638,8 @@ app.put('/products/:id', async (c) => {
       await c.env.DB.prepare(`
       UPDATE products 
       SET name = ?, description = ?, video_url = ?, manual_url = ?, image_url = ?, options = ?,
-          material = ?, purity = ?, weight = ?, width_mm = ?, height_mm = ?, price = ?, memo = ?
+          material = ?, purity = ?, weight = ?, width_mm = ?, height_mm = ?, price = ?, memo = ?,
+          certificate_id = ?
       WHERE id = ?
     `)
         .bind(
@@ -592,6 +656,7 @@ app.put('/products/:id', async (c) => {
           height_mm ?? '',
           price ?? '',
           memo ?? '',
+          certIdPut,
           id
         )
         .run();

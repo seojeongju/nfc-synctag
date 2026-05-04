@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS products (
     manual_url TEXT,
     image_url TEXT,
     sold_at TEXT,
+    certificate_id INTEGER,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -34,6 +34,10 @@ export default function AdminDashboard() {
 
   const [isAdminGuideOpen, setIsAdminGuideOpen] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
+  /** 제품에 연결 가능한 정품인증서 행 목록 (GET /certificates) */
+  const [certificateCatalog, setCertificateCatalog] = useState<
+    { id: number; goldbar_id: number; tag_uid: string; serial_number: string }[]
+  >([]);
   const [goldbars, setGoldbars] = useState<any[]>([]);
   const [userGoldbars, setUserGoldbars] = useState<any[]>([]);
   const [adminUsers, setAdminUsers] = useState<{ id: string; email: string; name: string | null }[]>([]);
@@ -71,7 +75,8 @@ export default function AdminDashboard() {
     image_url: '/jewelry.png',
     options: '',
     image_file_base64: '',
-    file_name: ''
+    file_name: '',
+    certificate_id: '' as number | ''
   });
 
   // 폼 상태 (제품 수정용)
@@ -93,7 +98,8 @@ export default function AdminDashboard() {
     image_file_base64: '',
     file_name: '',
     /** 판매 완료 시 태그 매칭 해제에 NFC 인증 필요 */
-    sold: false
+    sold: false,
+    certificate_id: '' as number | '',
   });
 
   // 폼 상태 (NFC 매핑)
@@ -270,6 +276,17 @@ export default function AdminDashboard() {
       console.error('Failed to fetch products', err);
     }
   };
+
+  const fetchCertificateCatalog = useCallback(async () => {
+    try {
+      const res = await fetch('/api/certificates');
+      if (!res.ok) return;
+      const data = await res.json();
+      setCertificateCatalog(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Failed to fetch certificates catalog', err);
+    }
+  }, []);
 
   const fetchTags = async () => {
     try {
@@ -472,6 +489,12 @@ export default function AdminDashboard() {
     fetchTags();
   }, []);
 
+  useEffect(() => {
+    if (currentTab === 'products' || isProductModalOpen || isEditProductModalOpen) {
+      fetchCertificateCatalog();
+    }
+  }, [currentTab, isProductModalOpen, isEditProductModalOpen, fetchCertificateCatalog]);
+
   // --- NFC 로직 ---
   const handleNFCScan = async (target: 'nfc' | 'goldbar' | 'edit') => {
     if (!('NDEFReader' in window)) {
@@ -603,10 +626,14 @@ export default function AdminDashboard() {
     if (!productFormData.name) return alert('제품 이름을 입력해 주세요.');
     setSubmitting(true);
     try {
+      const { certificate_id, ...productPayload } = productFormData;
       const res = await fetch('/api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(productFormData)
+        body: JSON.stringify({
+          ...productPayload,
+          certificate_id: certificate_id === '' ? null : certificate_id,
+        }),
       });
       if (res.ok) {
         setIsProductModalOpen(false);
@@ -625,7 +652,8 @@ export default function AdminDashboard() {
           image_url: '/jewelry.png',
           options: '',
           image_file_base64: '',
-          file_name: ''
+          file_name: '',
+          certificate_id: '',
         });
         fetchProducts();
       }
@@ -653,7 +681,11 @@ export default function AdminDashboard() {
       options: p.options || '',
       image_file_base64: '',
       file_name: '',
-      sold: !!p.sold_at
+      sold: !!p.sold_at,
+      certificate_id:
+        p.certificate_id != null && p.certificate_id !== ''
+          ? Number(p.certificate_id)
+          : '',
     });
     setIsEditProductModalOpen(true);
   };
@@ -663,10 +695,14 @@ export default function AdminDashboard() {
     if (!editProductFormData.name) return alert('이름을 입력하세요.');
     setSubmitting(true);
     try {
+      const { certificate_id, ...editPayload } = editProductFormData;
       const res = await fetch(`/api/products/${editProductFormData.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editProductFormData),
+        body: JSON.stringify({
+          ...editPayload,
+          certificate_id: certificate_id === '' ? null : certificate_id,
+        }),
       });
       if (res.ok) {
         setIsEditProductModalOpen(false);
@@ -1306,6 +1342,15 @@ export default function AdminDashboard() {
                           ) : null}
                         </div>
                         <p className="text-xs text-slate-400 font-bold line-clamp-2 mt-0.5 break-words">{p.description || '상세 설명 없음'}</p>
+                        {(p.cert_serial_number || p.cert_tag_uid) && (
+                          <p className="text-[10px] font-bold text-amber-700 mt-1.5 flex items-center gap-1.5 min-w-0">
+                            <Award className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">
+                              인증서: {p.cert_serial_number || '?'}
+                              {p.cert_tag_uid ? <span className="font-mono text-amber-800/90"> · {p.cert_tag_uid}</span> : null}
+                            </span>
+                          </p>
+                        )}
                       </div>
                       <div className="shrink-0 flex flex-col sm:flex-row items-end sm:items-start gap-0.5 pt-0.5">
                         <button type="button" onClick={() => handleEditProductOpen(p)} className="p-2 rounded-lg sm:rounded-xl hover:bg-slate-50 text-slate-400 hover:text-primary transition-all" aria-label="수정">
@@ -2089,6 +2134,33 @@ export default function AdminDashboard() {
                  <input type="text" placeholder="메모를 입력해 주세요" value={productFormData.memo} onChange={(e) => setProductFormData({ ...productFormData, memo: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
                </div>
 
+               <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-4 space-y-2">
+                 <label className="text-xs font-black text-slate-600 uppercase tracking-widest pl-1 flex items-center gap-2">
+                   <Award className="w-4 h-4 text-amber-600 shrink-0" />
+                   정품인증서(보증서) 연결
+                 </label>
+                 <p className="text-[11px] font-bold text-slate-500 pl-1 leading-relaxed">
+                   골드바 정품인증 관리에서 NFC가 연결된 인증서만 표시됩니다. 없으면 먼저 골드바·보증서를 등록하세요.
+                 </p>
+                 <select
+                   value={productFormData.certificate_id === '' ? '' : String(productFormData.certificate_id)}
+                   onChange={(e) =>
+                     setProductFormData({
+                       ...productFormData,
+                       certificate_id: e.target.value === '' ? '' : Number(e.target.value),
+                     })
+                   }
+                   className="w-full h-12 bg-white rounded-xl px-3 font-bold outline-none border border-amber-100 focus:border-amber-400/60 focus:ring-2 focus:ring-amber-100 transition-all cursor-pointer text-sm"
+                 >
+                   <option value="">연결 안 함</option>
+                   {certificateCatalog.map((c) => (
+                     <option key={c.id} value={c.id}>
+                       {c.serial_number} · {c.tag_uid}
+                     </option>
+                   ))}
+                 </select>
+               </div>
+
                <div className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3 space-y-1.5">
                  <p className="text-xs font-bold text-slate-500">
                    현재 금 시세 :{' '}
@@ -2198,6 +2270,33 @@ export default function AdminDashboard() {
                <div className="space-y-2">
                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">메모</label>
                  <input type="text" placeholder="메모를 입력해 주세요" value={editProductFormData.memo} onChange={(e) => setEditProductFormData({ ...editProductFormData, memo: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+               </div>
+
+               <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-4 space-y-2">
+                 <label className="text-xs font-black text-slate-600 uppercase tracking-widest pl-1 flex items-center gap-2">
+                   <Award className="w-4 h-4 text-amber-600 shrink-0" />
+                   정품인증서(보증서) 연결
+                 </label>
+                 <p className="text-[11px] font-bold text-slate-500 pl-1 leading-relaxed">
+                   골드바 정품인증 관리에서 등록된 인증서 중 선택합니다.
+                 </p>
+                 <select
+                   value={editProductFormData.certificate_id === '' ? '' : String(editProductFormData.certificate_id)}
+                   onChange={(e) =>
+                     setEditProductFormData({
+                       ...editProductFormData,
+                       certificate_id: e.target.value === '' ? '' : Number(e.target.value),
+                     })
+                   }
+                   className="w-full h-12 bg-white rounded-xl px-3 font-bold outline-none border border-amber-100 focus:border-amber-400/60 focus:ring-2 focus:ring-amber-100 transition-all cursor-pointer text-sm"
+                 >
+                   <option value="">연결 안 함</option>
+                   {certificateCatalog.map((c) => (
+                     <option key={c.id} value={c.id}>
+                       {c.serial_number} · {c.tag_uid}
+                     </option>
+                   ))}
+                 </select>
                </div>
 
                <label className="flex items-start gap-3 rounded-xl border border-rose-100 bg-rose-50/40 px-4 py-3 cursor-pointer">
