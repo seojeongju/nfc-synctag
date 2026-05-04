@@ -395,9 +395,9 @@ export default function UserLanding() {
 
                 {/* 하단 글래스모피즘 오버레이 팝업 */}
                 <div className="absolute bottom-3 left-3 right-3 bg-white/70 backdrop-blur-xl rounded-[1.8rem] p-5 border border-white/40 shadow-2xl flex flex-col items-center text-center">
-                  <h4 className="text-xl font-black text-slate-800 tracking-tight">럭셔리 제품 정품인증</h4>
-                  <p className="text-xs font-bold text-slate-500 mt-1 mb-1 leading-relaxed">
-                    NFC 태그를 스캔하면 실제 제품 정보를 확인할 수 있습니다.
+                  <h4 className="text-xl font-black text-slate-800 tracking-tight">Gold SyncTag 정품인증</h4>
+                  <p className="text-xs font-bold text-slate-600 mt-1 mb-1 leading-relaxed">
+                    NFC 태그를 스캔하여 실물 골드바의 정품 인증서와 나의 추억 앨범을 확인하세요.
                   </p>
                 </div>
               </div>
