@@ -145,6 +145,10 @@ export default function AdminDashboard() {
   const [submitting, setSubmitting] = useState(false);
   const [nfcScanning, setNfcScanning] = useState(false);
   const [nfcWriting, setNfcWriting] = useState(false);
+  /** 빈 태그 자산만 등록 vs 제품 동시 매핑 */
+  const [nfcRegisterMode, setNfcRegisterMode] = useState<'asset' | 'product'>('asset');
+  const [allTags, setAllTags] = useState<any[]>([]);
+  const [linkPick, setLinkPick] = useState<Record<string, string>>({});
 
   const closeAllAdminModals = useCallback(() => {
     setIsProductModalOpen(false);
@@ -174,6 +178,17 @@ export default function AdminDashboard() {
       setProducts(data);
     } catch (err) {
       console.error('Failed to fetch products', err);
+    }
+  };
+
+  const fetchTags = async () => {
+    try {
+      const res = await fetch('/api/tags');
+      if (!res.ok) return;
+      const data = await res.json();
+      setAllTags(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Failed to fetch tags', err);
     }
   };
 
@@ -332,6 +347,7 @@ export default function AdminDashboard() {
     fetchStats();
     fetchUserGoldbars();
     fetchAdminUsers();
+    fetchTags();
   }, []);
 
   // --- NFC 로직 ---
@@ -350,11 +366,21 @@ export default function AdminDashboard() {
         if ('vibrate' in navigator) navigator.vibrate(200);
 
         if (target === 'nfc') {
-          const res = await fetch(`/api/tags/${serialNumber}`);
+          const res = await fetch(`/api/tags/${encodeURIComponent(serialNumber)}`);
           const existingData = await res.json();
 
-          if (existingData && existingData.product_name) {
-            if (!confirm(`이미 '${existingData.product_name}'에 연결된 태그입니다. 계속하시겠습니까?`)) {
+          if (existingData?.reserved || existingData?.message === 'goldbar_tag') {
+            alert('이 UID는 골드바 정품 태그로 이미 사용 중입니다.');
+            setNfcScanning(false);
+            return;
+          }
+          if (existingData?.product_id != null && existingData?.product_id !== '') {
+            if (!confirm(`이미 제품「${existingData.product_name || '등록됨'}」에 연결된 태그입니다. 새로 매핑하면 덮어씁니다. 계속할까요?`)) {
+              setNfcScanning(false);
+              return;
+            }
+          } else if (existingData?.tag_uid && existingData?.message !== 'not_found') {
+            if (!confirm('이미 자산으로 등록된 태그입니다. 계속 진행할까요?')) {
               setNfcScanning(false);
               return;
             }
@@ -531,6 +557,7 @@ export default function AdminDashboard() {
       if (res.ok) {
         alert('삭제 성공!');
         fetchProducts();
+        fetchTags();
       }
     } catch (err: any) {
       alert('삭제 요청 실패');
@@ -539,22 +566,54 @@ export default function AdminDashboard() {
 
   const handleNfcMappingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nfcFormData.tag_uid || !nfcFormData.product_id) return alert('정보를 모두 입력하세요.');
+    if (!nfcFormData.tag_uid) return alert('태그 UID를 스캔하세요.');
+    if (nfcRegisterMode === 'product' && !nfcFormData.product_id) return alert('제품을 선택하세요.');
     setSubmitting(true);
     try {
+      const body =
+        nfcRegisterMode === 'asset'
+          ? { tag_uid: nfcFormData.tag_uid, product_id: null }
+          : { tag_uid: nfcFormData.tag_uid, product_id: nfcFormData.product_id };
       const res = await fetch('/api/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(nfcFormData)
+        body: JSON.stringify(body)
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         setIsNfcModalOpen(false);
+        setNfcRegisterMode('asset');
         setNfcFormData({ tag_uid: '', product_id: '' });
-        alert('매핑 성공!');
+        alert(data.mode === 'asset' ? '자산 태그로 등록되었습니다.' : '태그 매핑이 완료되었습니다.');
         fetchProducts();
+        fetchTags();
+      } else {
+        alert(typeof data.error === 'string' ? data.error : '등록에 실패했습니다.');
       }
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleLinkTagProduct = async (uid: string) => {
+    const pid = linkPick[uid];
+    if (!pid) return alert('연결할 제품을 선택하세요.');
+    try {
+      const res = await fetch('/api/tags/link-product', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag_uid: uid, product_id: Number(pid) })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        alert('출고 시 제품 연동이 완료되었습니다.');
+        fetchTags();
+        fetchProducts();
+      } else {
+        alert(typeof data.error === 'string' ? data.error : '연동에 실패했습니다.');
+      }
+    } catch (err: any) {
+      alert(err?.message || '연동 요청 실패');
     }
   };
 
@@ -695,7 +754,7 @@ export default function AdminDashboard() {
 
   const handleLogout = () => {
     localStorage.removeItem('admin_token');
-    window.location.href = '/login';
+    window.location.href = '/admin/login';
   };
 
   const usageRate = goldbars.length > 0 
@@ -1148,53 +1207,95 @@ export default function AdminDashboard() {
             <div className="space-y-6 sm:space-y-8 w-full min-w-0">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full min-w-0">
                 <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 shrink min-w-0">NFC 태그 관리</h2>
-                <button type="button" onClick={() => setIsNfcModalOpen(true)} className="bg-emerald-600 text-white font-black py-3 px-5 sm:px-6 rounded-2xl shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 shrink-0 w-full sm:w-auto text-sm">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNfcRegisterMode('asset');
+                    setNfcFormData({ tag_uid: '', product_id: '' });
+                    setIsNfcModalOpen(true);
+                  }}
+                  className="bg-emerald-600 text-white font-black py-3 px-5 sm:px-6 rounded-2xl shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 shrink-0 w-full sm:w-auto text-sm"
+                >
                   <Smartphone className="w-5 h-5 shrink-0" /> 새 태그 발행
                 </button>
               </div>
               
               <div className="bg-white rounded-2xl sm:rounded-[2.5rem] p-4 sm:p-8 border border-slate-50 shadow-sm overflow-hidden w-full min-w-0 max-w-full">
-                 <h3 className="text-xl font-black mb-6">최근 태그 작업</h3>
+                 <h3 className="text-xl font-black mb-2">카탈로그 NFC 태그</h3>
+                 <p className="text-xs font-bold text-slate-400 mb-6">자산만 등록된 태그는 출고 시 아래에서 제품을 연결할 수 있습니다.</p>
                  <div className="space-y-4">
-                   {products.filter(p => p.tag_uid).slice((currentPageTags - 1) * ITEMS_PER_PAGE, currentPageTags * ITEMS_PER_PAGE).map(p => (
-                     <div key={p.id} className="flex items-center gap-3 sm:gap-4 py-3 sm:py-4 px-4 sm:px-6 bg-slate-50 rounded-xl sm:rounded-2xl min-w-0 max-w-full">
-                       <div className="w-10 h-10 shrink-0 rounded-xl bg-white flex items-center justify-center text-primary border border-slate-100"><Hash className="w-5 h-5" /></div>
-                       <div className="flex-1 min-w-0">
-                          <p className="font-black text-slate-700 text-sm break-all">{p.tag_uid}</p>
-                          <p className="text-xs font-bold text-slate-400 mt-0.5 line-clamp-2 break-words">연결된 제품: {p.name}</p>
+                   {allTags
+                     .filter((t: any) => t.target_type === 'product')
+                     .slice((currentPageTags - 1) * ITEMS_PER_PAGE, currentPageTags * ITEMS_PER_PAGE)
+                     .map((t: any) => (
+                     <div key={`${t.id}-${t.tag_uid}`} className="flex flex-col gap-3 py-3 sm:py-4 px-4 sm:px-6 bg-slate-50 rounded-xl sm:rounded-2xl min-w-0 max-w-full">
+                       <div className="flex items-start gap-3 sm:gap-4 min-w-0">
+                         <div className="w-10 h-10 shrink-0 rounded-xl bg-white flex items-center justify-center text-primary border border-slate-100"><Hash className="w-5 h-5" /></div>
+                         <div className="flex-1 min-w-0">
+                            <p className="font-black text-slate-700 text-sm break-all">{t.tag_uid}</p>
+                            <p className="text-xs font-bold text-slate-400 mt-0.5 line-clamp-2 break-words">
+                              연결된 제품:{' '}
+                              {t.target_name ? (
+                                <span className="text-slate-600">{t.target_name}</span>
+                              ) : (
+                                <span className="text-amber-700">자산만 등록 · 출고 전 (제품 미연결)</span>
+                              )}
+                            </p>
+                         </div>
+                         <LinkIcon className="w-4 h-4 text-slate-300 shrink-0 mt-1" />
                        </div>
-                       <LinkIcon className="w-4 h-4 text-slate-300 shrink-0" />
+                       {!t.target_id && (
+                         <div className="flex flex-col sm:flex-row sm:items-center gap-2 pl-0 sm:pl-[3.25rem] w-full min-w-0">
+                           <select
+                             value={linkPick[t.tag_uid] ?? ''}
+                             onChange={(e) => setLinkPick((prev) => ({ ...prev, [t.tag_uid]: e.target.value }))}
+                             className="w-full sm:flex-1 min-w-0 h-11 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold outline-none focus:border-emerald-400"
+                           >
+                             <option value="">출고 연결할 제품 선택</option>
+                             {products.map((p: any) => (
+                               <option key={p.id} value={String(p.id)}>{p.name}</option>
+                             ))}
+                           </select>
+                           <button
+                             type="button"
+                             onClick={() => handleLinkTagProduct(t.tag_uid)}
+                             className="shrink-0 h-11 px-4 rounded-xl bg-emerald-600 text-white text-xs font-black shadow-sm hover:bg-emerald-700 transition-all"
+                           >
+                             제품 연결 (출고)
+                           </button>
+                         </div>
+                       )}
                      </div>
                    ))}
 
-                   {products.filter(p => p.tag_uid).length === 0 && (
-                     <p className="text-xs font-bold text-slate-400 text-center py-6">아직 등록된 NFC 태그가 없습니다.</p>
+                   {allTags.filter((x: any) => x.target_type === 'product').length === 0 && (
+                     <p className="text-xs font-bold text-slate-400 text-center py-6">아직 등록된 카탈로그 NFC 태그가 없습니다.</p>
                    )}
                  </div>
 
                  {/* NFC 태그 페이지네이션 */}
-                 {products.filter(p => p.tag_uid).length > ITEMS_PER_PAGE && (
-                   <div className="flex justify-center items-center gap-2 mt-6">
+                 {allTags.filter((x: any) => x.target_type === 'product').length > ITEMS_PER_PAGE && (
+                   <div className="flex justify-center items-center gap-2 mt-6 flex-wrap max-w-full overflow-x-auto pb-1 [scrollbar-width:thin]">
                      <button
                        disabled={currentPageTags === 1}
                        onClick={() => setCurrentPageTags(p => p - 1)}
-                       className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm"
+                       className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm shrink-0"
                      >
                        이전
                      </button>
-                     {Array.from({ length: Math.ceil(products.filter(p => p.tag_uid).length / ITEMS_PER_PAGE) }).map((_, i) => (
+                     {Array.from({ length: Math.ceil(allTags.filter((x: any) => x.target_type === 'product').length / ITEMS_PER_PAGE) }).map((_, i) => (
                        <button
                          key={i}
                          onClick={() => setCurrentPageTags(i + 1)}
-                         className={`w-10 h-10 text-xs font-black rounded-xl border transition-all ${currentPageTags === i + 1 ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-transparent shadow-md' : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'}`}
+                         className={`w-10 h-10 text-xs font-black rounded-xl border transition-all shrink-0 ${currentPageTags === i + 1 ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-transparent shadow-md' : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'}`}
                        >
                          {i + 1}
                        </button>
                      ))}
                      <button
-                       disabled={currentPageTags === Math.ceil(products.filter(p => p.tag_uid).length / ITEMS_PER_PAGE)}
+                       disabled={currentPageTags === Math.ceil(allTags.filter((x: any) => x.target_type === 'product').length / ITEMS_PER_PAGE)}
                        onClick={() => setCurrentPageTags(p => p + 1)}
-                       className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm"
+                       className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm shrink-0"
                      >
                        다음
                      </button>
@@ -1746,11 +1847,28 @@ export default function AdminDashboard() {
             <header className="p-8 border-b border-slate-50 flex justify-between items-center bg-emerald-50/50">
                <div>
                  <h3 className="text-2xl font-black text-emerald-800">NFC 태그 발행</h3>
-                 <p className="text-xs font-bold text-emerald-600 mt-1">실물 태그를 제품과 연결하고 URL을 기록합니다.</p>
+                 <p className="text-xs font-bold text-emerald-600 mt-1">자산만 등록하거나, 출고 전까지 제품 연결을 미룰 수 있습니다.</p>
                </div>
-               <button onClick={() => setIsNfcModalOpen(false)} className="p-2 bg-white rounded-xl text-slate-400 shadow-sm"><X className="w-6 h-6" /></button>
+               <button type="button" onClick={() => setIsNfcModalOpen(false)} className="p-2 bg-white rounded-xl text-slate-400 shadow-sm"><X className="w-6 h-6" /></button>
             </header>
-            <form onSubmit={handleNfcMappingSubmit} className="p-8 space-y-10 overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-12">
+            <form onSubmit={handleNfcMappingSubmit} className="p-8 space-y-8 overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-12">
+               <div className="flex rounded-2xl border border-slate-100 p-1 bg-slate-50 gap-1">
+                 <button
+                   type="button"
+                   onClick={() => setNfcRegisterMode('asset')}
+                   className={`flex-1 py-3 rounded-xl text-xs font-black transition-all ${nfcRegisterMode === 'asset' ? 'bg-white text-emerald-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                 >
+                   빈 태그 자산 등록
+                 </button>
+                 <button
+                   type="button"
+                   onClick={() => setNfcRegisterMode('product')}
+                   className={`flex-1 py-3 rounded-xl text-xs font-black transition-all ${nfcRegisterMode === 'product' ? 'bg-white text-emerald-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                 >
+                   제품과 함께 매핑
+                 </button>
+               </div>
+
                {/* 1. 태그 읽기 */}
                <div className="space-y-4">
                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">1단계: 태그 스캔</label>
@@ -1764,28 +1882,45 @@ export default function AdminDashboard() {
                  </div>
                </div>
 
-               {/* 2. 제품 선택 */}
-               <div className="space-y-4">
-                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">2단계: 제품 연결</label>
-                 <select 
-                   required value={nfcFormData.product_id}
-                   onChange={(e) => setNfcFormData({...nfcFormData, product_id: e.target.value})}
-                   className="w-full h-16 bg-slate-50 border-none rounded-2xl px-5 font-bold outline-none ring-4 ring-slate-100/50 appearance-none"
-                 >
-                   <option value="">제품을 선택하세요</option>
-                   {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                 </select>
-               </div>
+               {/* 2. 제품 선택 — 제품 모드에서만 */}
+               {nfcRegisterMode === 'product' ? (
+                 <div className="space-y-4">
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">2단계: 제품 연결</label>
+                   <select 
+                     required={nfcRegisterMode === 'product'}
+                     value={nfcFormData.product_id}
+                     onChange={(e) => setNfcFormData({...nfcFormData, product_id: e.target.value})}
+                     className="w-full h-16 bg-slate-50 border-none rounded-2xl px-5 font-bold outline-none ring-4 ring-slate-100/50 appearance-none"
+                   >
+                     <option value="">제품을 선택하세요</option>
+                     {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                   </select>
+                 </div>
+               ) : (
+                 <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4 space-y-2">
+                   <p className="text-xs font-black text-amber-900 uppercase tracking-wider">2단계: 제품 연결 없음</p>
+                   <p className="text-xs font-bold text-amber-800/90 leading-relaxed">
+                     상품에 연결되지 않은 NFC만 자산으로 등록됩니다. 출고 시 「NFC 태그 관리」 목록에서 제품 연결(출고)을 진행해 주세요.
+                   </p>
+                 </div>
+               )}
 
                {/* 3. 태그 쓰기 도구 */}
                <div className="bg-slate-50 p-6 rounded-[2rem] space-y-4 border border-slate-100">
                   <p className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">3단계: 태그에 URL 굽기 (기록)</p>
+                  <p className="text-[11px] font-bold text-slate-500 leading-relaxed">스캔 시 앱 메인으로 안내되도록 동일한 URL을 태그에 기록합니다.</p>
                   <button type="button" onClick={handleNFCWrite} className={`w-full h-14 rounded-2xl flex items-center justify-center gap-3 font-black text-sm transition-all ${nfcWriting ? 'bg-amber-100 text-amber-600 animate-pulse' : 'bg-white text-slate-700 hover:bg-emerald-600 hover:text-white shadow-sm'}`}>
                     <PenTool className="w-5 h-5" /> {nfcWriting ? '기록 중...' : '태그에 정보 기록하기'}
                   </button>
                </div>
 
-               <button type="submit" disabled={submitting || !nfcFormData.tag_uid || !nfcFormData.product_id} className="w-full h-16 bg-emerald-600 text-white text-lg font-black shadow-xl shadow-emerald-500/30 disabled:opacity-30">태그 매핑 최종 확정</button>
+               <button
+                 type="submit"
+                 disabled={submitting || !nfcFormData.tag_uid || (nfcRegisterMode === 'product' && !nfcFormData.product_id)}
+                 className="w-full h-16 bg-emerald-600 text-white text-lg font-black shadow-xl shadow-emerald-500/30 disabled:opacity-30"
+               >
+                 {nfcRegisterMode === 'asset' ? '자산 등록 완료' : '태그 매핑 최종 확정'}
+               </button>
             </form>
           </div>
         </div>

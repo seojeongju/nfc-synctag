@@ -5,7 +5,39 @@ type Bindings = {
   DB: D1Database;
   BUCKET: R2Bucket;
   ADMIN_PASSWORD?: string;
+  GOOGLE_OAUTH_CLIENT_ID?: string;
+  KAKAO_REST_API_KEY?: string;
 };
+
+async function ensureUsersPasswordColumn(db: D1Database) {
+  try {
+    await db.prepare(
+      `CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        email TEXT UNIQUE NOT NULL,
+        name TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`
+    ).run();
+  } catch (_) {}
+  try {
+    await db.prepare('ALTER TABLE users ADD COLUMN password_hash TEXT').run();
+  } catch (_) {}
+}
+
+async function hashUserPassword(email: string, password: string): Promise<string> {
+  const base = `wowtag:v1|${email.trim().toLowerCase()}|${password}`;
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(base));
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function sanitizeUserRow(u: Record<string, unknown> | null | undefined) {
+  if (!u) return u;
+  const { password_hash: _, ...rest } = u as Record<string, unknown>;
+  return rest;
+}
 
 const app = new Hono<{ Bindings: Bindings }>().basePath('/api');
 
@@ -199,14 +231,20 @@ app.get('/products', async (c) => {
 
 // 특정 태그 UID 정보 조회 (중복 체크용)
 app.get('/tags/:uid', async (c) => {
-  const { uid } = c.req.param();
+  const uid = c.req.param('uid');
+
+  const cert = await c.env.DB.prepare('SELECT tag_uid FROM certificates WHERE tag_uid = ?').bind(uid).first();
+  if (cert) {
+    return c.json({ message: 'goldbar_tag', reserved: true, tag_uid: uid });
+  }
+
   const tagInfo = await c.env.DB.prepare(`
     SELECT t.*, p.name as product_name 
     FROM tags t 
     LEFT JOIN products p ON t.product_id = p.id 
     WHERE t.tag_uid = ?
   `).bind(uid).first();
-  
+
   return c.json(tagInfo || { message: 'not_found' });
 });
 
@@ -426,16 +464,80 @@ app.get('/products/image/products/images/:filename', async (c) => {
   }
 });
 
-// 태그 매핑 (별도 수행 시 - 덮어쓰기 허용)
+// 태그 매핑 — product_id 생략/null 이면 빈 태그 자산 등록만 (출고 시 별도 연동)
 app.post('/tags', async (c) => {
-  const { tag_uid, product_id } = await c.req.json();
-  if (!tag_uid || !product_id) return c.json({ error: 'Invalid data' }, 400);
+  try {
+    const body = await c.req.json();
+    const rawUid = typeof body.tag_uid === 'string' ? body.tag_uid.trim() : '';
+    const product_id = body.product_id;
 
-  await c.env.DB.prepare(
-    'INSERT OR REPLACE INTO tags (tag_uid, product_id) VALUES (?, ?)'
-  ).bind(tag_uid, product_id).run();
+    if (!rawUid) {
+      return c.json({ error: 'tag_uid가 필요합니다.' }, 400);
+    }
 
-  return c.json({ success: true });
+    const cert = await c.env.DB.prepare('SELECT tag_uid FROM certificates WHERE tag_uid = ?').bind(rawUid).first();
+    if (cert) {
+      return c.json({ error: '이 UID는 골드바 정품 태그로 이미 사용 중입니다.' }, 400);
+    }
+
+    const hasProduct =
+      product_id !== undefined && product_id !== null && product_id !== '';
+
+    if (!hasProduct) {
+      const existing = await c.env.DB.prepare('SELECT product_id FROM tags WHERE tag_uid = ?').bind(rawUid).first();
+      if (existing && existing.product_id != null) {
+        return c.json({ error: '이미 제품과 연결된 태그는 빈 자산으로 등록할 수 없습니다.' }, 400);
+      }
+      await c.env.DB.prepare('INSERT OR REPLACE INTO tags (tag_uid, product_id) VALUES (?, NULL)').bind(rawUid).run();
+      return c.json({ success: true, mode: 'asset' });
+    }
+
+    const pid = Number(product_id);
+    if (!Number.isFinite(pid)) {
+      return c.json({ error: '유효한 product_id가 필요합니다.' }, 400);
+    }
+
+    await c.env.DB.prepare('INSERT OR REPLACE INTO tags (tag_uid, product_id) VALUES (?, ?)').bind(rawUid, pid).run();
+
+    return c.json({ success: true, mode: 'mapped' });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// 출고 시: 자산 태그(product_id IS NULL)에 제품만 연결
+app.put('/tags/link-product', async (c) => {
+  try {
+    const { tag_uid, product_id } = await c.req.json();
+    const rawUid = typeof tag_uid === 'string' ? tag_uid.trim() : '';
+    const pid = Number(product_id);
+    if (!rawUid || !Number.isFinite(pid)) {
+      return c.json({ error: 'tag_uid와 product_id가 필요합니다.' }, 400);
+    }
+
+    const productRow = await c.env.DB.prepare('SELECT id FROM products WHERE id = ?').bind(pid).first();
+    if (!productRow) {
+      return c.json({ error: '해당 제품이 존재하지 않습니다.' }, 404);
+    }
+
+    const result = await c.env.DB.prepare(
+      'UPDATE tags SET product_id = ? WHERE tag_uid = ? AND product_id IS NULL'
+    )
+      .bind(pid, rawUid)
+      .run();
+
+    if ((result.meta?.changes ?? 0) === 0) {
+      const row = await c.env.DB.prepare('SELECT product_id FROM tags WHERE tag_uid = ?').bind(rawUid).first();
+      if (!row) {
+        return c.json({ error: '등록된 태그를 찾을 수 없습니다. 먼저 빈 태그 자산 등록을 해 주세요.' }, 404);
+      }
+      return c.json({ error: '이미 제품이 연결된 태그이거나 연동할 수 없습니다.' }, 400);
+    }
+
+    return c.json({ success: true });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
 });
 
 // 모든 NFC 태그 목록 및 매핑 조회 API
@@ -479,18 +581,20 @@ app.delete('/tags/:uid', async (c) => {
   }
 });
 
-// 특정 태그(NFC)로 제품 정보 조회
+// 특정 태그(NFC) 스캔 — 자산만 등록된 태그 / 제품 연결 태그 모두 메인 안내용 JSON (제품 상세 페이지 대신 앱 메인 유도)
 app.get('/t/:tagId', async (c) => {
   const tagId = c.req.param('tagId');
-  const query = `
-    SELECT p.*, t.tag_uid 
-    FROM products p 
-    JOIN tags t ON p.id = t.product_id 
+
+  const row = await c.env.DB.prepare(`
+    SELECT t.tag_uid, t.product_id, p.id as product_pk
+    FROM tags t
+    LEFT JOIN products p ON p.id = t.product_id
     WHERE t.tag_uid = ?
-  `;
-  const product = await c.env.DB.prepare(query).bind(tagId).first();
-  
-  if (!product) {
+  `)
+    .bind(tagId)
+    .first();
+
+  if (!row) {
     return c.json({ error: 'not_found' }, 404);
   }
 
@@ -500,7 +604,19 @@ app.get('/t/:tagId', async (c) => {
       .run()
   );
 
-  return c.json(product);
+  if (row.product_id == null || row.product_pk == null) {
+    return c.json({
+      nfc_mode: 'asset',
+      tag_uid: tagId,
+      message: '출고 전 등록된 자산 태그입니다.',
+    });
+  }
+
+  return c.json({
+    nfc_mode: 'home',
+    tag_uid: tagId,
+    message: 'Gold SyncTag 정품 NFC 태그입니다.',
+  });
 });
 
 // 골드바 정보 수정 API
@@ -789,6 +905,89 @@ app.post('/user/auth', async (c) => {
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
   }
+});
+
+// 이메일·비밀번호 회원가입 (기존 무패스 유저는 최초 비밀번호 설정으로 업데이트)
+app.post('/user/register', async (c) => {
+  try {
+    await ensureUsersPasswordColumn(c.env.DB);
+    const { email, password, name } = await c.req.json();
+    const em = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    if (!em || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) {
+      return c.json({ error: '유효한 이메일을 입력해 주세요.' }, 400);
+    }
+    if (typeof password !== 'string' || password.length < 8) {
+      return c.json({ error: '비밀번호는 8자 이상으로 설정해 주세요.' }, 400);
+    }
+
+    const hash = await hashUserPassword(em, password);
+    const existing = (await c.env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(em).first()) as Record<
+      string,
+      unknown
+    > | null;
+
+    if (existing) {
+      if (existing.password_hash) {
+        return c.json({ error: '이미 가입된 이메일입니다. 로그인 탭을 이용해 주세요.' }, 409);
+      }
+      const nextName =
+        typeof name === 'string' && name.trim()
+          ? name.trim()
+          : ((existing.name as string) || '').trim() || '';
+      await c.env.DB.prepare('UPDATE users SET password_hash = ?, name = ? WHERE email = ?')
+        .bind(hash, nextName, em)
+        .run();
+      const user = await c.env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(em).first();
+      return c.json({ success: true, user: sanitizeUserRow(user as any) });
+    }
+
+    const userId = `user_${Date.now()}`;
+    await c.env.DB.prepare(
+      'INSERT INTO users (id, email, name, password_hash) VALUES (?, ?, ?, ?)'
+    )
+      .bind(userId, em, typeof name === 'string' ? name : '', hash)
+      .run();
+    const user = await c.env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(em).first();
+    return c.json({ success: true, user: sanitizeUserRow(user as any) }, 201);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// 이메일·비밀번호 로그인
+app.post('/user/login', async (c) => {
+  try {
+    await ensureUsersPasswordColumn(c.env.DB);
+    const { email, password } = await c.req.json();
+    const em = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    if (!em || typeof password !== 'string') {
+      return c.json({ error: '이메일과 비밀번호를 입력해 주세요.' }, 400);
+    }
+
+    const user = (await c.env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(em).first()) as Record<
+      string,
+      unknown
+    > | null;
+    if (!user || !user.password_hash) {
+      return c.json({ error: '이메일 또는 비밀번호가 올바르지 않습니다.' }, 401);
+    }
+
+    const hash = await hashUserPassword(em, password);
+    if (hash !== user.password_hash) {
+      return c.json({ error: '이메일 또는 비밀번호가 올바르지 않습니다.' }, 401);
+    }
+
+    return c.json({ success: true, user: sanitizeUserRow(user) });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// 소셜 로그인 연동 가능 여부 (클라이언트에서 버튼 활성화용)
+app.get('/auth/providers', async (c) => {
+  const google = !!(c.env as Bindings).GOOGLE_OAUTH_CLIENT_ID;
+  const kakao = !!(c.env as Bindings).KAKAO_REST_API_KEY;
+  return c.json({ google, kakao });
 });
 
 // 관리자: 등록된 사용자 목록 (시세 적용 시 선택용)

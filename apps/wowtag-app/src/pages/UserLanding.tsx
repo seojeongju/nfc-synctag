@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { Download, Play, ChevronRight, Bookmark, Loader2, Award, ShieldCheck, ShoppingCart, Info, CheckCircle2, MessageSquare, X, BookOpen, Smartphone, LogOut } from 'lucide-react';
 
 /** Chrome BeforeInstallPromptEvent (lib.dom에 없을 수 있음) */
@@ -10,6 +10,8 @@ type AnyBeforeInstallPrompt = {
 
 export default function UserLanding() {
   const { tagId } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [product, setProduct] = useState<any>(null);
   const [goldbar, setGoldbar] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -341,13 +343,20 @@ export default function UserLanding() {
       }
       
       try {
-        // 1. 일반 제품 조회
-        const productRes = await fetch(`/api/t/${tagId}`);
+        // 1. 카탈로그 NFC 태그 (자산만 / 제품연결 — 메인으로 안내)
+        const productRes = await fetch(`/api/t/${encodeURIComponent(tagId)}`);
         if (productRes.ok) {
           const data = await productRes.json();
-          setProduct(data);
-          setLoading(false);
-          return;
+          if (data.nfc_mode === 'home' || data.nfc_mode === 'asset') {
+            navigate('/', { replace: true, state: { nfcScan: data } });
+            setLoading(false);
+            return;
+          }
+          if (data.name && data.id != null) {
+            setProduct(data);
+            setLoading(false);
+            return;
+          }
         }
 
         // 2. 골드바 제품 조회
@@ -366,7 +375,7 @@ export default function UserLanding() {
       }
     }
     fetchData();
-  }, [tagId]);
+  }, [tagId, navigate]);
 
   const handlePurchaseSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -426,6 +435,7 @@ export default function UserLanding() {
   // [Case A] NFC 태그 ID가 없을 때: 공통 진입 랜딩 페이지
   // ==========================================
   if (!tagId) {
+    const nfcWelcome = (location.state as { nfcScan?: { message?: string; nfc_mode?: string } } | null)?.nfcScan;
     return (
       <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden box-border bg-[#F6F7FB] flex flex-col items-center px-4 py-5 pb-24 sm:p-5 font-sans leading-relaxed text-slate-900 animate-in fade-in duration-500 select-none">
         
@@ -469,6 +479,12 @@ export default function UserLanding() {
             </Link>
           )}
         </header>
+
+        {nfcWelcome?.message && (
+          <div className="w-full max-w-md mb-3 rounded-2xl border border-emerald-200/90 bg-emerald-50/95 px-4 py-3 shadow-sm animate-in fade-in duration-300">
+            <p className="text-xs font-black text-emerald-900 leading-relaxed">{nfcWelcome.message}</p>
+          </div>
+        )}
 
         {/* PWA 설치 유도 (Chrome: 이벤트 수신 시 / iOS: 수동 안내) */}
         {showInstallBanner && (
