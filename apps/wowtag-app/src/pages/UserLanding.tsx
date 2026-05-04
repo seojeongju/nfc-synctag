@@ -344,13 +344,6 @@ export default function UserLanding() {
             <ShoppingCart className="w-4 h-4" />
             전체 상품
           </button>
-          <button 
-            onClick={() => setActiveTab('myWallet')} 
-            className={`flex-1 h-12 rounded-xl text-[11px] font-black transition-all flex items-center justify-center gap-1.5 ${activeTab === 'myWallet' ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-md shadow-purple-500/20' : 'text-slate-400 hover:bg-slate-50'}`}
-          >
-            <Award className="w-4 h-4" />
-            내 소지품
-          </button>
         </div>
 
         {/* 탭 1: 홈 */}
