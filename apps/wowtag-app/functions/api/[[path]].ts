@@ -39,6 +39,38 @@ function sanitizeUserRow(u: Record<string, unknown> | null | undefined) {
   return rest;
 }
 
+/** NFC 미연결 시에도 제품–보증서 연결을 위해 사용하는 예약 tag_uid (certificate 행 id 유지) */
+function pendingCertificateTagUid(goldbarId: number): string {
+  return `__PENDING_GB_${goldbarId}__`;
+}
+
+async function ensureGoldbarsDisplayNameColumn(db: D1Database) {
+  try {
+    await db.prepare('ALTER TABLE goldbars ADD COLUMN display_name TEXT').run();
+  } catch (_) {}
+}
+
+/**
+ * certificates 행이 하나도 없는 골드바에 대해 placeholder 행을 넣어 제품 연결 목록에 나오게 함
+ * (과거: 보증서 PDF만 등록하고 NFC를 안 연결한 경우 테이블에 행이 없었음)
+ */
+async function ensureCertificateRowsForGoldbarsWithoutAny(db: D1Database) {
+  await ensureGoldbarsDisplayNameColumn(db);
+  try {
+    await db.prepare(`
+      INSERT INTO certificates (goldbar_id, tag_uid, cert_file_path)
+      SELECT
+        g.id,
+        '__PENDING_GB_' || g.id || '__',
+        'certificates/' || REPLACE(g.serial_number, '/', '_') || '_cert.pdf'
+      FROM goldbars g
+      WHERE NOT EXISTS (SELECT 1 FROM certificates c WHERE c.goldbar_id = g.id)
+    `).run();
+  } catch (_) {
+    /* 동시 요청 등으로 실패해도 무시 */
+  }
+}
+
 const app = new Hono<{ Bindings: Bindings }>().basePath('/api');
 
 // --- 관리자 로그인 API ---
@@ -183,6 +215,14 @@ app.post('/goldbars', async (c) => {
         INSERT OR REPLACE INTO certificates (goldbar_id, tag_uid, cert_file_path) 
         VALUES (?, ?, ?)
       `).bind(goldbarId, tag_uid, certFilePath).run();
+    } else if (cert_file_base64) {
+      // 보증서 파일만 올리고 NFC는 나중에 연결하는 경우 — 제품 연결용 certificate 행 필요
+      const synthetic = pendingCertificateTagUid(goldbarId);
+      await c.env.DB.prepare(
+        `INSERT INTO certificates (goldbar_id, tag_uid, cert_file_path) VALUES (?, ?, ?)`
+      )
+        .bind(goldbarId, synthetic, certFilePath)
+        .run();
     }
 
     return c.json({ success: true, goldbarId }, 201);
@@ -307,15 +347,35 @@ app.get('/certificates/download/:tagId', async (c) => {
   }
 });
 
-// 등록된 정품인증서(보증서) 행 목록 — 제품 등록 시 선택용 (골드바 일련번호 + NFC UID)
+// 등록된 정품인증서(보증서) 행 목록 — 제품 등록 시 선택용 (골드바 일련번호 + 표시명 + NFC UID)
 app.get('/certificates', async (c) => {
   try {
-    const { results } = await c.env.DB.prepare(`
-      SELECT c.id, c.goldbar_id, c.tag_uid, c.cert_file_path, g.serial_number
+    await ensureGoldbarsDisplayNameColumn(c.env.DB);
+    await ensureCertificateRowsForGoldbarsWithoutAny(c.env.DB);
+
+    const rawQ = (c.req.query('q') || '').trim();
+    const q = rawQ.length > 0 ? rawQ : '';
+
+    let sql = `
+      SELECT c.id, c.goldbar_id, c.tag_uid, c.cert_file_path, g.serial_number, g.display_name
       FROM certificates c
       JOIN goldbars g ON g.id = c.goldbar_id
-      ORDER BY c.issued_at DESC, c.id DESC
-    `).all();
+    `;
+    const binds: string[] = [];
+    if (q) {
+      const needle = q.toLowerCase();
+      sql += `
+      WHERE
+        INSTR(LOWER(IFNULL(g.serial_number, '')), ?) > 0
+        OR INSTR(LOWER(IFNULL(g.display_name, '')), ?) > 0
+        OR INSTR(LOWER(IFNULL(c.tag_uid, '')), ?) > 0
+      `;
+      binds.push(needle, needle, needle);
+    }
+    sql += ` ORDER BY c.issued_at DESC, c.id DESC`;
+
+    const stmt = binds.length ? c.env.DB.prepare(sql).bind(...binds) : c.env.DB.prepare(sql);
+    const { results } = await stmt.all();
     return c.json(results);
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
@@ -1070,16 +1130,65 @@ app.put('/goldbars/:id', async (c) => {
       await c.env.BUCKET.put(certFilePath, bytes.buffer, {
         httpMetadata: { contentType: 'application/pdf' },
       });
+    } else {
+      const existingPath = await c.env.DB.prepare(
+        'SELECT cert_file_path FROM certificates WHERE goldbar_id = ? ORDER BY issued_at DESC, id DESC LIMIT 1'
+      )
+        .bind(id)
+        .first();
+      if (existingPath && (existingPath as { cert_file_path: string }).cert_file_path) {
+        certFilePath = (existingPath as { cert_file_path: string }).cert_file_path;
+      }
     }
 
+    const idNum = Number(id);
+    const pendingUid = pendingCertificateTagUid(idNum);
+    const trimmedTag = tag_uid && String(tag_uid).trim() ? String(tag_uid).trim() : '';
+
     // 3. 태그 및 보증서 매핑 정보 갱신
-    if (tag_uid) {
+    if (trimmedTag) {
       await ensureGoldbarTagPoolTable(c.env.DB);
-      await removeTagFromGoldbarPool(c.env.DB, String(tag_uid).trim());
-      await c.env.DB.prepare(`
-        INSERT OR REPLACE INTO certificates (goldbar_id, tag_uid, cert_file_path) 
-        VALUES (?, ?, ?)
-      `).bind(id, tag_uid, certFilePath).run();
+      await removeTagFromGoldbarPool(c.env.DB, trimmedTag);
+      const pendingRow = await c.env.DB.prepare('SELECT id FROM certificates WHERE goldbar_id = ? AND tag_uid = ?')
+        .bind(id, pendingUid)
+        .first();
+      if (pendingRow) {
+        await c.env.DB.prepare('UPDATE certificates SET tag_uid = ?, cert_file_path = ? WHERE id = ?')
+          .bind(trimmedTag, certFilePath, (pendingRow as { id: number }).id)
+          .run();
+      } else {
+        await c.env.DB
+          .prepare(
+            `INSERT INTO certificates (goldbar_id, tag_uid, cert_file_path) VALUES (?, ?, ?)`
+          )
+          .bind(id, trimmedTag, certFilePath)
+          .run();
+      }
+    } else if (cert_file_base64) {
+      const pendingRow = await c.env.DB.prepare('SELECT id FROM certificates WHERE goldbar_id = ? AND tag_uid = ?')
+        .bind(id, pendingUid)
+        .first();
+      if (pendingRow) {
+        await c.env.DB.prepare('UPDATE certificates SET cert_file_path = ? WHERE id = ?')
+          .bind(certFilePath, (pendingRow as { id: number }).id)
+          .run();
+      } else {
+        const latest = await c.env.DB.prepare(
+          'SELECT id FROM certificates WHERE goldbar_id = ? ORDER BY issued_at DESC, id DESC LIMIT 1'
+        )
+          .bind(id)
+          .first();
+        if (latest) {
+          await c.env.DB.prepare('UPDATE certificates SET cert_file_path = ? WHERE id = ?')
+            .bind(certFilePath, (latest as { id: number }).id)
+            .run();
+        } else {
+          await c.env.DB
+            .prepare(`INSERT INTO certificates (goldbar_id, tag_uid, cert_file_path) VALUES (?, ?, ?)`)
+            .bind(id, pendingUid, certFilePath)
+            .run();
+        }
+      }
     }
 
     return c.json({ success: true }, 200);

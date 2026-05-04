@@ -31,7 +31,20 @@ function generateGoldbarSerialNumber(): string {
   return `GB${y}-${hex}`;
 }
 
-type CertCatalogRow = { id: number; tag_uid: string; serial_number: string };
+type CertCatalogRow = {
+  id: number;
+  tag_uid: string;
+  serial_number: string;
+  display_name?: string | null;
+};
+
+function isPendingCertTagUid(uid: string) {
+  return uid.startsWith('__PENDING_GB_') && uid.endsWith('__');
+}
+
+function formatCertTagForUi(uid: string) {
+  return isPendingCertTagUid(uid) ? 'NFC 미연결' : uid;
+}
 
 /** 모달·overflow 안에서 네이티브 select 옵션이 잘리는 문제 → viewport 고정 + 스크롤 목록 */
 function ProductCertificatePicker({
@@ -39,11 +52,15 @@ function ProductCertificatePicker({
   onChange,
   options,
   buttonId,
+  searchQuery,
+  onSearchQueryChange,
 }: {
   value: number | '';
   onChange: (v: number | '') => void;
   options: CertCatalogRow[];
   buttonId: string;
+  searchQuery: string;
+  onSearchQueryChange: (q: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -99,7 +116,11 @@ function ProductCertificatePicker({
 
   const selected = options.find((c) => c.id === value);
   const label =
-    value === '' ? '연결 안 함' : selected ? `${selected.serial_number} · ${selected.tag_uid}` : '선택됨';
+    value === ''
+      ? '연결 안 함'
+      : selected
+        ? `${selected.serial_number}${selected.display_name ? ` · ${selected.display_name}` : ''} · ${formatCertTagForUi(selected.tag_uid)}`
+        : '선택됨';
 
   return (
     <>
@@ -131,6 +152,20 @@ function ProductCertificatePicker({
                 maxHeight: panel.maxH,
               }}
             >
+              <div className="sticky top-0 z-10 border-b border-amber-100 bg-white px-2 py-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-amber-600/70" aria-hidden />
+                  <input
+                    type="search"
+                    value={searchQuery}
+                    onChange={(e) => onSearchQueryChange(e.target.value)}
+                    placeholder="일련번호 · 보증서명 · NFC UID"
+                    className="w-full rounded-lg border border-amber-100 bg-amber-50/40 py-2 pl-9 pr-2 text-xs font-bold text-slate-800 placeholder:text-slate-400 outline-none focus:border-amber-200 focus:bg-white"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  />
+                </div>
+              </div>
               <button
                 type="button"
                 role="option"
@@ -159,9 +194,15 @@ function ProductCertificatePicker({
                     value === c.id ? 'bg-amber-50 text-amber-900' : 'text-slate-800'
                   }`}
                 >
-                  <span className="font-sans">{c.serial_number}</span>
-                  <span className="text-slate-400"> · </span>
-                  <span className="font-mono text-xs break-all">{c.tag_uid}</span>
+                  <span className="block font-sans leading-snug">
+                    {c.serial_number}
+                    {c.display_name ? (
+                      <span className="font-bold text-slate-600"> · {c.display_name}</span>
+                    ) : null}
+                  </span>
+                  <span className="mt-0.5 block font-mono text-[11px] font-bold break-all text-slate-500">
+                    {formatCertTagForUi(c.tag_uid)}
+                  </span>
                 </button>
               ))}
             </div>
@@ -189,8 +230,16 @@ export default function AdminDashboard() {
   const [products, setProducts] = useState<any[]>([]);
   /** 제품에 연결 가능한 정품인증서 행 목록 (GET /certificates) */
   const [certificateCatalog, setCertificateCatalog] = useState<
-    { id: number; goldbar_id: number; tag_uid: string; serial_number: string }[]
+    {
+      id: number;
+      goldbar_id: number;
+      tag_uid: string;
+      serial_number: string;
+      display_name?: string | null;
+    }[]
   >([]);
+  /** 보증서 피커 검색 (일련번호·표시명·UID) — API q 파라미터 */
+  const [certificateSearchQuery, setCertificateSearchQuery] = useState('');
   const [goldbars, setGoldbars] = useState<any[]>([]);
   const [userGoldbars, setUserGoldbars] = useState<any[]>([]);
   const [adminUsers, setAdminUsers] = useState<{ id: string; email: string; name: string | null }[]>([]);
@@ -432,9 +481,11 @@ export default function AdminDashboard() {
     }
   };
 
-  const fetchCertificateCatalog = useCallback(async () => {
+  const fetchCertificateCatalog = useCallback(async (search?: string) => {
     try {
-      const res = await fetch('/api/certificates');
+      const q = (search ?? '').trim();
+      const url = q ? `/api/certificates?${new URLSearchParams({ q })}` : '/api/certificates';
+      const res = await fetch(url);
       if (!res.ok) return;
       const data = await res.json();
       setCertificateCatalog(Array.isArray(data) ? data : []);
@@ -645,10 +696,25 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    if (currentTab === 'products' || isProductModalOpen || isEditProductModalOpen) {
-      fetchCertificateCatalog();
+    if (!isProductModalOpen && !isEditProductModalOpen) {
+      setCertificateSearchQuery('');
     }
-  }, [currentTab, isProductModalOpen, isEditProductModalOpen, fetchCertificateCatalog]);
+  }, [isProductModalOpen, isEditProductModalOpen]);
+
+  useEffect(() => {
+    if (!(currentTab === 'products' || isProductModalOpen || isEditProductModalOpen)) return;
+    const delayMs = certificateSearchQuery.trim() ? 280 : 0;
+    const t = window.setTimeout(() => {
+      void fetchCertificateCatalog(certificateSearchQuery);
+    }, delayMs);
+    return () => window.clearTimeout(t);
+  }, [
+    currentTab,
+    isProductModalOpen,
+    isEditProductModalOpen,
+    certificateSearchQuery,
+    fetchCertificateCatalog,
+  ]);
 
   // --- NFC 로직 ---
   const handleNFCScan = async (target: 'nfc' | 'goldbar' | 'edit') => {
@@ -2306,13 +2372,18 @@ export default function AdminDashboard() {
                    정품인증서(보증서) 연결
                  </label>
                  <p className="text-[11px] font-bold text-slate-500 pl-1 leading-relaxed">
-                   골드바 정품인증 관리에서 NFC가 연결된 인증서만 표시됩니다. 없으면 먼저 골드바·보증서를 등록하세요.
+                   골드바 정품인증 관리에 등록된 보증서입니다. 일련번호·보증서명(표시명)·NFC UID로 검색할 수 있습니다. NFC는 나중에 연결해도 목록에 표시됩니다.
                  </p>
                  <ProductCertificatePicker
                    buttonId="product-cert-picker-create"
                    value={productFormData.certificate_id}
                    options={certificateCatalog}
-                   onChange={(v) => setProductFormData({ ...productFormData, certificate_id: v })}
+                   searchQuery={certificateSearchQuery}
+                   onSearchQueryChange={setCertificateSearchQuery}
+                   onChange={(v) => {
+                     setCertificateSearchQuery('');
+                     setProductFormData({ ...productFormData, certificate_id: v });
+                   }}
                  />
                </div>
 
@@ -2433,13 +2504,18 @@ export default function AdminDashboard() {
                    정품인증서(보증서) 연결
                  </label>
                  <p className="text-[11px] font-bold text-slate-500 pl-1 leading-relaxed">
-                   골드바 정품인증 관리에서 등록된 인증서 중 선택합니다.
+                   골드바 정품인증 관리에 등록된 보증서입니다. 일련번호·보증서명·NFC UID로 검색할 수 있습니다.
                  </p>
                  <ProductCertificatePicker
                    buttonId="product-cert-picker-edit"
                    value={editProductFormData.certificate_id}
                    options={certificateCatalog}
-                   onChange={(v) => setEditProductFormData({ ...editProductFormData, certificate_id: v })}
+                   searchQuery={certificateSearchQuery}
+                   onSearchQueryChange={setCertificateSearchQuery}
+                   onChange={(v) => {
+                     setCertificateSearchQuery('');
+                     setEditProductFormData({ ...editProductFormData, certificate_id: v });
+                   }}
                  />
                </div>
 
