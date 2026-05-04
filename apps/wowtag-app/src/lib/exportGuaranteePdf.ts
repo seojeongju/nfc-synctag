@@ -3,6 +3,58 @@ import { jsPDF } from 'jspdf';
 
 import { sanitizeGuaranteeFileBase } from './guaranteeCertificateData';
 
+/**
+ * Tailwind v4 등은 oklch() 색을 쓰는데 html2canvas 1.x는 이를 파싱하지 못함.
+ * 클론 문서에서 스타일시트를 제거하고(보증서는 인라인 스타일만 사용),
+ * 조상 노드에 안전한 hex만 남긴다.
+ */
+function sanitizeCloneForHtml2Canvas(clonedDoc: Document, clonedElement: HTMLElement) {
+  clonedDoc.querySelectorAll('link[rel="stylesheet"]').forEach((n) => n.remove());
+  clonedDoc.querySelectorAll('style').forEach((n) => n.remove());
+
+  const html = clonedDoc.documentElement;
+  const body = clonedDoc.body;
+  html.style.backgroundColor = '#ffffff';
+  html.style.color = '#111111';
+  body.style.backgroundColor = '#ffffff';
+  body.style.color = '#111111';
+  body.style.margin = '0';
+  body.style.padding = '0';
+
+  let p: HTMLElement | null = clonedElement;
+  while (p && p !== body) {
+    p.style.backgroundColor = '#ffffff';
+    p.style.color = '#111111';
+    p.style.boxShadow = 'none';
+    p.style.filter = 'none';
+    p.style.opacity = '1';
+    p.style.backdropFilter = 'none';
+    p = p.parentElement;
+  }
+
+  clonedDoc.querySelectorAll('*').forEach((node) => {
+    const el = node as HTMLElement;
+    el.removeAttribute('class');
+    const st = el.getAttribute('style');
+    if (st && /oklch|lab\(|lch\(|color-mix\(/i.test(st)) {
+      el.removeAttribute('style');
+    }
+  });
+
+  const root = clonedDoc.querySelector('[data-guarantee-pdf-root="1"]') as HTMLElement | null;
+  if (root) {
+    root.style.cssText = [
+      'width:794px',
+      'min-height:1123px',
+      'box-sizing:border-box',
+      'padding:44px 52px 48px',
+      'background-color:#ffffff',
+      'font-family:"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif',
+      'color:#0f172a',
+    ].join(';');
+  }
+}
+
 async function renderToCanvas(el: HTMLElement, scale: number) {
   return html2canvas(el, {
     scale,
@@ -12,6 +64,9 @@ async function renderToCanvas(el: HTMLElement, scale: number) {
     backgroundColor: '#ffffff',
     /** 모바일 WebKit에서 foreignObject 경로가 불안정한 경우가 있음 */
     foreignObjectRendering: false,
+    onclone: (clonedDoc, clonedEl) => {
+      sanitizeCloneForHtml2Canvas(clonedDoc, clonedEl);
+    },
   });
 }
 

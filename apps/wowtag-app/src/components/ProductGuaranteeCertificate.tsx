@@ -44,6 +44,7 @@ function Row({ label, value }: { label: string; value: string }) {
 export function ProductGuaranteeCertificate({ data }: { data: GuaranteeCertificateData }) {
   return (
     <div
+      data-guarantee-pdf-root="1"
       style={{
         width: '794px',
         minHeight: '1123px',
