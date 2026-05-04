@@ -185,20 +185,11 @@ export default function UserLanding() {
                 <div className="absolute inset-0 bg-gradient-to-tr from-purple-900/30 via-transparent to-transparent opacity-40"></div>
 
                 {/* 하단 글래스모피즘 오버레이 팝업 */}
-                <div className="absolute bottom-3 left-3 right-3 bg-white/70 backdrop-blur-xl rounded-[1.8rem] p-6 border border-white/40 shadow-2xl flex flex-col items-center text-center">
+                <div className="absolute bottom-3 left-3 right-3 bg-white/70 backdrop-blur-xl rounded-[1.8rem] p-5 border border-white/40 shadow-2xl flex flex-col items-center text-center">
                   <h4 className="text-xl font-black text-slate-800 tracking-tight">럭셔리 제품 정품인증</h4>
-                  <p className="text-xs font-bold text-slate-500 mt-1 mb-5 leading-relaxed">
+                  <p className="text-xs font-bold text-slate-500 mt-1 mb-1 leading-relaxed">
                     NFC 태그를 스캔하면 실제 제품 정보를 확인할 수 있습니다.
                   </p>
-
-                  {/* 사용 설명 영상 보기 버튼 */}
-                  <button 
-                    onClick={() => alert('사용 설명 영상이 곧 준비됩니다.')} 
-                    className="w-full h-12 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white font-black text-sm rounded-2xl flex items-center justify-center gap-3 shadow-lg shadow-purple-500/25 active:scale-[0.98] transition-all"
-                  >
-                    <Play className="w-4.5 h-4.5 fill-white" />
-                    사용 설명 영상 보기
-                  </button>
                 </div>
               </div>
             </div>
