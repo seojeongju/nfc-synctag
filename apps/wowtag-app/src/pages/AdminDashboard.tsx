@@ -6,6 +6,7 @@ export default function AdminDashboard() {
   const [isAdminGuideOpen, setIsAdminGuideOpen] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
   const [goldbars, setGoldbars] = useState<any[]>([]);
+  const [userGoldbars, setUserGoldbars] = useState<any[]>([]);
   const [stats, setStats] = useState<any>({ scanCount: 0, activeTags: 0, recentLogs: [], topGoldbars: [] });
   
   // 검색 및 필터 상태
@@ -122,10 +123,65 @@ export default function AdminDashboard() {
     }
   };
 
+  const fetchUserGoldbars = async () => {
+    try {
+      const res = await fetch('/api/admin/user-goldbars');
+      if (res.ok) {
+        const data = await res.json();
+        setUserGoldbars(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch user goldbars', err);
+    }
+  };
+
+  const handleToggleMarketPrice = async (userId: string, goldbarId: number, currentShow: boolean, price: number) => {
+    try {
+      const res = await fetch('/api/admin/user-goldbars', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          goldbarId,
+          showMarketPrice: !currentShow,
+          marketPricePerGram: price
+        })
+      });
+      if (res.ok) {
+        alert('시세 노출 상태가 성공적으로 변경되었습니다.');
+        fetchUserGoldbars();
+      }
+    } catch (err: any) {
+      alert(`수정 실패: ${err.message}`);
+    }
+  };
+
+  const handleUpdatePriceValue = async (userId: string, goldbarId: number, currentShow: boolean, newPrice: number) => {
+    try {
+      const res = await fetch('/api/admin/user-goldbars', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          goldbarId,
+          showMarketPrice: currentShow,
+          marketPricePerGram: newPrice
+        })
+      });
+      if (res.ok) {
+        alert('1g당 시세가 변경되었습니다.');
+        fetchUserGoldbars();
+      }
+    } catch (err: any) {
+      alert(`수정 실패: ${err.message}`);
+    }
+  };
+
   useEffect(() => {
     fetchProducts();
     fetchGoldbars();
     fetchStats();
+    fetchUserGoldbars();
   }, []);
 
   // --- NFC 로직 ---
@@ -1054,6 +1110,74 @@ export default function AdminDashboard() {
                   </button>
                 </div>
               )}
+
+              {/* 고객별 오늘의 시세 노출 관리 섹션 */}
+              <div className="bg-white rounded-[2.5rem] p-6 lg:p-8 border border-slate-50 shadow-sm space-y-6 mt-10">
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-6 bg-amber-500 rounded-full"></div>
+                  <h3 className="text-lg font-black text-slate-800">고객별 오늘의 시세 노출 관리</h3>
+                </div>
+                <p className="text-xs font-bold text-slate-400">
+                  각 골드바를 구매한 사용자에게 오늘의 시세를 노출할지 여부와 1g당 매입 시세를 직접 설정할 수 있습니다.
+                </p>
+
+                <div className="overflow-x-auto rounded-2xl border border-slate-100">
+                  <table className="w-full border-collapse text-left text-sm bg-white">
+                    <thead>
+                      <tr className="bg-slate-50/60 border-b border-slate-100 text-slate-400">
+                        <th className="p-4 font-black">소유자 이메일</th>
+                        <th className="p-4 font-black">골드바 일련번호</th>
+                        <th className="p-4 font-black">중량</th>
+                        <th className="p-4 font-black">1g당 시세</th>
+                        <th className="p-4 font-black">오늘의 시세 노출</th>
+                        <th className="p-4 font-black">설정 저장</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50 text-slate-700">
+                      {userGoldbars && userGoldbars.map((ug) => (
+                        <tr key={ug.id} className="hover:bg-slate-50/40 transition-colors">
+                          <td className="p-4 font-bold">{ug.user_email}</td>
+                          <td className="p-4 font-black text-amber-700">{ug.serial_number}</td>
+                          <td className="p-4 font-bold">{ug.weight}</td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-1.5">
+                              <input 
+                                type="number" 
+                                defaultValue={ug.market_price_per_gram || 110000} 
+                                onBlur={(e) => handleUpdatePriceValue(ug.user_id, ug.goldbar_id, ug.show_market_price === 1, Number(e.target.value))}
+                                className="w-24 h-9 bg-white border border-slate-200 rounded-lg text-center font-bold text-xs outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-50 transition-all" 
+                              />
+                              <span className="text-xs font-bold text-slate-400">원</span>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <button
+                              onClick={() => handleToggleMarketPrice(ug.user_id, ug.goldbar_id, ug.show_market_price === 1, ug.market_price_per_gram || 110000)}
+                              className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all shadow-sm flex items-center gap-1 ${
+                                ug.show_market_price === 1 
+                                  ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100/60' 
+                                  : 'bg-slate-50 text-slate-400 border border-slate-200 hover:bg-slate-100'
+                              }`}
+                            >
+                              {ug.show_market_price === 1 ? '노출 중' : '숨김 중'}
+                            </button>
+                          </td>
+                          <td className="p-4">
+                            <span className="text-[10px] font-bold text-slate-300">자동 저장됨</span>
+                          </td>
+                        </tr>
+                      ))}
+                      {(!userGoldbars || userGoldbars.length === 0) && (
+                        <tr>
+                          <td colSpan={6} className="p-8 text-center text-slate-400 font-bold">
+                            현재 골드바를 소유한 사용자 정보가 없습니다.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </>
           )}
         </div>

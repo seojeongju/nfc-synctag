@@ -707,11 +707,69 @@ app.post('/user/auth', async (c) => {
   }
 });
 
+// 관리자가 특정 유저의 골드바 시세 노출 여부 및 1g당 시세를 수정하는 API
+app.put('/admin/user-goldbars', async (c) => {
+  try {
+    const { userId, goldbarId, showMarketPrice, marketPricePerGram } = await c.req.json();
+    if (!userId || !goldbarId) return c.json({ error: '유저 및 골드바 정보가 필요합니다.' }, 400);
+
+    // 자동 마이그레이션
+    try {
+      await c.env.DB.prepare("ALTER TABLE user_goldbars ADD COLUMN show_market_price INTEGER DEFAULT 0").run();
+    } catch (_) {}
+    try {
+      await c.env.DB.prepare("ALTER TABLE user_goldbars ADD COLUMN market_price_per_gram REAL DEFAULT 110000").run();
+    } catch (_) {}
+
+    await c.env.DB.prepare(`
+      UPDATE user_goldbars 
+      SET show_market_price = ?, market_price_per_gram = ?
+      WHERE user_id = ? AND goldbar_id = ?
+    `).bind(showMarketPrice ? 1 : 0, marketPricePerGram || 110000, userId, goldbarId).run();
+
+    return c.json({ success: true });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// 관리자 대시보드에서 유저별 소유 골드바를 조회하는 API
+app.get('/admin/user-goldbars', async (c) => {
+  try {
+    // 자동 마이그레이션
+    try {
+      await c.env.DB.prepare("ALTER TABLE user_goldbars ADD COLUMN show_market_price INTEGER DEFAULT 0").run();
+    } catch (_) {}
+    try {
+      await c.env.DB.prepare("ALTER TABLE user_goldbars ADD COLUMN market_price_per_gram REAL DEFAULT 110000").run();
+    } catch (_) {}
+
+    const { results } = await c.env.DB.prepare(`
+      SELECT ug.id, ug.user_id, ug.goldbar_id, ug.show_market_price, ug.market_price_per_gram, u.email as user_email, u.name as user_name, g.serial_number, g.weight, g.purity
+      FROM user_goldbars ug
+      JOIN users u ON ug.user_id = u.id
+      JOIN goldbars g ON ug.goldbar_id = g.id
+      ORDER BY ug.added_at DESC
+    `).all();
+    return c.json(results);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 // 2. 사용자의 소유 골드바 목록 조회 및 동기화
 app.post('/user/sync', async (c) => {
   try {
     const { userId, goldbarIds } = await c.req.json();
     if (!userId) return c.json({ error: '인증이 필요합니다.' }, 401);
+
+    // 자동 마이그레이션
+    try {
+      await c.env.DB.prepare("ALTER TABLE user_goldbars ADD COLUMN show_market_price INTEGER DEFAULT 0").run();
+    } catch (_) {}
+    try {
+      await c.env.DB.prepare("ALTER TABLE user_goldbars ADD COLUMN market_price_per_gram REAL DEFAULT 110000").run();
+    } catch (_) {}
 
     // 로컬 스토리지에 담긴 골드바 ID를 서버에 동기화 (Insert Ignore)
     if (goldbarIds && Array.isArray(goldbarIds)) {
@@ -726,7 +784,7 @@ app.post('/user/sync', async (c) => {
 
     // 최종 동기화된 모든 골드바 목록 반환
     const { results } = await c.env.DB.prepare(`
-      SELECT g.*, c.tag_uid, c.cert_file_path 
+      SELECT g.*, c.tag_uid, c.cert_file_path, ug.show_market_price, ug.market_price_per_gram
       FROM user_goldbars ug
       JOIN goldbars g ON ug.goldbar_id = g.id
       LEFT JOIN certificates c ON g.id = c.goldbar_id

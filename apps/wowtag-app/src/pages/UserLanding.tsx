@@ -534,6 +534,41 @@ export default function UserLanding() {
                     📸 추억 전자 앨범 보기
                   </button>
 
+                  {/* 오늘의 시세 및 가치 환산 정보 (권한이 부여된 고객에게만 노출) */}
+                  {g.show_market_price === 1 && (
+                    <div className="bg-amber-50/50 border border-amber-200/40 p-4 rounded-2xl flex flex-col gap-2 mt-2 animate-in fade-in duration-300">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">💰</span>
+                          <span className="text-xs font-black text-amber-900">오늘의 금 매입 시세 및 자산 가치</span>
+                        </div>
+                        <span className="text-[10px] font-black bg-amber-100 text-amber-700 px-2 py-1 rounded-lg">LIVE</span>
+                      </div>
+                      <div className="border-t border-amber-200/30 pt-2 flex flex-col gap-1 text-sm">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-bold text-slate-500">1g 당 매입 시세</span>
+                          <span className="text-xs font-black text-slate-800">
+                            {Number(g.market_price_per_gram || 110000).toLocaleString()}원
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-bold text-slate-500">나의 골드바 중량</span>
+                          <span className="text-xs font-black text-slate-800">{g.weight}</span>
+                        </div>
+                        <div className="flex justify-between items-center border-t border-amber-200/30 pt-1.5 mt-0.5">
+                          <span className="text-xs font-black text-amber-900">내 골드바 총 자산 가치</span>
+                          <span className="text-sm font-black text-amber-600">
+                            {(() => {
+                              // 중량에서 숫자만 추출 (예: '10g' -> 10)
+                              const numericWeight = parseFloat(g.weight.replace(/[^0-9.]/g, '')) || 0;
+                              return Math.round(numericWeight * (g.market_price_per_gram || 110000)).toLocaleString();
+                            })()}원
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {g.cert_url && (
                     <a href={g.cert_url} target="_blank" rel="noreferrer" className="w-full h-11 bg-slate-50 border border-slate-100 hover:bg-amber-50 hover:border-amber-200/60 rounded-xl flex items-center justify-center text-xs font-black text-slate-600 hover:text-amber-700 transition-all gap-1.5 no-underline mt-1">
                       <ShieldCheck className="w-4 h-4" /> 정품인증서 확인 (URL)

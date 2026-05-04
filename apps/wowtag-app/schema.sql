@@ -98,6 +98,8 @@ CREATE TABLE IF NOT EXISTS user_goldbars (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     goldbar_id INTEGER NOT NULL REFERENCES goldbars(id) ON DELETE CASCADE,
+    show_market_price INTEGER DEFAULT 0,
+    market_price_per_gram REAL DEFAULT 110000,
     added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, goldbar_id)
 );
