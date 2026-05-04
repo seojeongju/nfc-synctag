@@ -736,7 +736,32 @@ app.put('/admin/user-goldbars', async (c) => {
 // 관리자 대시보드에서 유저별 소유 골드바를 조회하는 API
 app.get('/admin/user-goldbars', async (c) => {
   try {
-    // 자동 마이그레이션
+    // DB 테이블 생성 및 마이그레이션 (실서버 D1 오류 방지용)
+    try {
+      await c.env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS users (
+          id TEXT PRIMARY KEY,
+          email TEXT UNIQUE NOT NULL,
+          name TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `).run();
+    } catch (_) {}
+
+    try {
+      await c.env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS user_goldbars (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id TEXT NOT NULL,
+          goldbar_id INTEGER NOT NULL,
+          show_market_price INTEGER DEFAULT 0,
+          market_price_per_gram REAL DEFAULT 110000,
+          added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(user_id, goldbar_id)
+        )
+      `).run();
+    } catch (_) {}
+
     try {
       await c.env.DB.prepare("ALTER TABLE user_goldbars ADD COLUMN show_market_price INTEGER DEFAULT 0").run();
     } catch (_) {}
@@ -750,11 +775,11 @@ app.get('/admin/user-goldbars', async (c) => {
     const { results } = await c.env.DB.prepare(`
       SELECT ug.id, ug.user_id, ug.goldbar_id, ug.show_market_price, ug.market_price_per_gram, u.email as user_email, u.name as user_name, g.serial_number, g.weight, g.purity
       FROM user_goldbars ug
-      JOIN users u ON ug.user_id = u.id
-      JOIN goldbars g ON ug.goldbar_id = g.id
+      LEFT JOIN users u ON ug.user_id = u.id
+      LEFT JOIN goldbars g ON ug.goldbar_id = g.id
       ORDER BY ug.id DESC
     `).all();
-    return c.json(results);
+    return c.json(results || []);
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
   }
