@@ -99,6 +99,36 @@ export default function AdminDashboard() {
   const [nfcScanning, setNfcScanning] = useState(false);
   const [nfcWriting, setNfcWriting] = useState(false);
 
+  // 모바일 뒤로가기 해시 연동
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      if (hash && hash.startsWith('#tab=')) {
+        const tab = hash.replace('#tab=', '') as any;
+        if (['dashboard', 'products', 'nfc', 'goldbars', 'userGoldbars'].includes(tab)) {
+          setCurrentTab(tab);
+        }
+      } else {
+        setCurrentTab('dashboard');
+      }
+    };
+
+    if (!window.location.hash) {
+      window.history.replaceState(null, '', '#tab=' + currentTab);
+    } else {
+      handleHashChange();
+    }
+
+    window.addEventListener('popstate', handleHashChange);
+    return () => window.removeEventListener('popstate', handleHashChange);
+  }, []);
+
+  useEffect(() => {
+    if (window.location.hash !== '#tab=' + currentTab) {
+      window.history.pushState(null, '', '#tab=' + currentTab);
+    }
+  }, [currentTab]);
+
   const fetchProducts = async () => {
     try {
       const res = await fetch('/api/products');
