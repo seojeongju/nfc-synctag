@@ -707,6 +707,29 @@ app.post('/user/auth', async (c) => {
   }
 });
 
+// 관리자: 등록된 사용자 목록 (시세 적용 시 선택용)
+app.get('/admin/users', async (c) => {
+  try {
+    try {
+      await c.env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS users (
+          id TEXT PRIMARY KEY,
+          email TEXT UNIQUE NOT NULL,
+          name TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `).run();
+    } catch (_) {}
+
+    const { results } = await c.env.DB.prepare(
+      `SELECT id, email, name FROM users ORDER BY LOWER(email)`
+    ).all();
+    return c.json(results || []);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 // 관리자가 특정 유저의 골드바 시세 노출 여부 및 1g당 시세를 수정하는 API
 app.put('/admin/user-goldbars', async (c) => {
   try {
@@ -721,11 +744,18 @@ app.put('/admin/user-goldbars', async (c) => {
       await c.env.DB.prepare("ALTER TABLE user_goldbars ADD COLUMN market_price_per_gram REAL DEFAULT 110000").run();
     } catch (_) {}
 
-    await c.env.DB.prepare(`
+    const result = await c.env.DB.prepare(`
       UPDATE user_goldbars 
       SET show_market_price = ?, market_price_per_gram = ?
       WHERE user_id = ? AND goldbar_id = ?
     `).bind(showMarketPrice ? 1 : 0, marketPricePerGram || 110000, userId, goldbarId).run();
+
+    if ((result.meta?.changes ?? 0) === 0) {
+      return c.json(
+        { error: '해당 사용자와 골드바 연결(user_goldbars)이 없습니다. 소비자 지갑에 먼저 등록된 골드바만 시세를 설정할 수 있습니다.' },
+        400
+      );
+    }
 
     return c.json({ success: true });
   } catch (err: any) {

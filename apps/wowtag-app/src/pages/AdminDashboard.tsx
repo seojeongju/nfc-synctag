@@ -25,6 +25,11 @@ export default function AdminDashboard() {
   const [products, setProducts] = useState<any[]>([]);
   const [goldbars, setGoldbars] = useState<any[]>([]);
   const [userGoldbars, setUserGoldbars] = useState<any[]>([]);
+  const [adminUsers, setAdminUsers] = useState<{ id: string; email: string; name: string | null }[]>([]);
+  const [bulkMarketPrice, setBulkMarketPrice] = useState('');
+  const [bulkShowMarket, setBulkShowMarket] = useState(true);
+  const [bulkUserId, setBulkUserId] = useState('');
+  const [bulkGoldbarId, setBulkGoldbarId] = useState<number | ''>('');
   const [stats, setStats] = useState<any>({ scanCount: 0, activeTags: 0, recentLogs: [], topGoldbars: [] });
   
   // 검색 및 필터 상태
@@ -163,6 +168,77 @@ export default function AdminDashboard() {
     }
   };
 
+  const fetchAdminUsers = async () => {
+    try {
+      const res = await fetch('/api/admin/users');
+      if (res.ok) {
+        const data = await res.json();
+        setAdminUsers(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch admin users', err);
+    }
+  };
+
+  const bulkOwnedGoldbars = bulkUserId
+    ? userGoldbars.filter((ug) => ug.user_id === bulkUserId)
+    : [];
+
+  useEffect(() => {
+    if (!bulkUserId) {
+      setBulkGoldbarId('');
+      return;
+    }
+    const owned = userGoldbars.filter((ug: any) => ug.user_id === bulkUserId);
+    if (owned.length === 0) {
+      setBulkGoldbarId('');
+      return;
+    }
+    if (owned.length === 1) {
+      setBulkGoldbarId(owned[0].goldbar_id);
+      return;
+    }
+    setBulkGoldbarId((prev) => {
+      if (prev === '') return prev;
+      const ok = owned.some((o: any) => o.goldbar_id === prev);
+      return ok ? prev : '';
+    });
+  }, [bulkUserId, userGoldbars]);
+
+  const handleBulkApplyMarket = async () => {
+    if (!bulkUserId || bulkGoldbarId === '') {
+      alert('사용자와 골드바를 선택해 주세요.');
+      return;
+    }
+    const price = Number(String(bulkMarketPrice).replace(/,/g, '').trim());
+    if (!Number.isFinite(price) || price <= 0) {
+      alert('유효한 1g당 매입 시세를 입력해 주세요.');
+      return;
+    }
+    try {
+      const res = await fetch('/api/admin/user-goldbars', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: bulkUserId,
+          goldbarId: bulkGoldbarId,
+          showMarketPrice: bulkShowMarket,
+          marketPricePerGram: price
+        })
+      });
+      if (res.ok) {
+        alert('시세가 선택한 사용자에게 적용되었습니다.');
+        setBulkMarketPrice('');
+        fetchUserGoldbars();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert((data as any).error || '적용에 실패했습니다.');
+      }
+    } catch (err: any) {
+      alert(err.message || '적용에 실패했습니다.');
+    }
+  };
+
   const handleToggleMarketPrice = async (userId: string, goldbarId: number, currentShow: boolean, price: number) => {
     try {
       const res = await fetch('/api/admin/user-goldbars', {
@@ -210,6 +286,7 @@ export default function AdminDashboard() {
     fetchGoldbars();
     fetchStats();
     fetchUserGoldbars();
+    fetchAdminUsers();
   }, []);
 
   // --- NFC 로직 ---
@@ -715,29 +792,26 @@ export default function AdminDashboard() {
                   <h3 className="text-lg font-black text-slate-800">정품인증 태그(NFC) 등록 및 출고 프로세스 가이드</h3>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* 1행×3열: 모든 뷰포트에서 가로 배치 (모바일은 컴팩트) */}
+                <div className="grid grid-cols-3 gap-2 sm:gap-4">
                   {/* 1단계 */}
                   <div 
                     onClick={() => setActiveGuide(activeGuide === 1 ? null : 1)}
-                    className="bg-slate-50/60 p-5 rounded-3xl border border-slate-100 flex flex-col gap-4 relative overflow-hidden hover:border-purple-200/60 hover:shadow-md transition-all group cursor-pointer"
+                    className="bg-slate-50/60 p-3 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-100 flex flex-col gap-2 sm:gap-4 relative overflow-hidden hover:border-purple-200/60 hover:shadow-md transition-all group cursor-pointer min-h-0"
                   >
-                    <span className="absolute -right-4 -bottom-4 text-7xl font-black text-slate-100/60 tracking-tighter select-none">01</span>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center border border-amber-100/60 shadow-sm transition-transform group-hover:scale-105">
-                          <FileText className="w-6 h-6" />
-                        </div>
-                        <div>
-                          <span className="text-[10px] font-black uppercase text-amber-600 tracking-widest block">STEP 01</span>
-                          <h4 className="font-black text-slate-800 text-base">카탈로그(제품) 생성</h4>
-                        </div>
+                    <span className="absolute -right-1 -bottom-2 sm:-right-4 sm:-bottom-4 text-5xl sm:text-7xl font-black text-slate-100/60 tracking-tighter select-none pointer-events-none">01</span>
+                    <div className="flex flex-col items-center text-center gap-1.5 sm:gap-2 relative z-[1]">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center border border-amber-100/60 shadow-sm transition-transform group-hover:scale-105">
+                        <FileText className="w-5 h-5 sm:w-6 sm:h-6" />
                       </div>
-                      <div className="text-slate-400">
-                        {activeGuide === 1 ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                      <span className="text-[9px] sm:text-[10px] font-black uppercase text-amber-600 tracking-widest">STEP 01</span>
+                      <h4 className="font-black text-slate-800 text-[11px] sm:text-base leading-snug">카탈로그(제품) 생성</h4>
+                      <div className="text-slate-400 mt-0.5">
+                        {activeGuide === 1 ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 mx-auto" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 mx-auto" />}
                       </div>
                     </div>
                     {activeGuide === 1 && (
-                      <p className="text-xs font-bold text-slate-400 leading-relaxed pr-12 pt-2 border-t border-slate-100 animate-in fade-in slide-in-from-top-1 duration-300">
+                      <p className="text-[10px] sm:text-xs font-bold text-slate-400 leading-relaxed pt-2 border-t border-slate-100 text-left animate-in fade-in slide-in-from-top-1 duration-300 relative z-[1]">
                         골드바의 <strong className="text-slate-600">일련번호, 중량, 순도, 제조일자</strong> 등의 제원 정보를 등록하여 정품인증서 카탈로그를 생성합니다.
                       </p>
                     )}
@@ -746,25 +820,21 @@ export default function AdminDashboard() {
                   {/* 2단계 */}
                   <div 
                     onClick={() => setActiveGuide(activeGuide === 2 ? null : 2)}
-                    className="bg-slate-50/60 p-5 rounded-3xl border border-slate-100 flex flex-col gap-4 relative overflow-hidden hover:border-purple-200/60 hover:shadow-md transition-all group cursor-pointer"
+                    className="bg-slate-50/60 p-3 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-100 flex flex-col gap-2 sm:gap-4 relative overflow-hidden hover:border-purple-200/60 hover:shadow-md transition-all group cursor-pointer min-h-0"
                   >
-                    <span className="absolute -right-4 -bottom-4 text-7xl font-black text-slate-100/60 tracking-tighter select-none">02</span>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center border border-blue-100/60 shadow-sm transition-transform group-hover:scale-105">
-                          <Smartphone className="w-6 h-6" />
-                        </div>
-                        <div>
-                          <span className="text-[10px] font-black uppercase text-blue-600 tracking-widest block">STEP 02</span>
-                          <h4 className="font-black text-slate-800 text-base">신규 NFC 태그 등록</h4>
-                        </div>
+                    <span className="absolute -right-1 -bottom-2 sm:-right-4 sm:-bottom-4 text-5xl sm:text-7xl font-black text-slate-100/60 tracking-tighter select-none pointer-events-none">02</span>
+                    <div className="flex flex-col items-center text-center gap-1.5 sm:gap-2 relative z-[1]">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center border border-blue-100/60 shadow-sm transition-transform group-hover:scale-105">
+                        <Smartphone className="w-5 h-5 sm:w-6 sm:h-6" />
                       </div>
-                      <div className="text-slate-400">
-                        {activeGuide === 2 ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                      <span className="text-[9px] sm:text-[10px] font-black uppercase text-blue-600 tracking-widest">STEP 02</span>
+                      <h4 className="font-black text-slate-800 text-[11px] sm:text-base leading-snug">신규 NFC 태그 등록</h4>
+                      <div className="text-slate-400 mt-0.5">
+                        {activeGuide === 2 ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 mx-auto" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 mx-auto" />}
                       </div>
                     </div>
                     {activeGuide === 2 && (
-                      <p className="text-xs font-bold text-slate-400 leading-relaxed pr-12 pt-2 border-t border-slate-100 animate-in fade-in slide-in-from-top-1 duration-300">
+                      <p className="text-[10px] sm:text-xs font-bold text-slate-400 leading-relaxed pt-2 border-t border-slate-100 text-left animate-in fade-in slide-in-from-top-1 duration-300 relative z-[1]">
                         실물 NFC 태그의 고유 <strong className="text-slate-600">UID를 스캔하여 매핑</strong>하고, 카탈로그와 연결하여 데이터가 태그에 반영될 수 있도록 준비합니다.
                       </p>
                     )}
@@ -773,25 +843,21 @@ export default function AdminDashboard() {
                   {/* 3단계 */}
                   <div 
                     onClick={() => setActiveGuide(activeGuide === 3 ? null : 3)}
-                    className="bg-slate-50/60 p-5 rounded-3xl border border-slate-100 flex flex-col gap-4 relative overflow-hidden hover:border-purple-200/60 hover:shadow-md transition-all group cursor-pointer"
+                    className="bg-slate-50/60 p-3 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-100 flex flex-col gap-2 sm:gap-4 relative overflow-hidden hover:border-purple-200/60 hover:shadow-md transition-all group cursor-pointer min-h-0"
                   >
-                    <span className="absolute -right-4 -bottom-4 text-7xl font-black text-slate-100/60 tracking-tighter select-none">03</span>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center border border-emerald-100/60 shadow-sm transition-transform group-hover:scale-105">
-                          <LinkIcon className="w-6 h-6" />
-                        </div>
-                        <div>
-                          <span className="text-[10px] font-black uppercase text-emerald-600 tracking-widest block">STEP 03</span>
-                          <h4 className="font-black text-slate-800 text-base">정품인증 및 출고 연동</h4>
-                        </div>
+                    <span className="absolute -right-1 -bottom-2 sm:-right-4 sm:-bottom-4 text-5xl sm:text-7xl font-black text-slate-100/60 tracking-tighter select-none pointer-events-none">03</span>
+                    <div className="flex flex-col items-center text-center gap-1.5 sm:gap-2 relative z-[1]">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center border border-emerald-100/60 shadow-sm transition-transform group-hover:scale-105">
+                        <LinkIcon className="w-5 h-5 sm:w-6 sm:h-6" />
                       </div>
-                      <div className="text-slate-400">
-                        {activeGuide === 3 ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                      <span className="text-[9px] sm:text-[10px] font-black uppercase text-emerald-600 tracking-widest">STEP 03</span>
+                      <h4 className="font-black text-slate-800 text-[11px] sm:text-base leading-snug">정품인증 및 출고 연동</h4>
+                      <div className="text-slate-400 mt-0.5">
+                        {activeGuide === 3 ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 mx-auto" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 mx-auto" />}
                       </div>
                     </div>
                     {activeGuide === 3 && (
-                      <p className="text-xs font-bold text-slate-400 leading-relaxed pr-12 pt-2 border-t border-slate-100 animate-in fade-in slide-in-from-top-1 duration-300">
+                      <p className="text-[10px] sm:text-xs font-bold text-slate-400 leading-relaxed pt-2 border-t border-slate-100 text-left animate-in fade-in slide-in-from-top-1 duration-300 relative z-[1]">
                         출고 시점에 <strong className="text-slate-600">정품인증서 URL을 등록</strong>하면 최종 출고 처리가 되며, 사용자는 태그 스캔 시 웹 보증서로 바로 연결됩니다.
                       </p>
                     )}
@@ -1159,10 +1225,113 @@ export default function AdminDashboard() {
                   </p>
                 </div>
                 <button
-                  onClick={fetchUserGoldbars}
+                  onClick={() => {
+                    fetchUserGoldbars();
+                    fetchAdminUsers();
+                  }}
                   className="px-4 py-2.5 bg-white border border-slate-200 text-slate-600 font-black text-xs rounded-xl hover:bg-slate-50 transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
                 >
                   🔄 새로고침
+                </button>
+              </div>
+
+              {/* 시세 입력 → 사용자·골드바 선택 후 일괄 적용 */}
+              <div className="mt-6 bg-white rounded-3xl border border-amber-100 shadow-sm p-5 lg:p-6 space-y-4">
+                <div>
+                  <h3 className="text-base font-black text-slate-900">시세 입력 및 적용 대상 선택</h3>
+                  <p className="text-[11px] font-bold text-slate-400 mt-1">
+                    1g당 매입 시세를 입력한 뒤, 시세를 반영할 사용자와 골드바를 고르고 적용합니다.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">1g당 매입 시세 (원)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      step={100}
+                      placeholder="예: 110000"
+                      value={bulkMarketPrice}
+                      onChange={(e) => setBulkMarketPrice(e.target.value)}
+                      className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 font-black text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-50"
+                    />
+                  </div>
+                  <div className="space-y-2 flex flex-col justify-end">
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">시세 화면 노출</span>
+                    <div className="flex h-12 items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setBulkShowMarket(true)}
+                        className={`flex-1 h-10 rounded-xl text-xs font-black transition-all ${
+                          bulkShowMarket ? 'bg-amber-500 text-white shadow-md' : 'bg-slate-100 text-slate-500'
+                        }`}
+                      >
+                        노출
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBulkShowMarket(false)}
+                        className={`flex-1 h-10 rounded-xl text-xs font-black transition-all ${
+                          !bulkShowMarket ? 'bg-slate-600 text-white shadow-md' : 'bg-slate-100 text-slate-500'
+                        }`}
+                      >
+                        숨김
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">사용자 선택</label>
+                    <select
+                      value={bulkUserId}
+                      onChange={(e) => {
+                        setBulkUserId(e.target.value);
+                        setBulkGoldbarId('');
+                      }}
+                      className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 font-bold text-sm outline-none focus:border-amber-400 cursor-pointer"
+                    >
+                      <option value="">사용자를 선택하세요</option>
+                      {adminUsers.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.email}
+                          {u.name ? ` · ${u.name}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">골드바 선택</label>
+                    <select
+                      value={bulkGoldbarId === '' ? '' : String(bulkGoldbarId)}
+                      onChange={(e) =>
+                        setBulkGoldbarId(e.target.value ? Number(e.target.value) : '')
+                      }
+                      disabled={!bulkUserId || bulkOwnedGoldbars.length === 0}
+                      className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 font-bold text-sm outline-none focus:border-amber-400 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <option value="">
+                        {!bulkUserId
+                          ? '먼저 사용자를 선택하세요'
+                          : bulkOwnedGoldbars.length === 0
+                            ? '해당 사용자 지갑에 등록된 골드바가 없습니다'
+                            : '골드바를 선택하세요'}
+                      </option>
+                      {bulkOwnedGoldbars.map((ug: any) => (
+                        <option key={`${ug.user_id}-${ug.goldbar_id}`} value={ug.goldbar_id}>
+                          {ug.serial_number} · {ug.weight}
+                          {ug.purity ? ` · ${ug.purity}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleBulkApplyMarket}
+                  className="w-full h-12 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-sm shadow-lg shadow-amber-500/25 hover:opacity-95 active:scale-[0.99] transition-all"
+                >
+                  시세 적용하기
                 </button>
               </div>
 
