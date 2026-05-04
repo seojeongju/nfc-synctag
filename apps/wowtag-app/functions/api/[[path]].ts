@@ -996,44 +996,70 @@ app.delete('/tags/:uid', async (c) => {
 // 특정 태그(NFC) 스캔 — 자산만 등록된 태그 / 제품 연결 태그 모두 메인 안내용 JSON (제품 상세 페이지 대신 앱 메인 유도)
 // 골드바 자산 풀(goldbar_tag_pool)만 등록·인증서 미연결인 경우에도 200 + nfc_mode home → 앱 홈 오픈
 app.get('/t/:tagId', async (c) => {
-  const tagId = c.req.param('tagId');
+  const param = c.req.param('tagId');
   const unmapVerify = c.req.query('unmap_verify') === '1';
 
   await ensureGoldbarTagPoolTable(c.env.DB);
 
-  const row = await c.env.DB.prepare(`
+  const variants = nfcTagUidLookupVariants(param);
+  if (variants.length === 0) {
+    return c.json({ error: 'not_found' }, 404);
+  }
+
+  const tagSql = `
     SELECT t.tag_uid, t.product_id, p.id as product_pk
     FROM tags t
     LEFT JOIN products p ON p.id = t.product_id
     WHERE t.tag_uid = ?
-  `)
-    .bind(tagId)
-    .first();
+  `;
 
-  const poolRow = !row
-    ? await c.env.DB.prepare('SELECT tag_uid FROM goldbar_tag_pool WHERE tag_uid = ?').bind(tagId).first()
-    : null;
+  let row: {
+    tag_uid: string;
+    product_id: unknown;
+    product_pk: unknown;
+  } | null = null;
+  for (const v of variants) {
+    const r = await c.env.DB.prepare(tagSql).bind(v).first();
+    if (r) {
+      row = r as typeof row;
+      break;
+    }
+  }
+
+  let poolRow: { tag_uid: string } | null = null;
+  if (!row) {
+    for (const v of variants) {
+      const p = await c.env.DB.prepare('SELECT tag_uid FROM goldbar_tag_pool WHERE tag_uid = ?').bind(v).first();
+      if (p) {
+        poolRow = p as { tag_uid: string };
+        break;
+      }
+    }
+  }
 
   if (!row && !poolRow) {
     return c.json({ error: 'not_found' }, 404);
   }
 
+  const canonicalUid = row?.tag_uid ?? poolRow?.tag_uid ?? param;
+
   c.executionCtx.waitUntil(
-    c.env.DB.prepare('INSERT INTO scan_logs (tag_uid, scanned_at) VALUES (?, ?)')
-      .bind(tagId, new Date().toISOString())
+    c.env.DB
+      .prepare('INSERT INTO scan_logs (tag_uid, scanned_at) VALUES (?, ?)')
+      .bind(canonicalUid, new Date().toISOString())
       .run()
   );
 
   if (unmapVerify) {
     await ensureTagUnmapProofsTable(c.env.DB);
     const now = new Date().toISOString();
-    await c.env.DB.prepare('INSERT INTO tag_unmap_proofs (tag_uid, created_at) VALUES (?, ?)').bind(tagId, now).run();
+    await c.env.DB.prepare('INSERT INTO tag_unmap_proofs (tag_uid, created_at) VALUES (?, ?)').bind(canonicalUid, now).run();
   }
 
   if (poolRow) {
     return c.json({
       nfc_mode: 'home',
-      tag_uid: tagId,
+      tag_uid: canonicalUid,
       message:
         '등록된 NFC 태그입니다. 인증서가 연결되면 스캔 시 정품 정보를 확인할 수 있습니다.',
       goldbar_pool_only: true,
@@ -1048,7 +1074,7 @@ app.get('/t/:tagId', async (c) => {
   if (row.product_id == null || row.product_pk == null) {
     return c.json({
       nfc_mode: 'asset',
-      tag_uid: tagId,
+      tag_uid: canonicalUid,
       message: '출고 전 등록된 자산 태그입니다.',
       ...(unmapVerify ? { unmap_proof_recorded: true } : {}),
     });
@@ -1056,7 +1082,7 @@ app.get('/t/:tagId', async (c) => {
 
   return c.json({
     nfc_mode: 'home',
-    tag_uid: tagId,
+    tag_uid: canonicalUid,
     message: 'Gold SyncTag 정품 NFC 태그입니다.',
     ...(unmapVerify ? { unmap_proof_recorded: true } : {}),
   });

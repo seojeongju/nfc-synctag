@@ -417,9 +417,10 @@ export default function UserLanding() {
       const res = await fetch(`/api/goldbars/t/${encodeURIComponent(tagUid)}`);
       if (cancelled || !res.ok) return;
       const goldbarData = await res.json();
-      if (!goldbarData?.id) return;
+      const wid = goldbarData?.id;
+      if (wid === undefined || wid === null || wid === '') return;
       setMyGoldbars((prev) => {
-        if (prev.some((g) => g.id === goldbarData.id)) return prev;
+        if (prev.some((g) => g.id === wid)) return prev;
         const next = [...prev, { ...goldbarData, scanned_at: new Date().toLocaleDateString() }];
         try {
           localStorage.setItem('my_scanned_goldbars', JSON.stringify(next));
@@ -481,32 +482,11 @@ export default function UserLanding() {
       <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden box-border bg-[#F6F7FB] flex flex-col items-center px-4 py-5 pb-24 sm:p-5 font-sans leading-relaxed text-slate-900 animate-in fade-in duration-500 select-none">
         
         {/* 헤더 */}
-        <header className="w-full max-w-md flex justify-between items-center h-16 px-2 mb-2">
-          {/* 내 지갑 전체 비우기 */}
-          <button 
-            onClick={() => {
-              if (myGoldbars.length === 0) {
-                alert('내 지갑이 이미 비어 있습니다.');
-                return;
-              }
-              if (confirm('내 지갑에 있는 모든 골드바 정보를 삭제할까요?')) {
-                setMyGoldbars([]);
-                localStorage.setItem('my_scanned_goldbars', JSON.stringify([]));
-                alert('내 지갑이 비워졌습니다.');
-              }
-            }}
-            className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center border border-slate-100 shadow-sm text-slate-400 hover:text-rose-500 hover:border-rose-300 transition-all cursor-pointer"
-            title="내 지갑 비우기"
-          >
-            <X className="w-4.5 h-4.5" />
-          </button>
-
+        <header className="w-full max-w-md flex justify-center items-center h-16 px-2 mb-2">
           <div className="flex items-center gap-2 select-none">
             <img src="/gold_synctag_logo_v2.png" alt="Logo" className="w-7 h-7 object-contain rounded-lg" />
             <span className="text-xl font-extrabold text-slate-800 tracking-tight">Gold SyncTag</span>
           </div>
-
-          <div className="w-10 h-10 shrink-0" aria-hidden />
         </header>
 
         {nfcWelcome?.message && (
@@ -712,23 +692,33 @@ export default function UserLanding() {
             <div className="flex items-end justify-between px-1">
               <div>
                 <h3 className="text-xl font-black tracking-tight text-slate-800">내 지갑</h3>
-                <p className="text-xs font-bold text-slate-400 mt-0.5">태그로 접속 시 관리자가 매칭한 골드바가 자동으로 표시됩니다.</p>
+                <p className="text-xs font-bold text-slate-400 mt-0.5">
+                  태그로 접속 시 관리자가 매칭한 제품(카탈로그) 또는 골드바 인증 정보가 자동으로 표시됩니다.
+                </p>
               </div>
             </div>
 
             {/* 지갑에 저장된 상품 카드 리스트 */}
             <div className="grid gap-4">
-              {myGoldbars.map((g, index) => (
-                <div key={index} className="bg-white p-5 rounded-3xl border border-slate-100/60 hover:border-amber-400/50 hover:shadow-md cursor-pointer group transition-all flex flex-col gap-4 shadow-sm relative overflow-hidden">
+              {myGoldbars.map((g, index) => {
+                const isCatalog = g.wallet_source === 'catalog_product';
+                return (
+                <div key={`${String(g.id)}-${index}`} className="bg-white p-5 rounded-3xl border border-slate-100/60 hover:border-amber-400/50 hover:shadow-md cursor-pointer group transition-all flex flex-col gap-4 shadow-sm relative overflow-hidden">
                   <div className="absolute -right-4 -bottom-4 text-7xl font-black text-slate-100/50 select-none">0{index + 1}</div>
                   <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-3.5">
-                      <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center border border-amber-200/40 shrink-0">
-                        <Award className="w-6 h-6" />
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center border border-amber-200/40 shrink-0 overflow-hidden">
+                        {g.image_url && isCatalog ? (
+                          <img src={g.image_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <Award className="w-6 h-6" />
+                        )}
                       </div>
-                      <div>
-                        <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">CERTIFIED GOLDBAR</span>
-                        <h4 className="font-black text-slate-800 text-base mt-0.5">{g.serial_number}</h4>
+                      <div className="min-w-0">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">
+                          {isCatalog ? '등록 제품' : 'CERTIFIED GOLDBAR'}
+                        </span>
+                        <h4 className="font-black text-slate-800 text-base mt-0.5 break-words">{g.serial_number}</h4>
                       </div>
                     </div>
                     {/* 삭제 기능 제공 */}
@@ -748,12 +738,13 @@ export default function UserLanding() {
                   </div>
 
                   <div className="border-t border-slate-50 pt-3 flex flex-wrap gap-x-6 gap-y-2">
-                    <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400">중량</span><span className="text-xs font-black text-slate-700">{g.weight}</span></div>
-                    <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400">순도</span><span className="text-xs font-black text-slate-700">{g.purity}</span></div>
-                    <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400">제조일자</span><span className="text-xs font-black text-slate-700">{g.minted_at || '-'}</span></div>
+                    <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400">중량</span><span className="text-xs font-black text-slate-700">{g.weight || '-'}</span></div>
+                    <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400">순도</span><span className="text-xs font-black text-slate-700">{g.purity || '-'}</span></div>
+                    <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400">{isCatalog ? '유형' : '제조일자'}</span><span className="text-xs font-black text-slate-700">{isCatalog ? '카탈로그 매칭' : g.minted_at || '-'}</span></div>
                   </div>
 
-                  {/* 추억 전자 앨범 보기 버튼 */}
+                  {/* 골드바 인증 연결 시에만 전자앨범 (카탈로그만 매칭된 제품은 앨범 미지원) */}
+                  {!isCatalog && (
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
@@ -763,6 +754,7 @@ export default function UserLanding() {
                   >
                     📸 추억 전자 앨범 보기
                   </button>
+                  )}
 
                   {/* 오늘의 시세 및 가치 환산 정보 (권한이 부여된 고객에게만 노출) */}
                   {g.show_market_price === 1 && (
@@ -805,14 +797,15 @@ export default function UserLanding() {
                     </a>
                   )}
                 </div>
-              ))}
+              );
+              })}
 
               {myGoldbars.length === 0 && (
                 <div className="bg-white rounded-3xl border border-slate-100 p-12 flex flex-col items-center justify-center text-center shadow-sm">
                   <Award className="w-12 h-12 text-slate-200 mb-4" />
                   <p className="font-black text-slate-400 text-sm">내 지갑에 표시할 골드바가 없습니다.</p>
                   <p className="text-xs font-bold text-slate-400/80 mt-1 leading-relaxed">
-                    관리자가 이 태그에 골드바를 연결하면 자동으로 여기에 나타납니다. 풀 전용 태그이거나 아직 매칭 전이면 비어 있을 수 있습니다.
+                    관리자에서 이 태그에 제품(또는 골드바 인증서)을 매칭하면 태그 접속 시 자동으로 표시됩니다. UID 표기(콜론 등)가 다를 경우에도 서버에서 맞춰 조회합니다.
                   </p>
                 </div>
               )}
