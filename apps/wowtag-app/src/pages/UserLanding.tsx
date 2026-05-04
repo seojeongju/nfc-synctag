@@ -403,7 +403,7 @@ export default function UserLanding() {
   // ==========================================
   if (!tagId) {
     return (
-      <div className="min-h-screen bg-[#F6F7FB] flex flex-col items-center p-5 pb-24 font-sans leading-relaxed text-slate-900 animate-in fade-in duration-500 select-none">
+      <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden box-border bg-[#F6F7FB] flex flex-col items-center px-4 py-5 pb-24 sm:p-5 font-sans leading-relaxed text-slate-900 animate-in fade-in duration-500 select-none">
         
         {/* 헤더 */}
         <header className="w-full max-w-md flex justify-between items-center h-16 px-2 mb-2">
@@ -608,14 +608,14 @@ export default function UserLanding() {
 
             <div className="grid gap-4">
               {allProducts.map((p) => (
-                <div key={p.id} onClick={() => { setSelectedProduct(p); setPurchaseSuccess(false); setPurchaseFormData({ name: '', phone: '', memo: '' }); }} className="bg-white p-4 rounded-3xl border border-slate-100 flex items-center justify-between hover:border-purple-300 hover:shadow-lg cursor-pointer group transition-all shadow-sm">
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 bg-slate-50 border border-slate-100/60 rounded-2xl overflow-hidden shadow-inner flex items-center justify-center">
+                <div key={p.id} onClick={() => { setSelectedProduct(p); setPurchaseSuccess(false); setPurchaseFormData({ name: '', phone: '', memo: '' }); }} className="bg-white p-4 rounded-3xl border border-slate-100 flex items-center gap-3 min-w-0 max-w-full hover:border-purple-300 hover:shadow-lg cursor-pointer group transition-all shadow-sm overflow-hidden">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="w-14 h-14 sm:w-16 sm:h-16 shrink-0 bg-slate-50 border border-slate-100/60 rounded-2xl overflow-hidden shadow-inner flex items-center justify-center">
                       <img src={p.image_url} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-all duration-300" />
                     </div>
-                    <div className="flex-1">
-                      <h4 className="font-black text-slate-800 text-base">{p.name}</h4>
-                      <p className="text-xs font-bold text-slate-400 line-clamp-1 mt-0.5">{p.description || '상세 정보가 없습니다.'}</p>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-black text-slate-800 text-sm sm:text-base break-words line-clamp-2">{p.name}</h4>
+                      <p className="text-xs font-bold text-slate-400 line-clamp-2 mt-0.5 break-words">{p.description || '상세 정보가 없습니다.'}</p>
                       
                       {/* 옵션 표시 */}
                       {p.options && (
@@ -629,7 +629,7 @@ export default function UserLanding() {
                       )}
                     </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-slate-300 group-hover:translate-x-1 transition-all flex-shrink-0" />
+                  <ChevronRight className="w-5 h-5 text-slate-300 group-hover:translate-x-1 transition-all shrink-0" />
                 </div>
               ))}
 

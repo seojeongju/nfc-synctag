@@ -5,6 +5,19 @@ import { LayoutDashboard, Tag, Package, Plus, Bell, ArrowUpRight, Loader2, X, Sm
 const ADMIN_TAB_IDS = ['dashboard', 'products', 'nfc', 'goldbars', 'userGoldbars'] as const;
 type AdminTabId = (typeof ADMIN_TAB_IDS)[number];
 
+/** 제품 폼: 등록가·중량 기준 g당 환산 (표시용) */
+function formatProductGoldSummary(weight: string, price: string) {
+  const w = parseFloat(String(weight ?? '').replace(/[^0-9.]/g, ''));
+  const pr = parseFloat(String(price ?? '').replace(/[^0-9.]/g, ''));
+  const totalStr =
+    pr > 0 && Number.isFinite(pr) ? `${Math.round(pr).toLocaleString('ko-KR')}원` : '0원';
+  const perG =
+    w > 0 && pr > 0 && Number.isFinite(w) && Number.isFinite(pr)
+      ? `${Math.round(pr / w).toLocaleString('ko-KR')}원`
+      : '0원';
+  return { totalStr, perG };
+}
+
 export default function AdminDashboard() {
   const { tab: tabParam } = useParams<{ tab: string }>();
   const navigate = useNavigate();
@@ -47,6 +60,13 @@ export default function AdminDashboard() {
   // 폼 상태 (제품 등록)
   const [productFormData, setProductFormData] = useState({
     name: '',
+    material: '999.9',
+    purity: '24K',
+    weight: '',
+    width_mm: '',
+    height_mm: '',
+    price: '',
+    memo: '',
     description: '',
     video_url: '',
     manual_url: '',
@@ -60,6 +80,13 @@ export default function AdminDashboard() {
   const [editProductFormData, setEditProductFormData] = useState({
     id: '',
     name: '',
+    material: '999.9',
+    purity: '24K',
+    weight: '',
+    width_mm: '',
+    height_mm: '',
+    price: '',
+    memo: '',
     description: '',
     video_url: '',
     manual_url: '',
@@ -408,6 +435,13 @@ export default function AdminDashboard() {
         setIsProductModalOpen(false);
         setProductFormData({
           name: '',
+          material: '999.9',
+          purity: '24K',
+          weight: '',
+          width_mm: '',
+          height_mm: '',
+          price: '',
+          memo: '',
           description: '',
           video_url: '',
           manual_url: '',
@@ -428,6 +462,13 @@ export default function AdminDashboard() {
     setEditProductFormData({
       id: p.id,
       name: p.name,
+      material: p.material ?? '999.9',
+      purity: p.purity ?? '24K',
+      weight: p.weight ?? '',
+      width_mm: p.width_mm ?? '',
+      height_mm: p.height_mm ?? '',
+      price: p.price ?? '',
+      memo: p.memo ?? '',
       description: p.description || '',
       video_url: p.video_url || '',
       manual_url: p.manual_url || '',
@@ -656,7 +697,7 @@ export default function AdminDashboard() {
   );
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex font-sans leading-relaxed text-slate-900 animate-in fade-in duration-300">
+    <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden bg-[#F8FAFC] flex font-sans leading-relaxed text-slate-900 animate-in fade-in duration-300">
       {/* 사이드바 - 데스크탑 */}
       <aside className="hidden lg:flex w-72 flex-col p-6 bg-white border-r border-slate-100 shadow-sm fixed h-full z-20">
         <div className="flex items-center gap-3 mb-12 px-2 select-none">
@@ -705,14 +746,14 @@ export default function AdminDashboard() {
         </div>
       </aside>
 
-      <main className="flex-1 lg:ml-72 flex flex-col min-h-screen">
+      <main className="flex-1 min-w-0 w-full overflow-x-hidden lg:ml-72 flex flex-col min-h-screen">
         {/* 헤더 */}
-        <header className="h-16 lg:h-20 bg-white/80 backdrop-blur-xl border-b border-slate-50 px-4 lg:px-10 flex items-center justify-between sticky top-0 z-10 transition-all">
-          <div className="flex items-center gap-2.5 lg:hidden select-none cursor-pointer" onClick={() => goToTab('dashboard')}>
-            <img src="/gold_synctag_logo_v2.png" alt="Logo" className="w-7 h-7 object-contain rounded-lg" />
-            <span className="font-black text-slate-800">Gold SyncTag</span>
+        <header className="h-16 lg:h-20 bg-white/80 backdrop-blur-xl border-b border-slate-50 px-3 sm:px-4 lg:px-10 flex items-center justify-between sticky top-0 z-10 transition-all min-w-0 gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-1 lg:flex-initial cursor-pointer select-none" onClick={() => goToTab('dashboard')}>
+            <img src="/gold_synctag_logo_v2.png" alt="Logo" className="w-7 h-7 shrink-0 object-contain rounded-lg" />
+            <span className="font-black text-slate-800 truncate lg:hidden">Gold SyncTag</span>
           </div>
-          <div className="flex items-center gap-1 sm:gap-2 ml-auto">
+          <div className="flex items-center gap-0.5 sm:gap-2 shrink-0">
             <button
               type="button"
               onClick={() => window.open('/', '_blank', 'noopener,noreferrer')}
@@ -732,7 +773,7 @@ export default function AdminDashboard() {
         </header>
 
         {/* 탭 기반 콘텐츠 */}
-        <div className="p-4 lg:p-10 pb-28 lg:pb-10 space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="p-3 sm:p-4 lg:p-10 pb-28 lg:pb-10 space-y-8 sm:space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500 w-full min-w-0 max-w-full overflow-x-hidden box-border">
           
           {/* 1. 대시보드 탭 */}
           {currentTab === 'dashboard' && (
@@ -777,7 +818,7 @@ export default function AdminDashboard() {
               </div>
 
               {/* 통계 카드 */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 min-w-0 w-full">
                 {[
                   { label: '전체 제품', value: products.length, icon: Package, color: 'text-blue-600', bg: 'bg-blue-50', tab: 'products' },
                   { label: '골드바 개수', value: goldbars.length, icon: Award, color: 'text-amber-600', bg: 'bg-amber-50', tab: 'goldbars' },
@@ -787,7 +828,7 @@ export default function AdminDashboard() {
                   <div 
                     key={i} 
                     onClick={() => stat.tab && goToTab(stat.tab as AdminTabId)}
-                    className="bg-white p-5 lg:p-8 rounded-[2rem] shadow-sm border border-slate-50 hover:border-slate-200/60 hover:shadow-xl transition-all cursor-pointer group hover:scale-[1.02] active:scale-[0.98] flex flex-col justify-between min-h-[160px]"
+                    className="bg-white p-4 sm:p-5 lg:p-8 rounded-2xl sm:rounded-[2rem] shadow-sm border border-slate-50 hover:border-slate-200/60 hover:shadow-xl transition-all cursor-pointer group hover:scale-[1.02] active:scale-[0.98] flex flex-col justify-between min-h-[140px] sm:min-h-[160px] min-w-0 max-w-full"
                   >
                     <div className={`w-12 h-12 rounded-2xl ${stat.bg} ${stat.color} flex items-center justify-center mb-4 transition-transform group-hover:scale-105`}><stat.icon className="w-6 h-6" /></div>
                     <div>
@@ -989,16 +1030,18 @@ export default function AdminDashboard() {
           {/* 2. 제품 정보 관리 탭 */}
           {currentTab === 'products' && (
             <>
-              <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-                <div>
-                  <h2 className="text-2xl lg:text-3xl font-black text-slate-900">제품 정보 관리</h2>
-                  <p className="text-xs font-bold text-slate-400 mt-1">NFC 태그를 매핑할 순수 제품의 제원 정보를 관리합니다.</p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between w-full min-w-0">
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 break-words">제품 정보 관리</h2>
+                  <p className="text-[11px] sm:text-xs font-bold text-slate-400 mt-1 leading-relaxed">NFC 태그를 매핑할 순수 제품의 제원 정보를 관리합니다.</p>
                 </div>
-                <button onClick={() => setIsProductModalOpen(true)} className="purple-btn !py-3.5 !px-6 flex items-center gap-2"><Plus className="w-5 h-5" /> 제품 등록</button>
+                <button type="button" onClick={() => setIsProductModalOpen(true)} className="purple-btn !py-3 !px-5 sm:!py-3.5 sm:!px-6 flex items-center justify-center gap-2 shrink-0 w-full sm:w-auto text-sm">
+                  <Plus className="w-5 h-5 shrink-0" /> 제품 등록
+                </button>
               </div>
 
               {/* 검색 바 */}
-              <div className="bg-white rounded-2xl p-4 border border-slate-100 flex items-center gap-3 shadow-sm max-w-md">
+              <div className="bg-white rounded-2xl p-3 sm:p-4 border border-slate-100 flex items-center gap-3 shadow-sm w-full min-w-0 max-w-full">
                 <Search className="w-5 h-5 text-slate-300" />
                 <input 
                   type="text" 
@@ -1009,27 +1052,23 @@ export default function AdminDashboard() {
                 />
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-2">
+              <div className="grid gap-3 sm:gap-4 lg:grid-cols-2 w-full min-w-0">
                 {filteredProducts.slice((currentPageProducts - 1) * ITEMS_PER_PAGE, currentPageProducts * ITEMS_PER_PAGE).map((p) => (
-                  <div key={p.id} className="bg-white p-5 rounded-[2rem] border border-slate-100 flex flex-col gap-4 hover:border-primary/30 transition-all group shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-5">
-                        <div className="w-16 h-16 rounded-2xl bg-slate-50 overflow-hidden ring-4 ring-slate-50">
-                          <img src={p.image_url.startsWith('/') ? p.image_url : p.image_url} className="w-full h-full object-cover" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-black text-slate-800 text-lg truncate">{p.name}</h4>
-                          <p className="text-xs text-slate-400 font-bold line-clamp-1">{p.description || '상세 설명 없음'}</p>
-                        </div>
+                  <div key={p.id} className="bg-white p-4 sm:p-5 rounded-2xl sm:rounded-[2rem] border border-slate-100 flex flex-col gap-3 sm:gap-4 hover:border-primary/30 transition-all group shadow-sm w-full min-w-0 max-w-full overflow-hidden">
+                    <div className="flex gap-2 sm:gap-3 w-full min-w-0 items-start">
+                      <div className="shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-slate-50 overflow-hidden ring-2 sm:ring-4 ring-slate-50">
+                        <img src={p.image_url.startsWith('/') ? p.image_url : p.image_url} alt="" className="w-full h-full object-cover" />
                       </div>
-
-                      {/* 수정 및 삭제 도구 */}
-                      <div className="flex items-center gap-1 pl-4">
-                        <button onClick={() => handleEditProductOpen(p)} className="p-2.5 rounded-xl hover:bg-slate-50 text-slate-400 hover:text-primary transition-all">
-                          <Edit3 className="w-4.5 h-4.5" />
+                      <div className="flex-1 min-w-0 pt-0.5">
+                        <h4 className="font-black text-slate-800 text-base sm:text-lg break-words line-clamp-2">{p.name}</h4>
+                        <p className="text-xs text-slate-400 font-bold line-clamp-2 mt-0.5 break-words">{p.description || '상세 설명 없음'}</p>
+                      </div>
+                      <div className="shrink-0 flex flex-col sm:flex-row items-end sm:items-start gap-0.5 pt-0.5">
+                        <button type="button" onClick={() => handleEditProductOpen(p)} className="p-2 rounded-lg sm:rounded-xl hover:bg-slate-50 text-slate-400 hover:text-primary transition-all" aria-label="수정">
+                          <Edit3 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                         </button>
-                        <button onClick={() => handleDeleteProduct(p.id)} className="p-2.5 rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-all">
-                          <Trash2 className="w-4.5 h-4.5" />
+                        <button type="button" onClick={() => handleDeleteProduct(p.id)} className="p-2 rounded-lg sm:rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-all" aria-label="삭제">
+                          <Trash2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                         </button>
                       </div>
                     </div>
@@ -1057,11 +1096,11 @@ export default function AdminDashboard() {
 
               {/* 제품 페이지네이션 */}
               {filteredProducts.length > ITEMS_PER_PAGE && (
-                <div className="flex justify-center items-center gap-2 mt-6">
+                <div className="flex justify-center items-center gap-2 mt-6 flex-wrap max-w-full overflow-x-auto pb-1 [scrollbar-width:thin]">
                   <button
                     disabled={currentPageProducts === 1}
                     onClick={() => setCurrentPageProducts(p => p - 1)}
-                    className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm"
+                    className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm shrink-0"
                   >
                     이전
                   </button>
@@ -1069,7 +1108,7 @@ export default function AdminDashboard() {
                     <button
                       key={i}
                       onClick={() => setCurrentPageProducts(i + 1)}
-                      className={`w-10 h-10 text-xs font-black rounded-xl border transition-all ${currentPageProducts === i + 1 ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white border-transparent shadow-md' : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'}`}
+                      className={`w-10 h-10 text-xs font-black rounded-xl border transition-all shrink-0 ${currentPageProducts === i + 1 ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white border-transparent shadow-md' : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'}`}
                     >
                       {i + 1}
                     </button>
@@ -1077,7 +1116,7 @@ export default function AdminDashboard() {
                   <button
                     disabled={currentPageProducts === Math.ceil(filteredProducts.length / ITEMS_PER_PAGE)}
                     onClick={() => setCurrentPageProducts(p => p + 1)}
-                    className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm"
+                    className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm shrink-0"
                   >
                     다음
                   </button>
@@ -1088,23 +1127,25 @@ export default function AdminDashboard() {
 
           {/* 3. NFC 태그 관리 탭 */}
           {currentTab === 'nfc' && (
-            <div className="space-y-8">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl lg:text-3xl font-black text-slate-900">NFC 태그 관리</h2>
-                <button onClick={() => setIsNfcModalOpen(true)} className="bg-emerald-600 text-white font-black py-3 px-6 rounded-2xl shadow-lg shadow-emerald-500/20 flex items-center gap-2"><Smartphone className="w-5 h-5" /> 새 태그 발행</button>
+            <div className="space-y-6 sm:space-y-8 w-full min-w-0">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full min-w-0">
+                <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 shrink min-w-0">NFC 태그 관리</h2>
+                <button type="button" onClick={() => setIsNfcModalOpen(true)} className="bg-emerald-600 text-white font-black py-3 px-5 sm:px-6 rounded-2xl shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 shrink-0 w-full sm:w-auto text-sm">
+                  <Smartphone className="w-5 h-5 shrink-0" /> 새 태그 발행
+                </button>
               </div>
               
-              <div className="bg-white rounded-[2.5rem] p-8 border border-slate-50 shadow-sm overflow-hidden">
+              <div className="bg-white rounded-2xl sm:rounded-[2.5rem] p-4 sm:p-8 border border-slate-50 shadow-sm overflow-hidden w-full min-w-0 max-w-full">
                  <h3 className="text-xl font-black mb-6">최근 태그 작업</h3>
                  <div className="space-y-4">
                    {products.filter(p => p.tag_uid).slice((currentPageTags - 1) * ITEMS_PER_PAGE, currentPageTags * ITEMS_PER_PAGE).map(p => (
-                     <div key={p.id} className="flex items-center gap-4 py-4 px-6 bg-slate-50 rounded-2xl">
-                       <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-primary border border-slate-100"><Hash className="w-5 h-5" /></div>
-                       <div className="flex-1">
-                          <p className="font-black text-slate-700">{p.tag_uid}</p>
-                          <p className="text-xs font-bold text-slate-400">연결된 제품: {p.name}</p>
+                     <div key={p.id} className="flex items-center gap-3 sm:gap-4 py-3 sm:py-4 px-4 sm:px-6 bg-slate-50 rounded-xl sm:rounded-2xl min-w-0 max-w-full">
+                       <div className="w-10 h-10 shrink-0 rounded-xl bg-white flex items-center justify-center text-primary border border-slate-100"><Hash className="w-5 h-5" /></div>
+                       <div className="flex-1 min-w-0">
+                          <p className="font-black text-slate-700 text-sm break-all">{p.tag_uid}</p>
+                          <p className="text-xs font-bold text-slate-400 mt-0.5 line-clamp-2 break-words">연결된 제품: {p.name}</p>
                        </div>
-                       <LinkIcon className="w-4 h-4 text-slate-300" />
+                       <LinkIcon className="w-4 h-4 text-slate-300 shrink-0" />
                      </div>
                    ))}
 
@@ -1186,42 +1227,38 @@ export default function AdminDashboard() {
               {/* 골드바 리스트 */}
               <div className="grid gap-4 lg:grid-cols-2">
                 {filteredGoldbars.slice((currentPageGoldbars - 1) * ITEMS_PER_PAGE, currentPageGoldbars * ITEMS_PER_PAGE).map((g) => (
-                  <div key={g.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 flex flex-col gap-4 hover:border-amber-400/50 hover:shadow-xl transition-all group">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-500"><Award className="w-6 h-6" /></div>
-                        <div>
-                          <h4 className="font-black text-slate-800 text-lg">일련번호: {g.serial_number}</h4>
-                          <p className="text-xs font-bold text-slate-400">등록일: {new Date(g.created_at).toLocaleDateString()}</p>
-                        </div>
+                  <div key={g.id} className="bg-white p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] border border-slate-100 flex flex-col gap-3 sm:gap-4 hover:border-amber-400/50 hover:shadow-xl transition-all group w-full min-w-0 max-w-full overflow-hidden">
+                    <div className="flex gap-2 sm:gap-3 w-full min-w-0 items-start">
+                      <div className="shrink-0 w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-500"><Award className="w-5 h-5 sm:w-6 sm:h-6" /></div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-black text-slate-800 text-base sm:text-lg break-words line-clamp-2">일련번호: {g.serial_number}</h4>
+                        <p className="text-xs font-bold text-slate-400 mt-0.5">등록일: {new Date(g.created_at).toLocaleDateString()}</p>
                       </div>
-
-                      {/* 수정 & 삭제 도구 */}
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => handleEditOpen(g)} className="p-2.5 rounded-xl hover:bg-slate-50 text-slate-400 hover:text-amber-600 transition-all">
-                          <Edit3 className="w-4.5 h-4.5" />
+                      <div className="shrink-0 flex flex-col sm:flex-row items-end gap-0.5">
+                        <button type="button" onClick={() => handleEditOpen(g)} className="p-2 rounded-lg sm:rounded-xl hover:bg-slate-50 text-slate-400 hover:text-amber-600 transition-all" aria-label="수정">
+                          <Edit3 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                         </button>
-                        <button onClick={() => handleDeleteGoldbar(g.id)} className="p-2.5 rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-all">
-                          <Trash2 className="w-4.5 h-4.5" />
+                        <button type="button" onClick={() => handleDeleteGoldbar(g.id)} className="p-2 rounded-lg sm:rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-all" aria-label="삭제">
+                          <Trash2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                         </button>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100/60 text-sm">
-                      <div>
-                        <span className="text-slate-400 font-bold block">중량</span>
-                        <span className="font-black text-slate-700">{g.weight}</span>
+                    <div className="grid grid-cols-2 gap-3 sm:gap-4 bg-slate-50 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-100/60 text-sm min-w-0">
+                      <div className="min-w-0">
+                        <span className="text-slate-400 font-bold block text-[11px]">중량</span>
+                        <span className="font-black text-slate-700 break-words">{g.weight}</span>
                       </div>
-                      <div>
-                        <span className="text-slate-400 font-bold block">제조일자</span>
-                        <span className="font-black text-slate-700">{g.minted_at || '-'}</span>
+                      <div className="min-w-0">
+                        <span className="text-slate-400 font-bold block text-[11px]">제조일자</span>
+                        <span className="font-black text-slate-700 break-words">{g.minted_at || '-'}</span>
                       </div>
-                      <div className="col-span-2 border-t border-slate-100 pt-2 mt-1 flex justify-between items-center">
-                        <div>
-                          <span className="text-slate-400 font-bold block">연결된 NFC 태그 UID</span>
-                          <span className="font-mono font-black text-amber-700 text-sm">{g.tag_uid || '미매핑'}</span>
+                      <div className="col-span-2 border-t border-slate-100 pt-2 mt-1 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 min-w-0">
+                        <div className="min-w-0 flex-1">
+                          <span className="text-slate-400 font-bold block text-[11px]">연결된 NFC 태그 UID</span>
+                          <span className="font-mono font-black text-amber-700 text-xs sm:text-sm break-all">{g.tag_uid || '미매핑'}</span>
                         </div>
-                        <span className="text-xs bg-amber-50 text-amber-700 px-3 py-1.5 rounded-xl font-black">{g.purity}</span>
+                        <span className="text-xs bg-amber-50 text-amber-700 px-2.5 py-1 rounded-xl font-black shrink-0 self-start">{g.purity}</span>
                       </div>
                     </div>
                   </div>
@@ -1236,11 +1273,11 @@ export default function AdminDashboard() {
 
               {/* 골드바 페이지네이션 */}
               {filteredGoldbars.length > ITEMS_PER_PAGE && (
-                <div className="flex justify-center items-center gap-2 mt-6">
+                <div className="flex justify-center items-center gap-2 mt-6 flex-wrap max-w-full overflow-x-auto pb-1 [scrollbar-width:thin]">
                   <button
                     disabled={currentPageGoldbars === 1}
                     onClick={() => setCurrentPageGoldbars(p => p - 1)}
-                    className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm"
+                    className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm shrink-0"
                   >
                     이전
                   </button>
@@ -1248,7 +1285,7 @@ export default function AdminDashboard() {
                     <button
                       key={i}
                       onClick={() => setCurrentPageGoldbars(i + 1)}
-                      className={`w-10 h-10 text-xs font-black rounded-xl border transition-all ${currentPageGoldbars === i + 1 ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-transparent shadow-md' : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'}`}
+                      className={`w-10 h-10 text-xs font-black rounded-xl border transition-all shrink-0 ${currentPageGoldbars === i + 1 ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-transparent shadow-md' : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'}`}
                     >
                       {i + 1}
                     </button>
@@ -1256,7 +1293,7 @@ export default function AdminDashboard() {
                   <button
                     disabled={currentPageGoldbars === Math.ceil(filteredGoldbars.length / ITEMS_PER_PAGE)}
                     onClick={() => setCurrentPageGoldbars(p => p + 1)}
-                    className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm"
+                    className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm shrink-0"
                   >
                     다음
                   </button>
@@ -1386,9 +1423,9 @@ export default function AdminDashboard() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mt-6 w-full min-w-0">
                 {userGoldbars && userGoldbars.map((ug) => (
-                  <div key={ug.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between hover:border-amber-400 hover:shadow-md transition-all gap-5 select-none relative overflow-hidden group">
+                  <div key={ug.id} className="bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between hover:border-amber-400 hover:shadow-md transition-all gap-4 sm:gap-5 select-none relative overflow-hidden group w-full min-w-0 max-w-full">
                     <div className="absolute -right-4 -top-4 w-20 h-20 bg-amber-50/40 rounded-full blur-2xl group-hover:bg-amber-100/40 transition-colors"></div>
                     <div>
                       {/* 카드 상단: 유저 정보 및 골드바 정보 */}
@@ -1420,16 +1457,16 @@ export default function AdminDashboard() {
 
                     {/* 카드 하단: 1g당 매입 시세 수정 및 노출 설정 */}
                     <div className="border-t border-slate-50/80 pt-4 flex flex-col gap-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-black text-slate-500 uppercase tracking-widest">1g당 시세</span>
-                        <div className="flex items-center gap-2">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between min-w-0">
+                        <span className="text-xs font-black text-slate-500 uppercase tracking-widest shrink-0">1g당 시세</span>
+                        <div className="flex items-center gap-2 min-w-0 w-full sm:w-auto justify-end">
                           <input 
                             type="number" 
                             defaultValue={ug.market_price_per_gram || 110000} 
                             onBlur={(e) => handleUpdatePriceValue(ug.user_id, ug.goldbar_id, ug.show_market_price === 1, Number(e.target.value))}
-                            className="w-28 h-10 bg-white border border-slate-200 rounded-xl text-center font-black text-sm outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-50 transition-all shadow-sm" 
+                            className="w-full min-w-0 max-w-[11rem] sm:w-28 h-10 bg-white border border-slate-200 rounded-xl text-center font-black text-sm outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-50 transition-all shadow-sm" 
                           />
-                          <span className="text-xs font-black text-slate-400">원</span>
+                          <span className="text-xs font-black text-slate-400 shrink-0">원</span>
                         </div>
                       </div>
 
@@ -1470,43 +1507,101 @@ export default function AdminDashboard() {
               <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">순수 제품 등록</h3>
               <button onClick={() => setIsProductModalOpen(false)} className="p-2 bg-white rounded-xl text-slate-400 shadow-sm"><X className="w-6 h-6" /></button>
             </header>
-            <form onSubmit={handleProductSubmit} className="p-8 space-y-6 overflow-y-auto pb-12">
+            <form onSubmit={handleProductSubmit} className="p-8 space-y-4 overflow-y-auto pb-12">
                <div className="space-y-2">
-                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">제품 이름 *</label>
-                 <input required type="text" value={productFormData.name} onChange={(e) => setProductFormData({...productFormData, name: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-primary focus:bg-white transition-all" />
-               </div>
-
-               {/* 제품 옵션 */}
-               <div className="space-y-2">
-                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">제품 옵션 (콤마로 구분)</label>
-                 <input type="text" placeholder="예: 골드, 실버, 로즈골드" value={productFormData.options} onChange={(e) => setProductFormData({...productFormData, options: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-primary focus:bg-white transition-all" />
-               </div>
-
-               <div className="space-y-2">
-                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">상세 설명</label>
-                 <textarea rows={2} value={productFormData.description} onChange={(e) => setProductFormData({...productFormData, description: e.target.value})} className="w-full p-5 bg-slate-100/50 rounded-2xl font-bold outline-none resize-none border border-transparent focus:border-primary focus:bg-white transition-all" />
-               </div>
-
-               {/* 제품 이미지 업로드 및 자동 리사이징 */}
-               <div className="space-y-2 bg-slate-50 p-5 rounded-2xl border border-slate-100/80">
-                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">제품 이미지 업로드 (자동 500x500 압축)</label>
-                 <div className="mt-2 flex items-center gap-4">
-                    <label className="bg-white border border-slate-200 px-4 py-3 rounded-xl font-bold text-xs text-slate-600 hover:bg-slate-50 cursor-pointer flex items-center gap-2 shadow-sm">
-                      <FileText className="w-4 h-4" /> 이미지 파일 선택
-                      <input type="file" accept="image/*" onChange={(e) => handleProductImageChange(e, 'create')} className="hidden" />
-                    </label>
-                    <span className="text-xs font-bold text-slate-400 line-clamp-1 flex-1">
-                      {productFormData.file_name || '선택된 파일이 없습니다.'}
-                    </span>
-                 </div>
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">품명 *</label>
+                 <input required type="text" placeholder="예: 골드바3.75g" value={productFormData.name} onChange={(e) => setProductFormData({ ...productFormData, name: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent hover:border-primary/20 focus:border-primary/50 focus:bg-white transition-all" />
                </div>
 
                <div className="grid grid-cols-2 gap-4">
-                 <div className="space-y-2"><label className="text-xs font-black text-slate-400 tracking-widest px-1">영상 URL</label><input type="url" value={productFormData.video_url} onChange={(e)=>setProductFormData({...productFormData, video_url: e.target.value})} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 outline-none text-sm" /></div>
-                 <div className="space-y-2"><label className="text-xs font-black text-slate-400 tracking-widest px-1">매뉴얼 URL</label><input type="url" value={productFormData.manual_url} onChange={(e)=>setProductFormData({...productFormData, manual_url: e.target.value})} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 outline-none text-sm" /></div>
+                 <div className="space-y-2">
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">소재</label>
+                   <input type="text" placeholder="예: 999.9" value={productFormData.material} onChange={(e) => setProductFormData({ ...productFormData, material: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+                 </div>
+                 <div className="space-y-2">
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">금 함량</label>
+                   <select value={productFormData.purity} onChange={(e) => setProductFormData({ ...productFormData, purity: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-3 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all cursor-pointer">
+                     <option value="24K">24K</option>
+                     <option value="18K">18K</option>
+                     <option value="14K">14K</option>
+                   </select>
+                 </div>
                </div>
 
-               <button type="submit" disabled={submitting} className="w-full h-16 purple-btn text-lg font-black shadow-xl shadow-primary/30 mt-4 disabled:opacity-50">
+               <div className="space-y-2 relative">
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">중량(g)</label>
+                 <input type="text" placeholder="예: 3.75" value={productFormData.weight} onChange={(e) => setProductFormData({ ...productFormData, weight: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-12 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+                 <span className="absolute right-4 bottom-3 font-bold text-slate-400 select-none">g</span>
+               </div>
+
+               <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-2 relative">
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">가로 길이(mm)</label>
+                   <input type="text" placeholder="예: 17" value={productFormData.width_mm} onChange={(e) => setProductFormData({ ...productFormData, width_mm: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-14 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+                   <span className="absolute right-4 bottom-3 font-bold text-slate-400 select-none">mm</span>
+                 </div>
+                 <div className="space-y-2 relative">
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">세로 길이(mm)</label>
+                   <input type="text" placeholder="예: 25" value={productFormData.height_mm} onChange={(e) => setProductFormData({ ...productFormData, height_mm: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-14 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+                   <span className="absolute right-4 bottom-3 font-bold text-slate-400 select-none">mm</span>
+                 </div>
+               </div>
+
+               <div className="space-y-2 relative">
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">가격</label>
+                 <input type="number" placeholder="예: 850000" value={productFormData.price} onChange={(e) => setProductFormData({ ...productFormData, price: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-12 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+                 <span className="absolute right-4 bottom-3 font-bold text-slate-400 select-none">원</span>
+               </div>
+
+               <div className="space-y-2">
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">메모</label>
+                 <input type="text" placeholder="메모를 입력해 주세요" value={productFormData.memo} onChange={(e) => setProductFormData({ ...productFormData, memo: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+               </div>
+
+               <div className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3 space-y-1.5">
+                 <p className="text-xs font-bold text-slate-500">
+                   현재 금 시세 :{' '}
+                   <span className="text-slate-800 font-black">{formatProductGoldSummary(productFormData.weight, productFormData.price).totalStr}</span>
+                 </p>
+                 <p className="text-xs font-bold text-slate-500">
+                   g 당 금 시세 :{' '}
+                   <span className="text-slate-800 font-black">{formatProductGoldSummary(productFormData.weight, productFormData.price).perG}</span>
+                 </p>
+               </div>
+
+               <div className="pt-2 border-t border-slate-100 space-y-4">
+                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">추가 · 옵션 및 미디어</p>
+                 <div className="space-y-2">
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">제품 옵션 (콤마로 구분)</label>
+                   <input type="text" placeholder="예: 골드, 실버, 로즈골드" value={productFormData.options} onChange={(e) => setProductFormData({ ...productFormData, options: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+                 </div>
+                 <div className="space-y-2">
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">상세 설명</label>
+                   <textarea rows={2} value={productFormData.description} onChange={(e) => setProductFormData({ ...productFormData, description: e.target.value })} className="w-full p-4 bg-slate-100/50 rounded-xl font-bold outline-none resize-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+                 </div>
+                 <div className="space-y-2 bg-slate-50 p-4 rounded-xl border border-slate-100/80">
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">제품 이미지 업로드 (자동 500x500 압축)</label>
+                   <div className="mt-2 flex flex-wrap items-center gap-3">
+                     <label className="bg-white border border-slate-200 px-4 py-2.5 rounded-xl font-bold text-xs text-slate-600 hover:bg-slate-50 cursor-pointer flex items-center gap-2 shadow-sm">
+                       <FileText className="w-4 h-4" /> 이미지 파일 선택
+                       <input type="file" accept="image/*" onChange={(e) => handleProductImageChange(e, 'create')} className="hidden" />
+                     </label>
+                     <span className="text-xs font-bold text-slate-400 line-clamp-1 flex-1 min-w-0">{productFormData.file_name || '선택된 파일이 없습니다.'}</span>
+                   </div>
+                 </div>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                   <div className="space-y-2">
+                     <label className="text-xs font-black text-slate-400 tracking-widest pl-1">영상 URL</label>
+                     <input type="url" value={productFormData.video_url} onChange={(e) => setProductFormData({ ...productFormData, video_url: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 outline-none text-sm font-bold border border-transparent focus:border-primary/50 focus:bg-white" />
+                   </div>
+                   <div className="space-y-2">
+                     <label className="text-xs font-black text-slate-400 tracking-widest pl-1">매뉴얼 URL</label>
+                     <input type="url" value={productFormData.manual_url} onChange={(e) => setProductFormData({ ...productFormData, manual_url: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 outline-none text-sm font-bold border border-transparent focus:border-primary/50 focus:bg-white" />
+                   </div>
+                 </div>
+               </div>
+
+               <button type="submit" disabled={submitting} className="w-full h-16 purple-btn text-lg font-black shadow-xl shadow-primary/30 mt-2 disabled:opacity-50">
                  {submitting && <Loader2 className="w-5 h-5 animate-spin" />} 정보 저장
                </button>
             </form>
@@ -1523,43 +1618,101 @@ export default function AdminDashboard() {
               <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">제품 정보 수정</h3>
               <button onClick={() => setIsEditProductModalOpen(false)} className="p-2 bg-white rounded-xl text-slate-400 shadow-sm"><X className="w-6 h-6" /></button>
             </header>
-            <form onSubmit={handleEditProductSubmit} className="p-8 space-y-6 overflow-y-auto pb-12">
+            <form onSubmit={handleEditProductSubmit} className="p-8 space-y-4 overflow-y-auto pb-12">
                <div className="space-y-2">
-                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">제품 이름 *</label>
-                 <input required type="text" value={editProductFormData.name} onChange={(e) => setEditProductFormData({...editProductFormData, name: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-primary focus:bg-white transition-all" />
-               </div>
-
-               {/* 제품 옵션 */}
-               <div className="space-y-2">
-                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">제품 옵션 (콤마로 구분)</label>
-                 <input type="text" placeholder="예: 골드, 실버, 로즈골드" value={editProductFormData.options} onChange={(e) => setEditProductFormData({...editProductFormData, options: e.target.value})} className="w-full h-14 bg-slate-100/50 rounded-2xl px-5 font-bold outline-none border border-transparent focus:border-primary focus:bg-white transition-all" />
-               </div>
-
-               <div className="space-y-2">
-                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">상세 설명</label>
-                 <textarea rows={2} value={editProductFormData.description} onChange={(e) => setEditProductFormData({...editProductFormData, description: e.target.value})} className="w-full p-5 bg-slate-100/50 rounded-2xl font-bold outline-none resize-none border border-transparent focus:border-primary focus:bg-white transition-all" />
-               </div>
-
-               {/* 제품 이미지 업로드 및 자동 리사이징 */}
-               <div className="space-y-2 bg-slate-50 p-5 rounded-2xl border border-slate-100/80">
-                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">제품 이미지 교체 (자동 500x500 압축)</label>
-                 <div className="mt-2 flex items-center gap-4">
-                    <label className="bg-white border border-slate-200 px-4 py-3 rounded-xl font-bold text-xs text-slate-600 hover:bg-slate-50 cursor-pointer flex items-center gap-2 shadow-sm">
-                      <FileText className="w-4 h-4" /> 이미지 파일 선택
-                      <input type="file" accept="image/*" onChange={(e) => handleProductImageChange(e, 'edit')} className="hidden" />
-                    </label>
-                    <span className="text-xs font-bold text-slate-400 line-clamp-1 flex-1">
-                      {editProductFormData.file_name || '파일을 변경하지 않으려면 비워 두세요.'}
-                    </span>
-                 </div>
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">품명 *</label>
+                 <input required type="text" placeholder="예: 골드바3.75g" value={editProductFormData.name} onChange={(e) => setEditProductFormData({ ...editProductFormData, name: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent hover:border-primary/20 focus:border-primary/50 focus:bg-white transition-all" />
                </div>
 
                <div className="grid grid-cols-2 gap-4">
-                 <div className="space-y-2"><label className="text-xs font-black text-slate-400 tracking-widest px-1">영상 URL</label><input type="url" value={editProductFormData.video_url} onChange={(e)=>setEditProductFormData({...editProductFormData, video_url: e.target.value})} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 outline-none text-sm" /></div>
-                 <div className="space-y-2"><label className="text-xs font-black text-slate-400 tracking-widest px-1">매뉴얼 URL</label><input type="url" value={editProductFormData.manual_url} onChange={(e)=>setEditProductFormData({...editProductFormData, manual_url: e.target.value})} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 outline-none text-sm" /></div>
+                 <div className="space-y-2">
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">소재</label>
+                   <input type="text" placeholder="예: 999.9" value={editProductFormData.material} onChange={(e) => setEditProductFormData({ ...editProductFormData, material: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+                 </div>
+                 <div className="space-y-2">
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">금 함량</label>
+                   <select value={editProductFormData.purity} onChange={(e) => setEditProductFormData({ ...editProductFormData, purity: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-3 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all cursor-pointer">
+                     <option value="24K">24K</option>
+                     <option value="18K">18K</option>
+                     <option value="14K">14K</option>
+                   </select>
+                 </div>
                </div>
 
-               <button type="submit" disabled={submitting} className="w-full h-16 purple-btn text-lg font-black shadow-xl shadow-primary/30 mt-4 disabled:opacity-50">
+               <div className="space-y-2 relative">
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">중량(g)</label>
+                 <input type="text" placeholder="예: 3.75" value={editProductFormData.weight} onChange={(e) => setEditProductFormData({ ...editProductFormData, weight: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-12 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+                 <span className="absolute right-4 bottom-3 font-bold text-slate-400 select-none">g</span>
+               </div>
+
+               <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-2 relative">
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">가로 길이(mm)</label>
+                   <input type="text" placeholder="예: 17" value={editProductFormData.width_mm} onChange={(e) => setEditProductFormData({ ...editProductFormData, width_mm: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-14 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+                   <span className="absolute right-4 bottom-3 font-bold text-slate-400 select-none">mm</span>
+                 </div>
+                 <div className="space-y-2 relative">
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">세로 길이(mm)</label>
+                   <input type="text" placeholder="예: 25" value={editProductFormData.height_mm} onChange={(e) => setEditProductFormData({ ...editProductFormData, height_mm: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-14 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+                   <span className="absolute right-4 bottom-3 font-bold text-slate-400 select-none">mm</span>
+                 </div>
+               </div>
+
+               <div className="space-y-2 relative">
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">가격</label>
+                 <input type="number" placeholder="예: 850000" value={editProductFormData.price} onChange={(e) => setEditProductFormData({ ...editProductFormData, price: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-12 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+                 <span className="absolute right-4 bottom-3 font-bold text-slate-400 select-none">원</span>
+               </div>
+
+               <div className="space-y-2">
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">메모</label>
+                 <input type="text" placeholder="메모를 입력해 주세요" value={editProductFormData.memo} onChange={(e) => setEditProductFormData({ ...editProductFormData, memo: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+               </div>
+
+               <div className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3 space-y-1.5">
+                 <p className="text-xs font-bold text-slate-500">
+                   현재 금 시세 :{' '}
+                   <span className="text-slate-800 font-black">{formatProductGoldSummary(editProductFormData.weight, editProductFormData.price).totalStr}</span>
+                 </p>
+                 <p className="text-xs font-bold text-slate-500">
+                   g 당 금 시세 :{' '}
+                   <span className="text-slate-800 font-black">{formatProductGoldSummary(editProductFormData.weight, editProductFormData.price).perG}</span>
+                 </p>
+               </div>
+
+               <div className="pt-2 border-t border-slate-100 space-y-4">
+                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">추가 · 옵션 및 미디어</p>
+                 <div className="space-y-2">
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">제품 옵션 (콤마로 구분)</label>
+                   <input type="text" placeholder="예: 골드, 실버, 로즈골드" value={editProductFormData.options} onChange={(e) => setEditProductFormData({ ...editProductFormData, options: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+                 </div>
+                 <div className="space-y-2">
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">상세 설명</label>
+                   <textarea rows={2} value={editProductFormData.description} onChange={(e) => setEditProductFormData({ ...editProductFormData, description: e.target.value })} className="w-full p-4 bg-slate-100/50 rounded-xl font-bold outline-none resize-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+                 </div>
+                 <div className="space-y-2 bg-slate-50 p-4 rounded-xl border border-slate-100/80">
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">제품 이미지 교체 (자동 500x500 압축)</label>
+                   <div className="mt-2 flex flex-wrap items-center gap-3">
+                     <label className="bg-white border border-slate-200 px-4 py-2.5 rounded-xl font-bold text-xs text-slate-600 hover:bg-slate-50 cursor-pointer flex items-center gap-2 shadow-sm">
+                       <FileText className="w-4 h-4" /> 이미지 파일 선택
+                       <input type="file" accept="image/*" onChange={(e) => handleProductImageChange(e, 'edit')} className="hidden" />
+                     </label>
+                     <span className="text-xs font-bold text-slate-400 line-clamp-1 flex-1 min-w-0">{editProductFormData.file_name || '파일을 변경하지 않으려면 비워 두세요.'}</span>
+                   </div>
+                 </div>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                   <div className="space-y-2">
+                     <label className="text-xs font-black text-slate-400 tracking-widest pl-1">영상 URL</label>
+                     <input type="url" value={editProductFormData.video_url} onChange={(e) => setEditProductFormData({ ...editProductFormData, video_url: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 outline-none text-sm font-bold border border-transparent focus:border-primary/50 focus:bg-white" />
+                   </div>
+                   <div className="space-y-2">
+                     <label className="text-xs font-black text-slate-400 tracking-widest pl-1">매뉴얼 URL</label>
+                     <input type="url" value={editProductFormData.manual_url} onChange={(e) => setEditProductFormData({ ...editProductFormData, manual_url: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 outline-none text-sm font-bold border border-transparent focus:border-primary/50 focus:bg-white" />
+                   </div>
+                 </div>
+               </div>
+
+               <button type="submit" disabled={submitting} className="w-full h-16 purple-btn text-lg font-black shadow-xl shadow-primary/30 mt-2 disabled:opacity-50">
                  {submitting && <Loader2 className="w-5 h-5 animate-spin" />} 수정 완료
                </button>
             </form>

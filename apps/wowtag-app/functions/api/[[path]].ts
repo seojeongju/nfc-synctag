@@ -210,16 +210,48 @@ app.get('/tags/:uid', async (c) => {
   return c.json(tagInfo || { message: 'not_found' });
 });
 
+async function migrateProductsExtraColumns(db: D1Database) {
+  const stmts = [
+    'ALTER TABLE products ADD COLUMN options TEXT',
+    'ALTER TABLE products ADD COLUMN material TEXT',
+    'ALTER TABLE products ADD COLUMN purity TEXT',
+    'ALTER TABLE products ADD COLUMN weight TEXT',
+    'ALTER TABLE products ADD COLUMN width_mm TEXT',
+    'ALTER TABLE products ADD COLUMN height_mm TEXT',
+    'ALTER TABLE products ADD COLUMN price TEXT',
+    'ALTER TABLE products ADD COLUMN memo TEXT',
+  ];
+  for (const sql of stmts) {
+    try {
+      await db.prepare(sql).run();
+    } catch (_) {}
+  }
+}
+
 // 제품 등록
 app.post('/products', async (c) => {
   try {
-    // products 테이블에 options 컬럼이 없으면 추가 시도 (자동 마이그레이션)
-    try {
-      await c.env.DB.prepare('ALTER TABLE products ADD COLUMN options TEXT').run();
-    } catch (_) {}
+    await migrateProductsExtraColumns(c.env.DB);
 
     const body = await c.req.json();
-    const { name, description, video_url, manual_url, image_url, tag_uid, options, image_file_base64, file_name } = body;
+    const {
+      name,
+      description,
+      video_url,
+      manual_url,
+      image_url,
+      tag_uid,
+      options,
+      image_file_base64,
+      file_name,
+      material,
+      purity,
+      weight,
+      width_mm,
+      height_mm,
+      price,
+      memo,
+    } = body;
 
     if (!name) return c.json({ error: 'Name is required' }, 400);
 
@@ -246,8 +278,27 @@ app.post('/products', async (c) => {
 
     // 2. 제품 생성
     const productResult = await c.env.DB.prepare(
-      'INSERT INTO products (name, description, video_url, manual_url, image_url, options) VALUES (?, ?, ?, ?, ?, ?) RETURNING id'
-    ).bind(name, description, video_url, manual_url, savedImageUrl, options).first();
+      `INSERT INTO products (
+        name, description, video_url, manual_url, image_url, options,
+        material, purity, weight, width_mm, height_mm, price, memo
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
+    )
+      .bind(
+        name,
+        description ?? '',
+        video_url ?? '',
+        manual_url ?? '',
+        savedImageUrl,
+        options ?? '',
+        material ?? '',
+        purity ?? '',
+        weight ?? '',
+        width_mm ?? '',
+        height_mm ?? '',
+        price ?? '',
+        memo ?? ''
+      )
+      .first();
 
     const productId = (productResult as any).id;
 
@@ -267,12 +318,27 @@ app.post('/products', async (c) => {
 // 제품 수정 API
 app.put('/products/:id', async (c) => {
   try {
-    try {
-      await c.env.DB.prepare('ALTER TABLE products ADD COLUMN options TEXT').run();
-    } catch (_) {}
+    await migrateProductsExtraColumns(c.env.DB);
 
     const id = c.req.param('id');
-    const { name, description, video_url, manual_url, image_url, options, image_file_base64, file_name } = await c.req.json();
+    const body = await c.req.json();
+    const {
+      name,
+      description,
+      video_url,
+      manual_url,
+      image_url,
+      options,
+      image_file_base64,
+      file_name,
+      material,
+      purity,
+      weight,
+      width_mm,
+      height_mm,
+      price,
+      memo,
+    } = body;
 
     if (!name) return c.json({ error: 'Name is required' }, 400);
 
@@ -297,9 +363,27 @@ app.put('/products/:id', async (c) => {
 
     await c.env.DB.prepare(`
       UPDATE products 
-      SET name = ?, description = ?, video_url = ?, manual_url = ?, image_url = ?, options = ? 
+      SET name = ?, description = ?, video_url = ?, manual_url = ?, image_url = ?, options = ?,
+          material = ?, purity = ?, weight = ?, width_mm = ?, height_mm = ?, price = ?, memo = ?
       WHERE id = ?
-    `).bind(name, description, video_url, manual_url, savedImageUrl, options, id).run();
+    `)
+      .bind(
+        name,
+        description ?? '',
+        video_url ?? '',
+        manual_url ?? '',
+        savedImageUrl,
+        options ?? '',
+        material ?? '',
+        purity ?? '',
+        weight ?? '',
+        width_mm ?? '',
+        height_mm ?? '',
+        price ?? '',
+        memo ?? '',
+        id
+      )
+      .run();
 
     return c.json({ success: true }, 200);
   } catch (err: any) {
