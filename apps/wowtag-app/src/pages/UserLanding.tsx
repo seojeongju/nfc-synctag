@@ -211,7 +211,7 @@ export default function UserLanding() {
                     <Award className="w-5 h-5" />
                   </div>
                   <div>
-                    <h5 className="font-black text-slate-800 text-sm">나의 소지품 목록</h5>
+                    <h5 className="font-black text-slate-800 text-sm">나의 제품 목록(정품인증서) 바로가기</h5>
                     <p className="text-[11px] font-bold text-slate-400 mt-0.5">내가 스캔하고 등록한 정품 확인</p>
                   </div>
                 </div>
