@@ -203,12 +203,18 @@ export function GuaranteePdfHost({
       await new Promise<void>((resolve) => {
         requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
       });
+      /** 모바일 WebView: 레이아웃·웹폰트 안정화 */
+      await new Promise<void>((r) => setTimeout(r, 150));
       if (cancelled) return;
       try {
         await downloadProductGuaranteePdf(el, data.productName);
       } catch (e) {
         console.error(e);
-        alert('보증서 PDF를 만드는 중 오류가 발생했습니다.');
+        const msg =
+          e instanceof Error && e.message
+            ? e.message
+            : '보증서 PDF를 만드는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.';
+        alert(msg);
       } finally {
         if (!cancelled) onDoneRef.current();
       }
@@ -220,9 +226,25 @@ export function GuaranteePdfHost({
     };
   }, [data]);
 
+  /**
+   * 모바일 Chrome/WebView는 z-index 음수·화면 멀리 떨어진 노드를 레이어에서 생략해
+   * html2canvas가 빈 캔버스/예외로 실패할 수 있음 → 뷰포트 (0,0)에 두고 opacity 0으로만 숨김.
+   */
   return createPortal(
-    <div style={{ position: 'fixed', left: -14000, top: 0, zIndex: -1, pointerEvents: 'none' }} aria-hidden>
-      <div ref={ref}>
+    <div
+      style={{
+        position: 'fixed',
+        left: 0,
+        top: 0,
+        width: 794,
+        opacity: 0,
+        pointerEvents: 'none',
+        zIndex: 2147483646,
+        overflow: 'hidden',
+      }}
+      aria-hidden
+    >
+      <div ref={ref} style={{ width: 794 }}>
         <ProductGuaranteeCertificate data={data} />
       </div>
     </div>,

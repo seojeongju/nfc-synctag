@@ -3,15 +3,53 @@ import { jsPDF } from 'jspdf';
 
 import { sanitizeGuaranteeFileBase } from './guaranteeCertificateData';
 
-export async function downloadProductGuaranteePdf(element: HTMLElement, fileTitle: string) {
-  const canvas = await html2canvas(element, {
-    scale: 2,
+async function renderToCanvas(el: HTMLElement, scale: number) {
+  return html2canvas(el, {
+    scale,
     useCORS: true,
+    allowTaint: false,
     logging: false,
     backgroundColor: '#ffffff',
+    /** 모바일 WebKit에서 foreignObject 경로가 불안정한 경우가 있음 */
+    foreignObjectRendering: false,
   });
+}
 
-  const imgData = canvas.toDataURL('image/png', 1.0);
+export async function downloadProductGuaranteePdf(element: HTMLElement, fileTitle: string) {
+  try {
+    if (typeof document !== 'undefined' && document.fonts?.ready) {
+      await document.fonts.ready;
+    }
+  } catch {
+    /* ignore */
+  }
+  await new Promise<void>((r) => setTimeout(r, 100));
+
+  let canvas: HTMLCanvasElement;
+  try {
+    const dpr = typeof window !== 'undefined' ? Math.min(2, window.devicePixelRatio || 2) : 2;
+    canvas = await renderToCanvas(element, dpr);
+  } catch (first) {
+    console.warn('[guarantee-pdf] html2canvas retry scale=1', first);
+    try {
+      canvas = await renderToCanvas(element, 1);
+    } catch (second) {
+      console.error('[guarantee-pdf] html2canvas failed', second);
+      throw second;
+    }
+  }
+
+  if (!canvas.width || !canvas.height) {
+    throw new Error('보증서 렌더 결과가 비어 있습니다. 화면을 한 번 닫았다가 다시 시도해 주세요.');
+  }
+
+  let imgData: string;
+  try {
+    imgData = canvas.toDataURL('image/png', 1.0);
+  } catch (e) {
+    console.error('[guarantee-pdf] toDataURL', e);
+    throw e;
+  }
   const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
   const pageW = pdf.internal.pageSize.getWidth();
   const pageH = pdf.internal.pageSize.getHeight();
