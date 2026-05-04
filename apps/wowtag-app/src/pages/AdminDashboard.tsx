@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Tag, Package, Plus, Bell, ArrowUpRight, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut, Eye, ChevronDown, ChevronUp } from 'lucide-react';
 
@@ -31,9 +31,6 @@ export default function AdminDashboard() {
     }
   }, [tabParam, navigate]);
 
-  const goToTab = (id: AdminTabId) => {
-    navigate(`/admin/${id}`);
-  };
   const [isAdminGuideOpen, setIsAdminGuideOpen] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
   const [goldbars, setGoldbars] = useState<any[]>([]);
@@ -56,7 +53,7 @@ export default function AdminDashboard() {
   const [isNfcModalOpen, setIsNfcModalOpen] = useState(false);
   const [isGoldbarModalOpen, setIsGoldbarModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  
+
   // 폼 상태 (제품 등록)
   const [productFormData, setProductFormData] = useState({
     name: '',
@@ -148,6 +145,27 @@ export default function AdminDashboard() {
   const [submitting, setSubmitting] = useState(false);
   const [nfcScanning, setNfcScanning] = useState(false);
   const [nfcWriting, setNfcWriting] = useState(false);
+
+  const closeAllAdminModals = useCallback(() => {
+    setIsProductModalOpen(false);
+    setIsEditProductModalOpen(false);
+    setIsNfcModalOpen(false);
+    setIsGoldbarModalOpen(false);
+    setIsEditModalOpen(false);
+    setIsAdminGuideOpen(false);
+  }, []);
+
+  const goToTab = useCallback(
+    (id: AdminTabId) => {
+      closeAllAdminModals();
+      navigate(`/admin/${id}`);
+    },
+    [closeAllAdminModals, navigate]
+  );
+
+  useEffect(() => {
+    closeAllAdminModals();
+  }, [currentTab, closeAllAdminModals]);
 
   const fetchProducts = async () => {
     try {
