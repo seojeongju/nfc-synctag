@@ -49,6 +49,30 @@ export default function UserLanding() {
   const [authName, setAuthName] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
+  type UserLandingTab = 'home' | 'products' | 'myWallet';
+
+  const closeAllUserModals = useCallback(() => {
+    setSelectedProduct(null);
+    setPurchaseSuccess(false);
+    setPurchaseFormData({ name: '', phone: '', memo: '' });
+    setShowGuideModal(false);
+    setIsAlbumModalOpen(false);
+    setIsLoginModalOpen(false);
+    setCurrentGoldbarForAlbum(null);
+  }, []);
+
+  const goToUserTab = useCallback(
+    (tab: UserLandingTab) => {
+      closeAllUserModals();
+      setActiveTab(tab);
+    },
+    [closeAllUserModals]
+  );
+
+  useEffect(() => {
+    closeAllUserModals();
+  }, [activeTab, closeAllUserModals]);
+
   // 앨범 데이터 패치
   const fetchAlbum = async (goldbarId: any) => {
     try {
@@ -506,16 +530,16 @@ export default function UserLanding() {
         </div>
 
         {/* 상단 탭 전환 바 */}
-        <div className="w-full max-w-md bg-white p-1.5 rounded-2xl border border-slate-100/80 flex gap-1 mb-5 shadow-sm">
+        <div className="w-full max-w-md bg-white p-1.5 rounded-2xl border border-slate-100/80 flex gap-1 mb-5 shadow-sm relative z-[140]">
           <button 
-            onClick={() => setActiveTab('home')} 
+            onClick={() => goToUserTab('home')} 
             className={`flex-1 h-12 rounded-xl text-[11px] font-black transition-all flex items-center justify-center gap-1.5 ${activeTab === 'home' ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-md shadow-purple-500/20' : 'text-slate-400 hover:bg-slate-50'}`}
           >
             <Info className="w-4 h-4" />
             홈
           </button>
           <button 
-            onClick={() => setActiveTab('products')} 
+            onClick={() => goToUserTab('products')} 
             className={`flex-1 h-12 rounded-xl text-[11px] font-black transition-all flex items-center justify-center gap-1.5 ${activeTab === 'products' ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-md shadow-purple-500/20' : 'text-slate-400 hover:bg-slate-50'}`}
           >
             <ShoppingCart className="w-4 h-4" />
@@ -547,7 +571,7 @@ export default function UserLanding() {
             <div className="w-full max-w-md grid grid-cols-2 gap-3.5 mb-5">
               {/* 내 소지품 바로가기 */}
               <div 
-                onClick={() => setActiveTab('myWallet')} 
+                onClick={() => goToUserTab('myWallet')} 
                 className="bg-white border border-slate-100/80 rounded-[2rem] p-5 flex flex-col justify-between hover:border-amber-400 hover:shadow-lg transition-all cursor-pointer group shadow-sm min-h-[140px]"
               >
                 <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 group-hover:scale-105 transition-all mb-auto border border-amber-200/40">
@@ -565,7 +589,7 @@ export default function UserLanding() {
                   if (myGoldbars.length > 0) {
                     handleOpenAlbum(myGoldbars[0]);
                   } else {
-                    setActiveTab('myWallet');
+                    goToUserTab('myWallet');
                   }
                 }} 
                 className="bg-white border border-slate-100/80 rounded-[2rem] p-5 flex flex-col justify-between hover:border-emerald-400 hover:shadow-lg transition-all cursor-pointer group shadow-sm min-h-[140px]"
@@ -767,7 +791,7 @@ export default function UserLanding() {
 
         {/* 제품 상세 & 구매 문의 폼 모달 */}
         {selectedProduct && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 lg:p-4">
+          <div className="fixed inset-0 z-[130] flex items-end sm:items-center justify-center p-0 lg:p-4">
             <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setSelectedProduct(null)}></div>
             <div className="relative w-full max-w-md bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh] overflow-hidden">
               <header className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/40">
@@ -864,7 +888,7 @@ export default function UserLanding() {
 
         {/* 일반 가입자 간편 로그인/회원가입 모달 */}
         {isLoginModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 lg:p-4">
+          <div className="fixed inset-0 z-[130] flex items-end sm:items-center justify-center p-0 lg:p-4">
             <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setIsLoginModalOpen(false)}></div>
             <div className="relative w-full max-w-md bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh] overflow-hidden">
               <header className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/40">
@@ -923,7 +947,7 @@ export default function UserLanding() {
 
         {/* 추억 전자 앨범 모달 */}
         {isAlbumModalOpen && currentGoldbarForAlbum && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 lg:p-4">
+          <div className="fixed inset-0 z-[130] flex items-end sm:items-center justify-center p-0 lg:p-4">
             <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setIsAlbumModalOpen(false)}></div>
             <div className="relative w-full max-w-md bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh] overflow-hidden">
               <header className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/40">
@@ -999,7 +1023,7 @@ export default function UserLanding() {
 
         {/* 사용방법 가이드 모달 */}
         {showGuideModal && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 lg:p-4">
+          <div className="fixed inset-0 z-[130] flex items-end sm:items-center justify-center p-0 lg:p-4">
             <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setShowGuideModal(false)}></div>
             <div className="relative w-full max-w-md bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh] overflow-hidden">
               <header className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/40">
