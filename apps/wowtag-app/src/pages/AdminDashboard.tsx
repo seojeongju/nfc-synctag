@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Tag, Package, Plus, Bell, ArrowUpRight, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Link2Off, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut, Eye, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
+import { LayoutDashboard, Tag, Package, Plus, Bell, ArrowUpRight, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Link2Off, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut, Eye, ChevronDown, ChevronUp, RefreshCw, Download } from 'lucide-react';
 import { ImeTextInput } from '../components/ImeTextInput';
+import { GuaranteePdfHost } from '../components/ProductGuaranteeCertificate';
+import { mapProductToGuaranteeData } from '../lib/guaranteeCertificateData';
+import type { GuaranteeCertificateData } from '../lib/guaranteeCertificateData';
 
 const ADMIN_TAB_IDS = ['dashboard', 'products', 'nfc', 'goldbars', 'userGoldbars'] as const;
 type AdminTabId = (typeof ADMIN_TAB_IDS)[number];
@@ -380,6 +383,8 @@ export default function AdminDashboard() {
   } | null>(null);
   /** 판매 완료 제품: NFC 스캔 후 매칭 해제 */
   const [unmapSoldModalTag, setUnmapSoldModalTag] = useState<any | null>(null);
+  /** 제품 보증서 PDF 생성 (화면 밖 렌더 → html2canvas) */
+  const [guaranteePdfPayload, setGuaranteePdfPayload] = useState<GuaranteeCertificateData | null>(null);
 
   const nfcProductTags = useMemo(() => allTags.filter((t: any) => t.target_type === 'product'), [allTags]);
   const nfcUnlinkedList = useMemo(
@@ -1602,6 +1607,15 @@ export default function AdminDashboard() {
                         )}
                       </div>
                       <div className="shrink-0 flex flex-col sm:flex-row items-end sm:items-start gap-0.5 pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setGuaranteePdfPayload(mapProductToGuaranteeData(p as Record<string, unknown>))}
+                          className="p-2 rounded-lg sm:rounded-xl hover:bg-amber-50 text-slate-400 hover:text-amber-700 transition-all"
+                          aria-label="제품 보증서 PDF"
+                          title="제품 보증서 PDF"
+                        >
+                          <Download className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+                        </button>
                         <button type="button" onClick={() => handleEditProductOpen(p)} className="p-2 rounded-lg sm:rounded-xl hover:bg-slate-50 text-slate-400 hover:text-primary transition-all" aria-label="수정">
                           <Edit3 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                         </button>
@@ -2683,6 +2697,10 @@ export default function AdminDashboard() {
             </button>
           </div>
         </div>
+      )}
+
+      {guaranteePdfPayload && (
+        <GuaranteePdfHost data={guaranteePdfPayload} onDone={() => setGuaranteePdfPayload(null)} />
       )}
 
       {/* NFC 태그 관리 모달 (NFC 전용 도구) */}

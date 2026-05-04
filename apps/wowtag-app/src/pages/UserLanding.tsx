@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { Download, Play, ChevronRight, Bookmark, Loader2, Award, ShieldCheck, ShoppingCart, Info, CheckCircle2, MessageSquare, X, BookOpen, Smartphone, LogOut } from 'lucide-react';
+import { GuaranteePdfHost } from '../components/ProductGuaranteeCertificate';
+import { mapProductToGuaranteeData } from '../lib/guaranteeCertificateData';
+import type { GuaranteeCertificateData } from '../lib/guaranteeCertificateData';
 
 /** Chrome BeforeInstallPromptEvent (lib.dom에 없을 수 있음) */
 type AnyBeforeInstallPrompt = {
@@ -38,6 +41,7 @@ export default function UserLanding() {
   });
   const [purchaseSuccess, setPurchaseSuccess] = useState(false);
   const [showGuideModal, setShowGuideModal] = useState(false);
+  const [userGuaranteePdf, setUserGuaranteePdf] = useState<GuaranteeCertificateData | null>(null);
 
   // 전자 앨범 관련 상태
   const [isAlbumModalOpen, setIsAlbumModalOpen] = useState(false);
@@ -868,6 +872,16 @@ export default function UserLanding() {
                     </div>
                   )}
 
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setUserGuaranteePdf(mapProductToGuaranteeData(selectedProduct as Record<string, unknown>))
+                    }
+                    className="w-full h-12 rounded-2xl border border-amber-200/80 bg-amber-50 text-amber-900 font-black text-xs flex items-center justify-center gap-2 hover:bg-amber-100 transition-all shadow-sm"
+                  >
+                    <Download className="w-4 h-4 shrink-0" /> 제품 보증서 PDF 저장
+                  </button>
+
                   {/* 구매/상담 신청 폼 */}
                   <form onSubmit={handlePurchaseSubmit} className="bg-slate-50/80 p-5 rounded-[1.8rem] border border-slate-100/60 space-y-4">
                     <div className="flex items-center gap-2 mb-2">
@@ -1067,6 +1081,10 @@ export default function UserLanding() {
               </div>
             </div>
           </div>
+        )}
+
+        {userGuaranteePdf && (
+          <GuaranteePdfHost data={userGuaranteePdf} onDone={() => setUserGuaranteePdf(null)} />
         )}
 
         {/* 푸터 */}
