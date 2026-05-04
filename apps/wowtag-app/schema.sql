@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS products (
     video_url TEXT,
     manual_url TEXT,
     image_url TEXT,
+    sold_at TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

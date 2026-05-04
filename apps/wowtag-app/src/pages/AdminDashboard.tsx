@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Tag, Package, Plus, Bell, ArrowUpRight, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut, Eye, ChevronDown, ChevronUp } from 'lucide-react';
+import { LayoutDashboard, Tag, Package, Plus, Bell, ArrowUpRight, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Link2Off, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut, Eye, ChevronDown, ChevronUp } from 'lucide-react';
 
 const ADMIN_TAB_IDS = ['dashboard', 'products', 'nfc', 'goldbars', 'userGoldbars'] as const;
 type AdminTabId = (typeof ADMIN_TAB_IDS)[number];
@@ -90,7 +90,9 @@ export default function AdminDashboard() {
     image_url: '/jewelry.png',
     options: '',
     image_file_base64: '',
-    file_name: ''
+    file_name: '',
+    /** 판매 완료 시 태그 매칭 해제에 NFC 인증 필요 */
+    sold: false
   });
 
   // 폼 상태 (NFC 매핑)
@@ -156,6 +158,8 @@ export default function AdminDashboard() {
     productName: string | null;
     createdAt?: string;
   } | null>(null);
+  /** 판매 완료 제품: NFC 스캔 후 매칭 해제 */
+  const [unmapSoldModalTag, setUnmapSoldModalTag] = useState<any | null>(null);
 
   const nfcProductTags = useMemo(() => allTags.filter((t: any) => t.target_type === 'product'), [allTags]);
   const nfcUnlinkedList = useMemo(
@@ -175,7 +179,61 @@ export default function AdminDashboard() {
     setIsEditModalOpen(false);
     setIsAdminGuideOpen(false);
     setNfcExistingSnapshot(null);
+    setUnmapSoldModalTag(null);
   }, []);
+
+  const adminAuthHeaders = (): HeadersInit => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null;
+    return {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+  };
+
+  const executeTagUnmap = async (tagUid: string) => {
+    const res = await fetch(`/api/tags/${encodeURIComponent(tagUid)}/unmap`, {
+      method: 'POST',
+      headers: adminAuthHeaders(),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      if (data?.code === 'NEEDS_NFC_SCAN') {
+        alert(data?.error || '실제 NFC 태그를 스캔한 뒤 다시 시도해 주세요.');
+      } else {
+        alert(data?.error || '매칭 해제에 실패했습니다.');
+      }
+      return false;
+    }
+    alert('매칭이 해제되었습니다. 태그는 출고 전 자산 목록으로 이동합니다.');
+    fetchTags();
+    return true;
+  };
+
+  const handleUnmapTagClick = (t: any) => {
+    if (!t?.tag_uid) return;
+    if (t.product_sold_at) {
+      setUnmapSoldModalTag(t);
+      return;
+    }
+    if (
+      !confirm(
+        '이 태그와 제품의 매칭을 해제할까요?\n태그는 「① UID만 등록된 태그」 목록(출고 전 자산)으로 돌아갑니다.'
+      )
+    ) {
+      return;
+    }
+    void executeTagUnmap(t.tag_uid);
+  };
+
+  const copyUnmapScanUrl = async (tagUid: string) => {
+    const url = `${window.location.origin}/t/${encodeURIComponent(tagUid)}?unmap=1`;
+    try {
+      await navigator.clipboard.writeText(url);
+      alert('링크가 복사되었습니다. 태그 스캔으로 이 주소를 여세요.');
+    } catch {
+      prompt('아래 URL을 복사해 태그에 연결된 기기에서 여세요:', url);
+    }
+  };
 
   const goToTab = useCallback(
     (id: AdminTabId) => {
@@ -542,7 +600,8 @@ export default function AdminDashboard() {
       image_url: p.image_url || '/jewelry.png',
       options: p.options || '',
       image_file_base64: '',
-      file_name: ''
+      file_name: '',
+      sold: !!p.sold_at
     });
     setIsEditProductModalOpen(true);
   };
@@ -555,7 +614,7 @@ export default function AdminDashboard() {
       const res = await fetch(`/api/products/${editProductFormData.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editProductFormData)
+        body: JSON.stringify(editProductFormData),
       });
       if (res.ok) {
         setIsEditProductModalOpen(false);
@@ -1176,7 +1235,14 @@ export default function AdminDashboard() {
                         <img src={p.image_url.startsWith('/') ? p.image_url : p.image_url} alt="" className="w-full h-full object-cover" />
                       </div>
                       <div className="flex-1 min-w-0 pt-0.5">
-                        <h4 className="font-black text-slate-800 text-base sm:text-lg break-words line-clamp-2">{p.name}</h4>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <h4 className="font-black text-slate-800 text-base sm:text-lg break-words line-clamp-2">{p.name}</h4>
+                          {p.sold_at ? (
+                            <span className="text-[10px] font-black uppercase tracking-wider bg-rose-50 text-rose-700 px-2 py-0.5 rounded-lg border border-rose-100 shrink-0">
+                              판매완료
+                            </span>
+                          ) : null}
+                        </div>
                         <p className="text-xs text-slate-400 font-bold line-clamp-2 mt-0.5 break-words">{p.description || '상세 설명 없음'}</p>
                       </div>
                       <div className="shrink-0 flex flex-col sm:flex-row items-end sm:items-start gap-0.5 pt-0.5">
@@ -1371,7 +1437,9 @@ export default function AdminDashboard() {
                   <div>
                     <h3 className="text-lg sm:text-xl font-black text-slate-900">② 제품과 매칭된 태그</h3>
                     <p className="text-xs font-bold text-slate-500 mt-1">
-                      출고·스캔 연동이 완료된 태그입니다. 발행 화면에서 제품 변경·URL 재기록(덮어쓰기)이 가능합니다.
+                      출고·스캔 연동이 완료된 태그입니다. 발행 화면에서 제품 변경·URL 재기록(덮어쓰기)이 가능합니다.{' '}
+                      <span className="text-emerald-700">판매 완료</span>로 표시된 제품에 붙은 태그는 실제 NFC 스캔 인증 후에만
+                      매칭 해제됩니다.
                     </p>
                   </div>
                   <span className="text-xs font-black text-emerald-800 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
@@ -1397,15 +1465,27 @@ export default function AdminDashboard() {
                             {t.created_at
                               ? new Date(t.created_at).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' })
                               : '-'}
+                            {t.product_sold_at ? (
+                              <span className="ml-2 text-rose-700 font-black">· 판매완료 제품</span>
+                            ) : null}
                           </p>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => openNfcModalFromTag(t)}
-                          className="shrink-0 h-10 px-4 rounded-xl bg-emerald-600 text-white text-xs font-black shadow-sm hover:bg-emerald-700 transition-all self-start sm:self-center flex items-center gap-1.5"
-                        >
-                          <Edit3 className="w-4 h-4" /> 재매핑·재발행
-                        </button>
+                        <div className="flex flex-col gap-2 shrink-0 self-start sm:self-center w-full sm:w-auto">
+                          <button
+                            type="button"
+                            onClick={() => openNfcModalFromTag(t)}
+                            className="h-10 px-4 rounded-xl bg-emerald-600 text-white text-xs font-black shadow-sm hover:bg-emerald-700 transition-all flex items-center justify-center gap-1.5 w-full sm:w-auto"
+                          >
+                            <Edit3 className="w-4 h-4" /> 재매핑·재발행
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleUnmapTagClick(t)}
+                            className="h-10 px-4 rounded-xl border border-slate-200 bg-white text-slate-800 text-xs font-black hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5 w-full sm:w-auto"
+                          >
+                            <Link2Off className="w-4 h-4" /> 매칭 해제
+                          </button>
+                        </div>
                       </div>
                     ))}
                   {nfcLinkedList.length === 0 && (
@@ -1933,6 +2013,18 @@ export default function AdminDashboard() {
                  <input type="text" placeholder="메모를 입력해 주세요" value={editProductFormData.memo} onChange={(e) => setEditProductFormData({ ...editProductFormData, memo: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
                </div>
 
+               <label className="flex items-start gap-3 rounded-xl border border-rose-100 bg-rose-50/40 px-4 py-3 cursor-pointer">
+                 <input
+                   type="checkbox"
+                   checked={editProductFormData.sold}
+                   onChange={(e) => setEditProductFormData({ ...editProductFormData, sold: e.target.checked })}
+                   className="mt-1 size-4 rounded border-rose-200 text-rose-600 focus:ring-rose-400"
+                 />
+                 <span className="text-xs font-bold text-slate-700 leading-relaxed">
+                   <span className="font-black text-rose-800">판매 완료</span>로 표시합니다. 표시 후 이 제품에 매칭된 태그는 관리자 화면에서 바로 해제할 수 없으며, NFC로 태그를 스캔해 인증한 뒤에만 매칭 해제됩니다.
+                 </span>
+               </label>
+
                <div className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3 space-y-1.5">
                  <p className="text-xs font-bold text-slate-500">
                    현재 금 시세 :{' '}
@@ -1980,6 +2072,62 @@ export default function AdminDashboard() {
                  {submitting && <Loader2 className="w-5 h-5 animate-spin" />} 수정 완료
                </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {unmapSoldModalTag && (
+        <div className="fixed inset-0 z-[125] flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div
+            className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
+            onClick={() => setUnmapSoldModalTag(null)}
+            aria-hidden
+          />
+          <div className="relative w-full max-w-md bg-white rounded-t-[2rem] sm:rounded-3xl shadow-2xl p-6 sm:p-8 animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-start gap-3 mb-4">
+              <div>
+                <h3 className="text-lg font-black text-slate-900">판매 완료 제품 — NFC 인증</h3>
+                <p className="text-xs font-bold text-slate-500 mt-1 leading-relaxed">
+                  아래 링크로 태그를 스캔(또는 열기)한 뒤, 15분 이내에 여기서 해제를 완료하세요.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setUnmapSoldModalTag(null)}
+                className="p-2 rounded-xl text-slate-400 hover:bg-slate-50"
+                aria-label="닫기"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-xs font-mono font-bold text-slate-800 break-all bg-slate-50 border border-slate-100 rounded-xl p-3 mb-3">
+              {unmapSoldModalTag.tag_uid}
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2 mb-4">
+              <button
+                type="button"
+                onClick={() => copyUnmapScanUrl(unmapSoldModalTag.tag_uid)}
+                className="flex-1 h-11 rounded-xl border border-slate-200 bg-white text-slate-800 text-xs font-black hover:bg-slate-50"
+              >
+                인증 URL 복사
+              </button>
+              <a
+                href={`/t/${encodeURIComponent(unmapSoldModalTag.tag_uid)}?unmap=1`}
+                className="flex-1 h-11 rounded-xl bg-slate-900 text-white text-xs font-black flex items-center justify-center no-underline hover:bg-slate-800"
+              >
+                이 기기에서 열기
+              </a>
+            </div>
+            <button
+              type="button"
+              onClick={async () => {
+                const ok = await executeTagUnmap(unmapSoldModalTag.tag_uid);
+                if (ok) setUnmapSoldModalTag(null);
+              }}
+              className="w-full h-12 rounded-xl bg-rose-600 text-white text-sm font-black hover:bg-rose-700 transition-all"
+            >
+              스캔 완료 — 매칭 해제 실행
+            </button>
           </div>
         </div>
       )}

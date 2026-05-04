@@ -16,6 +16,8 @@ export default function UserLanding() {
   const [goldbar, setGoldbar] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** /t/:id?unmap=1 — 판매 제품 태그 매칭 해제용 NFC 인증 기록 완료 */
+  const [adminUnmapScanOk, setAdminUnmapScanOk] = useState(false);
 
   // 소비자 탭 (태그 없을 때)
   const [activeTab, setActiveTab] = useState<'home' | 'products' | 'myWallet'>('home');
@@ -341,6 +343,25 @@ export default function UserLanding() {
         }
         return;
       }
+
+      const unmapIntent = new URLSearchParams(location.search).get('unmap') === '1';
+      if (unmapIntent) {
+        try {
+          const vr = await fetch(`/api/t/${encodeURIComponent(tagId)}?unmap_verify=1`);
+          if (!vr.ok) {
+            setError('태그를 찾을 수 없거나 등록되지 않았습니다.');
+            setLoading(false);
+            return;
+          }
+          setAdminUnmapScanOk(true);
+          setLoading(false);
+          return;
+        } catch (e: any) {
+          setError(e?.message || '인증 기록에 실패했습니다.');
+          setLoading(false);
+          return;
+        }
+      }
       
       try {
         // 1. 카탈로그 NFC 태그 (자산만 / 제품연결 — 메인으로 안내)
@@ -375,7 +396,7 @@ export default function UserLanding() {
       }
     }
     fetchData();
-  }, [tagId, navigate]);
+  }, [tagId, navigate, location.search]);
 
   const handlePurchaseSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -427,6 +448,26 @@ export default function UserLanding() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
         <Loader2 className="w-10 h-10 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  // 관리자 매칭 해제용 NFC 인증 (판매 완료 제품)
+  if (tagId && adminUnmapScanOk) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F0FDF4] p-6 text-center">
+        <div className="w-16 h-16 bg-emerald-100 border border-emerald-200 rounded-3xl flex items-center justify-center text-emerald-600 mb-4">
+          <CheckCircle2 className="w-9 h-9" />
+        </div>
+        <h3 className="text-xl font-black text-slate-800 tracking-tight">태그 인증이 기록되었습니다</h3>
+        <p className="text-xs font-bold text-slate-500 mt-2 max-w-sm leading-relaxed">
+          관리자 화면(태그 탭)에서 같은 태그의 <span className="text-emerald-700">「매칭 해제」</span>를 눌러
+          해제를 완료하세요. 이 화면은 15분 이내에 연결됩니다.
+        </p>
+        <p className="text-[10px] font-mono font-bold text-slate-400 mt-4 break-all max-w-full">{tagId}</p>
+        <Link to="/" className="mt-8 text-xs font-black text-emerald-700 hover:underline">
+          홈으로 이동
+        </Link>
       </div>
     );
   }

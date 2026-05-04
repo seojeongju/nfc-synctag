@@ -258,6 +258,7 @@ async function migrateProductsExtraColumns(db: D1Database) {
     'ALTER TABLE products ADD COLUMN height_mm TEXT',
     'ALTER TABLE products ADD COLUMN price TEXT',
     'ALTER TABLE products ADD COLUMN memo TEXT',
+    'ALTER TABLE products ADD COLUMN sold_at TEXT',
   ];
   for (const sql of stmts) {
     try {
@@ -265,6 +266,37 @@ async function migrateProductsExtraColumns(db: D1Database) {
     } catch (_) {}
   }
 }
+
+async function ensureTagUnmapProofsTable(db: D1Database) {
+  await db
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS tag_unmap_proofs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tag_uid TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )`
+    )
+    .run();
+}
+
+function verifyAdminToken(c: { req: { header: (name: string) => string | undefined }; env: Bindings }): boolean {
+  const auth = c.req.header('Authorization');
+  const alt = c.req.header('X-Admin-Token');
+  const raw = auth?.startsWith('Bearer ') ? auth.slice(7) : alt;
+  if (!raw) return false;
+  try {
+    const decoded = atob(raw);
+    const validPassword = c.env.ADMIN_PASSWORD || 'wowtag2026!';
+    const parts = decoded.split(':');
+    if (parts.length < 3) return false;
+    const [email, password] = parts;
+    return email === 'admin@wowtag.com' && password === validPassword;
+  } catch {
+    return false;
+  }
+}
+
+const UNMAP_PROOF_MAX_AGE_MIN = 15;
 
 // 제품 등록
 app.post('/products', async (c) => {
@@ -376,9 +408,12 @@ app.put('/products/:id', async (c) => {
       height_mm,
       price,
       memo,
+      sold,
     } = body;
 
     if (!name) return c.json({ error: 'Name is required' }, 400);
+
+    const soldInBody = Object.prototype.hasOwnProperty.call(body, 'sold');
 
     let savedImageUrl = image_url;
 
@@ -399,29 +434,83 @@ app.put('/products/:id', async (c) => {
       savedImageUrl = `/api/products/image/${r2Path}`;
     }
 
-    await c.env.DB.prepare(`
+    if (soldInBody && sold === true) {
+      const mark = new Date().toISOString();
+      await c.env.DB.prepare(`
+      UPDATE products 
+      SET name = ?, description = ?, video_url = ?, manual_url = ?, image_url = ?, options = ?,
+          material = ?, purity = ?, weight = ?, width_mm = ?, height_mm = ?, price = ?, memo = ?,
+          sold_at = COALESCE(sold_at, ?)
+      WHERE id = ?
+    `)
+        .bind(
+          name,
+          description ?? '',
+          video_url ?? '',
+          manual_url ?? '',
+          savedImageUrl,
+          options ?? '',
+          material ?? '',
+          purity ?? '',
+          weight ?? '',
+          width_mm ?? '',
+          height_mm ?? '',
+          price ?? '',
+          memo ?? '',
+          mark,
+          id
+        )
+        .run();
+    } else if (soldInBody && sold === false) {
+      await c.env.DB.prepare(`
+      UPDATE products 
+      SET name = ?, description = ?, video_url = ?, manual_url = ?, image_url = ?, options = ?,
+          material = ?, purity = ?, weight = ?, width_mm = ?, height_mm = ?, price = ?, memo = ?,
+          sold_at = NULL
+      WHERE id = ?
+    `)
+        .bind(
+          name,
+          description ?? '',
+          video_url ?? '',
+          manual_url ?? '',
+          savedImageUrl,
+          options ?? '',
+          material ?? '',
+          purity ?? '',
+          weight ?? '',
+          width_mm ?? '',
+          height_mm ?? '',
+          price ?? '',
+          memo ?? '',
+          id
+        )
+        .run();
+    } else {
+      await c.env.DB.prepare(`
       UPDATE products 
       SET name = ?, description = ?, video_url = ?, manual_url = ?, image_url = ?, options = ?,
           material = ?, purity = ?, weight = ?, width_mm = ?, height_mm = ?, price = ?, memo = ?
       WHERE id = ?
     `)
-      .bind(
-        name,
-        description ?? '',
-        video_url ?? '',
-        manual_url ?? '',
-        savedImageUrl,
-        options ?? '',
-        material ?? '',
-        purity ?? '',
-        weight ?? '',
-        width_mm ?? '',
-        height_mm ?? '',
-        price ?? '',
-        memo ?? '',
-        id
-      )
-      .run();
+        .bind(
+          name,
+          description ?? '',
+          video_url ?? '',
+          manual_url ?? '',
+          savedImageUrl,
+          options ?? '',
+          material ?? '',
+          purity ?? '',
+          weight ?? '',
+          width_mm ?? '',
+          height_mm ?? '',
+          price ?? '',
+          memo ?? '',
+          id
+        )
+        .run();
+    }
 
     return c.json({ success: true }, 200);
   } catch (err: any) {
@@ -543,8 +632,11 @@ app.put('/tags/link-product', async (c) => {
 // 모든 NFC 태그 목록 및 매핑 조회 API
 app.get('/tags', async (c) => {
   try {
+    await migrateProductsExtraColumns(c.env.DB);
+
     const { results: productTags } = await c.env.DB.prepare(`
-      SELECT t.id, t.tag_uid, t.created_at, p.id as target_id, p.name as target_name, 'product' as target_type
+      SELECT t.id, t.tag_uid, t.created_at, p.id as target_id, p.name as target_name,
+             p.sold_at as product_sold_at, 'product' as target_type
       FROM tags t
       LEFT JOIN products p ON t.product_id = p.id
       ORDER BY t.created_at DESC
@@ -559,6 +651,70 @@ app.get('/tags', async (c) => {
 
     const allTags = [...productTags, ...goldbarTags];
     return c.json(allTags);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// 제품-태그 매칭 해제 (product_id → NULL, 행 유지) — 미판매는 관리자만, 판매 완료 제품은 최근 NFC 인증 필요
+app.post('/tags/:uid/unmap', async (c) => {
+  try {
+    if (!verifyAdminToken(c)) {
+      return c.json({ error: '관리자 인증이 필요합니다.' }, 401);
+    }
+    await migrateProductsExtraColumns(c.env.DB);
+    await ensureTagUnmapProofsTable(c.env.DB);
+
+    const uid = c.req.param('uid');
+    const row = await c.env.DB.prepare(
+      `
+      SELECT t.tag_uid, t.product_id, p.sold_at as product_sold_at
+      FROM tags t
+      LEFT JOIN products p ON p.id = t.product_id
+      WHERE t.tag_uid = ?
+    `
+    )
+      .bind(uid)
+      .first();
+
+    if (!row) {
+      return c.json({ error: '등록된 태그를 찾을 수 없습니다.' }, 404);
+    }
+    if (row.product_id == null) {
+      return c.json({ error: '이미 제품과 매칭되지 않은 태그입니다.' }, 400);
+    }
+
+    const isSold = row.product_sold_at != null && String(row.product_sold_at).trim() !== '';
+
+    if (isSold) {
+      const cutoff = new Date(Date.now() - UNMAP_PROOF_MAX_AGE_MIN * 60 * 1000).toISOString();
+      const proof = await c.env.DB.prepare(
+        `
+        SELECT id FROM tag_unmap_proofs
+        WHERE tag_uid = ? AND created_at > ?
+        ORDER BY id DESC
+        LIMIT 1
+      `
+      )
+        .bind(uid, cutoff)
+        .first();
+
+      if (!proof) {
+        return c.json(
+          {
+            error: '판매 완료된 제품입니다. 실제 NFC 태그를 스캔한 뒤 다시 시도해 주세요.',
+            code: 'NEEDS_NFC_SCAN',
+          },
+          403
+        );
+      }
+
+      await c.env.DB.prepare('DELETE FROM tag_unmap_proofs WHERE id = ?').bind(proof.id).run();
+    }
+
+    await c.env.DB.prepare('UPDATE tags SET product_id = NULL WHERE tag_uid = ?').bind(uid).run();
+
+    return c.json({ success: true });
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
   }
@@ -584,6 +740,7 @@ app.delete('/tags/:uid', async (c) => {
 // 특정 태그(NFC) 스캔 — 자산만 등록된 태그 / 제품 연결 태그 모두 메인 안내용 JSON (제품 상세 페이지 대신 앱 메인 유도)
 app.get('/t/:tagId', async (c) => {
   const tagId = c.req.param('tagId');
+  const unmapVerify = c.req.query('unmap_verify') === '1';
 
   const row = await c.env.DB.prepare(`
     SELECT t.tag_uid, t.product_id, p.id as product_pk
@@ -604,11 +761,18 @@ app.get('/t/:tagId', async (c) => {
       .run()
   );
 
+  if (unmapVerify) {
+    await ensureTagUnmapProofsTable(c.env.DB);
+    const now = new Date().toISOString();
+    await c.env.DB.prepare('INSERT INTO tag_unmap_proofs (tag_uid, created_at) VALUES (?, ?)').bind(tagId, now).run();
+  }
+
   if (row.product_id == null || row.product_pk == null) {
     return c.json({
       nfc_mode: 'asset',
       tag_uid: tagId,
       message: '출고 전 등록된 자산 태그입니다.',
+      ...(unmapVerify ? { unmap_proof_recorded: true } : {}),
     });
   }
 
@@ -616,6 +780,7 @@ app.get('/t/:tagId', async (c) => {
     nfc_mode: 'home',
     tag_uid: tagId,
     message: 'Gold SyncTag 정품 NFC 태그입니다.',
+    ...(unmapVerify ? { unmap_proof_recorded: true } : {}),
   });
 });
 
