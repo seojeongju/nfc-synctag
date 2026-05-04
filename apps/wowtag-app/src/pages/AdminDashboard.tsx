@@ -618,7 +618,7 @@ export default function AdminDashboard() {
                   <h3 className="text-lg font-black text-slate-800">정품인증 태그(NFC) 등록 및 출고 프로세스 가이드</h3>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* 1단계 */}
                   <div 
                     onClick={() => setActiveGuide(activeGuide === 1 ? null : 1)}
