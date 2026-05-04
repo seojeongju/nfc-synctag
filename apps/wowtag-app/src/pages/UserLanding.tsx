@@ -1,6 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Download, Play, ChevronRight, Bookmark, Loader2, Award, ShieldCheck, ShoppingCart, Info, CheckCircle2, MessageSquare, X, BookOpen, Smartphone, LogOut } from 'lucide-react';
+
+/** Chrome BeforeInstallPromptEvent (lib.dom에 없을 수 있음) */
+type AnyBeforeInstallPrompt = {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+};
 
 export default function UserLanding() {
   const { tagId } = useParams();
@@ -14,7 +20,10 @@ export default function UserLanding() {
   const [allProducts, setAllProducts] = useState<any[]>([]);
   const [myGoldbars, setMyGoldbars] = useState<any[]>([]);
   const [scanningToWallet, setScanningToWallet] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  /** Chrome/Edge: beforeinstallprompt — 동일 인스턴스는 prompt() 1회만. ref로 보관 */
+  const installPromptRef = useRef<AnyBeforeInstallPrompt | null>(null);
+  const [installPromptReady, setInstallPromptReady] = useState(false);
+  const [isIosDevice, setIsIosDevice] = useState(false);
 
   // 상세 모달 상태
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
@@ -172,28 +181,73 @@ export default function UserLanding() {
     alert('로그아웃 되었습니다.');
   };
 
-  // PWA 설치 이벤트 캡처
+  const isStandalonePwa =
+    typeof window !== 'undefined' &&
+    (window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as Navigator & { standalone?: boolean }).standalone === true);
+
   useEffect(() => {
-    const handleBeforeInstallPrompt = (e: any) => {
+    const ua = navigator.userAgent || '';
+    const iOS =
+      /iPad|iPhone|iPod/.test(ua) ||
+      (navigator.platform === 'MacIntel' && (navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints! > 1);
+    setIsIosDevice(iOS);
+  }, []);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e);
+      installPromptRef.current = e as unknown as AnyBeforeInstallPrompt;
+      setInstallPromptReady(true);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
 
-  const handleInstallApp = async () => {
-    if (!deferredPrompt) {
-      alert('이미 설치되어 있거나 현재 브라우저가 앱 설치를 지원하지 않습니다.\n안드로이드 크롬 또는 삼성 인터넷 등을 이용해 주시기 바랍니다.\n\n해결 방법:\n1. 브라우저 우측 상단 메뉴(점 3개)를 누릅니다.\n2. [홈 화면에 추가] 또는 [앱 설치] 버튼을 눌러 설치해 주세요.');
+  const showInstallBanner = !isStandalonePwa && (installPromptReady || isIosDevice);
+
+  const handleInstallApp = useCallback(async () => {
+    if (isStandalonePwa) {
+      alert('이미 앱(홈 화면 설치) 모드에서 실행 중입니다.');
       return;
     }
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setDeferredPrompt(null);
+
+    if (isIosDevice) {
+      alert(
+        'iPhone/iPad Safari에서는 다음 순서로 추가할 수 있습니다.\n\n' +
+          '1) 하단 공유 버튼(□↑) 을 누른 뒤\n' +
+          '2) 「홈 화면에 추가」를 선택해 주세요.\n\n' +
+          'Chrome 앱이 아닌 Safari로 열어 주시면 설치가 더 안정적입니다.'
+      );
+      return;
     }
-  };
+
+    const p = installPromptRef.current;
+    if (!p) {
+      alert(
+        '이 환경에서는 자동 설치 창을 띄울 수 없습니다.\n\n' +
+          '【안드로이드 Chrome】\n' +
+          '1) 주소창 오른쪽의 ⊕ 설치 아이콘을 누르거나\n' +
+          '2) 우측 상단 ⋮ 메뉴 → 「앱 설치」 또는 「홈 화면에 추가」\n\n' +
+          '인스타/카카오 등 앱 안 웹뷰가 아닌, Chrome으로 사이트를 열어 주세요.'
+      );
+      return;
+    }
+
+    try {
+      await p.prompt();
+      await p.userChoice;
+    } catch (err) {
+      console.error('[PWA] install prompt failed', err);
+      alert(
+        '설치 창을 열지 못했습니다. Chrome을 최신으로 유지한 뒤, 주소창의 설치(⊕) 아이콘 또는 ⋮ 메뉴의 「앱 설치」를 이용해 주세요.'
+      );
+    } finally {
+      installPromptRef.current = null;
+      setInstallPromptReady(false);
+    }
+  }, [isIosDevice, isStandalonePwa]);
 
   // 해시 기반 탭 네비게이션 구현 (모바일 뒤로가기 대응)
   useEffect(() => {
@@ -392,22 +446,25 @@ export default function UserLanding() {
           )}
         </header>
 
-        {/* PWA 설치 유도 배너 */}
-        {deferredPrompt && (
-          <div className="w-full max-w-md bg-gradient-to-r from-amber-50 to-orange-50/50 border border-amber-200/50 rounded-2xl p-4 mb-4 flex items-center justify-between shadow-sm animate-in fade-in duration-300">
-            <div>
+        {/* PWA 설치 유도 (Chrome: 이벤트 수신 시 / iOS: 수동 안내) */}
+        {showInstallBanner && (
+          <div className="w-full max-w-md bg-gradient-to-r from-amber-50 to-orange-50/50 border border-amber-200/50 rounded-2xl p-4 mb-4 flex items-center justify-between gap-3 shadow-sm animate-in fade-in duration-300">
+            <div className="min-w-0 flex-1">
               <h5 className="font-black text-slate-800 text-xs flex items-center gap-1.5">
                 <span>📱</span> Gold SyncTag 전용 앱 설치
               </h5>
               <p className="text-[10px] font-bold text-slate-500 mt-0.5">
-                앱으로 설치하여 더욱 편리하게 정품인증을 이용해 보세요.
+                {isIosDevice
+                  ? 'Safari에서 홈 화면에 추가하면 앱처럼 사용할 수 있습니다.'
+                  : '앱으로 설치하여 더욱 편리하게 정품인증을 이용해 보세요.'}
               </p>
             </div>
             <button
+              type="button"
               onClick={handleInstallApp}
-              className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-[11px] rounded-xl hover:from-amber-600 hover:to-orange-600 transition-all cursor-pointer shadow-md shadow-amber-500/10 whitespace-nowrap"
+              className="shrink-0 px-3.5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-[11px] rounded-xl hover:from-amber-600 hover:to-orange-600 transition-all cursor-pointer shadow-md shadow-amber-500/10 whitespace-nowrap active:scale-[0.98]"
             >
-              앱 설치하기
+              {isIosDevice ? '설치 방법' : '앱 설치하기'}
             </button>
           </div>
         )}
