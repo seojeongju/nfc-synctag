@@ -46,12 +46,10 @@ export default function UserLanding() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [albumCaption, setAlbumCaption] = useState('');
 
-  // 일반 사용자 인증 관련 상태
+  // 일반 사용자 인증 관련 상태 (로그인 UI는 /login 단일 화면)
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-  const [authEmail, setAuthEmail] = useState('');
-  const [authName, setAuthName] = useState('');
-  const [authLoading, setAuthLoading] = useState(false);
+
+  const PENDING_ALBUM_KEY = 'wowtag_pending_album_goldbar';
 
   type UserLandingTab = 'home' | 'products' | 'myWallet';
 
@@ -61,7 +59,6 @@ export default function UserLanding() {
     setPurchaseFormData({ name: '', phone: '', memo: '' });
     setShowGuideModal(false);
     setIsAlbumModalOpen(false);
-    setIsLoginModalOpen(false);
     setCurrentGoldbarForAlbum(null);
   }, []);
 
@@ -88,11 +85,18 @@ export default function UserLanding() {
     } catch (err) {}
   };
 
-  // 앨범 모달 오픈 (로그인 필요)
+  // 앨범 모달 오픈 (미로그인 시 /login으로 보내고, 로그인 후 앨범 자동 오픈)
   const handleOpenAlbum = (g: any) => {
     if (!currentUser) {
-      setCurrentGoldbarForAlbum(g);
-      setIsLoginModalOpen(true);
+      try {
+        sessionStorage.setItem(
+          PENDING_ALBUM_KEY,
+          JSON.stringify({ id: g.id, serial_number: g.serial_number })
+        );
+      } catch {
+        /* ignore */
+      }
+      navigate('/login');
       return;
     }
     setCurrentGoldbarForAlbum(g);
@@ -149,57 +153,6 @@ export default function UserLanding() {
         fetchAlbum(currentGoldbarForAlbum.id || currentGoldbarForAlbum.serial_number);
       }
     } catch (err) {}
-  };
-
-  // 간편 로그인/회원가입 처리
-  const handleUserAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!authEmail) return alert('이메일을 입력해 주세요.');
-    setAuthLoading(true);
-    try {
-      const res = await fetch('/api/user/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: authEmail, name: authName })
-      });
-      if (res.ok) {
-        const d = await res.json();
-        const user = d.user;
-        setCurrentUser(user);
-        localStorage.setItem('wowtag_current_user', JSON.stringify(user));
-
-        // 기존 로컬 스토리지 골드바 ID 리스트를 서버로 동기화
-        const stored = localStorage.getItem('my_scanned_goldbars');
-        const goldbarIds = stored ? JSON.parse(stored).map((g: any) => g.id) : [];
-
-        const syncRes = await fetch('/api/user/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: user.id, goldbarIds })
-        });
-
-        if (syncRes.ok) {
-          const syncData = await syncRes.json();
-          if (syncData.syncGoldbars) {
-            setMyGoldbars(syncData.syncGoldbars);
-            localStorage.setItem('my_scanned_goldbars', JSON.stringify(syncData.syncGoldbars));
-          }
-        }
-
-        setIsLoginModalOpen(false);
-        if (currentGoldbarForAlbum) {
-          setIsAlbumModalOpen(true);
-          fetchAlbum(currentGoldbarForAlbum.id || currentGoldbarForAlbum.serial_number);
-        }
-      } else {
-        const errData = await res.json();
-        alert(errData.error || '인증에 실패했습니다.');
-      }
-    } catch (err: any) {
-      alert('인증 요청 중 오류가 발생했습니다.');
-    } finally {
-      setAuthLoading(false);
-    }
   };
 
   // 로그아웃 처리
@@ -313,6 +266,31 @@ export default function UserLanding() {
       }
     }
   }, [activeTab]);
+
+  // /login에서 돌아온 뒤 앨범 열기 대기(비로그인 시 앨범 클릭 → 로그인 유도)
+  useEffect(() => {
+    if (!currentUser) return;
+    let raw: string | null = null;
+    try {
+      raw = sessionStorage.getItem(PENDING_ALBUM_KEY);
+    } catch {
+      return;
+    }
+    if (!raw) return;
+    try {
+      const g = JSON.parse(raw) as { id?: number; serial_number?: string };
+      sessionStorage.removeItem(PENDING_ALBUM_KEY);
+      setCurrentGoldbarForAlbum(g);
+      setIsAlbumModalOpen(true);
+      void fetchAlbum(g.id ?? g.serial_number);
+    } catch {
+      try {
+        sessionStorage.removeItem(PENDING_ALBUM_KEY);
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [currentUser]);
 
   useEffect(() => {
     try {
@@ -515,7 +493,11 @@ export default function UserLanding() {
               <LogOut className="w-4.5 h-4.5" />
             </button>
           ) : (
-            <Link to="/login" className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center border border-slate-100 shadow-sm text-slate-400 hover:text-primary hover:border-primary/40 transition-all">
+            <Link
+              to="/login"
+              title="로그인 / 회원가입"
+              className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center border border-slate-100 shadow-sm text-slate-400 hover:text-primary hover:border-primary/40 transition-all"
+            >
               <Bookmark className="w-5 h-5" />
             </Link>
           )}
@@ -571,17 +553,19 @@ export default function UserLanding() {
               </button>
             </div>
           ) : (
-            <div className="flex items-center justify-between w-full">
-              <div>
+            <div className="flex items-center justify-between w-full gap-3">
+              <div className="min-w-0">
                 <h5 className="text-xs font-black text-slate-800">간편 로그인을 진행하세요</h5>
-                <p className="text-[10px] font-bold text-slate-400 mt-0.5">자산 목록과 추억 앨범을 안전하게 보존합니다.</p>
+                <p className="text-[10px] font-bold text-slate-400 mt-0.5">
+                  자산 목록과 추억 앨범을 안전하게 보존합니다. 우측 상단 아이콘과 동일한 로그인 화면으로 이동합니다.
+                </p>
               </div>
-              <button 
-                onClick={() => setIsLoginModalOpen(true)}
-                className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-[11px] rounded-xl hover:from-amber-600 hover:to-orange-600 transition-all cursor-pointer shadow-md shadow-amber-500/10"
+              <Link
+                to="/login"
+                className="shrink-0 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-[11px] rounded-xl hover:from-amber-600 hover:to-orange-600 transition-all shadow-md shadow-amber-500/10 no-underline inline-flex items-center justify-center"
               >
                 로그인 / 가입
-              </button>
+              </Link>
             </div>
           )}
         </div>
@@ -939,65 +923,6 @@ export default function UserLanding() {
                   </button>
                 </div>
               )}
-            </div>
-          </div>
-        )}
-
-        {/* 일반 가입자 간편 로그인/회원가입 모달 */}
-        {isLoginModalOpen && (
-          <div className="fixed inset-0 z-[130] flex items-end sm:items-center justify-center p-0 lg:p-4">
-            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setIsLoginModalOpen(false)}></div>
-            <div className="relative w-full max-w-md bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh] overflow-hidden">
-              <header className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/40">
-                <div>
-                  <h4 className="text-lg font-black text-slate-800 tracking-tight">🔑 전자앨범 접속 로그인</h4>
-                  <p className="text-[10px] font-bold text-slate-400 mt-0.5">전자앨범을 열람하려면 로그인해 주세요</p>
-                </div>
-                <button onClick={() => setIsLoginModalOpen(false)} className="p-2 bg-white rounded-xl text-slate-400 hover:text-rose-600 transition-colors shadow-sm">
-                  <X className="w-5 h-5" />
-                </button>
-              </header>
-
-              <div className="p-6 overflow-y-auto space-y-5 flex-1 pb-10">
-                <div className="bg-amber-50/50 border border-amber-100 rounded-2xl p-4">
-                  <h5 className="font-black text-amber-800 text-xs">💡 안내 사항</h5>
-                  <p className="text-[10px] font-bold text-amber-600 mt-0.5">
-                    로그인하시면 기기를 변경하셔도 소중한 내 정품 목록과 전자앨범 데이터를 안전하게 영구 보존하여 확인할 수 있습니다.
-                  </p>
-                </div>
-
-                <form onSubmit={handleUserAuth} className="space-y-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">이메일 주소 *</label>
-                    <input 
-                      required type="email" placeholder="example@wowtag.com" value={authEmail}
-                      onChange={(e) => setAuthEmail(e.target.value)}
-                      className="w-full h-12 bg-slate-50/70 border border-slate-100 rounded-xl px-4 text-xs font-bold focus:border-amber-500 focus:outline-none transition-all"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">이름/닉네임 (선택)</label>
-                    <input 
-                      type="text" placeholder="홍길동" value={authName}
-                      onChange={(e) => setAuthName(e.target.value)}
-                      className="w-full h-12 bg-slate-50/70 border border-slate-100 rounded-xl px-4 text-xs font-bold focus:border-amber-500 focus:outline-none transition-all"
-                    />
-                  </div>
-
-                  <button 
-                    type="submit" 
-                    disabled={authLoading}
-                    className="w-full h-14 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black rounded-xl text-sm shadow-xl shadow-amber-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mt-4"
-                  >
-                    {authLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : '간편 로그인 및 계속하기'}
-                  </button>
-                </form>
-
-                <button onClick={() => setIsLoginModalOpen(false)} className="w-full h-12 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black rounded-xl text-xs transition-all mt-1">
-                  취소
-                </button>
-              </div>
             </div>
           </div>
         )}
