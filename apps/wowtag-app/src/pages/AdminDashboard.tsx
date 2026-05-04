@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Tag, Package, Plus, Bell, ArrowUpRight, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Link2Off, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut, Eye, ChevronDown, ChevronUp } from 'lucide-react';
 import { ImeTextInput } from '../components/ImeTextInput';
@@ -17,6 +18,147 @@ function formatProductGoldSummary(weight: string, price: string) {
       ? `${Math.round(pr / w).toLocaleString('ko-KR')}원`
       : '0원';
   return { totalStr, perG };
+}
+
+type CertCatalogRow = { id: number; tag_uid: string; serial_number: string };
+
+/** 모달·overflow 안에서 네이티브 select 옵션이 잘리는 문제 → viewport 고정 + 스크롤 목록 */
+function ProductCertificatePicker({
+  value,
+  onChange,
+  options,
+  buttonId,
+}: {
+  value: number | '';
+  onChange: (v: number | '') => void;
+  options: CertCatalogRow[];
+  buttonId: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [panel, setPanel] = useState<{ top: number; left: number; width: number; maxH: number } | null>(null);
+
+  const measure = useCallback(() => {
+    const el = btnRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const margin = 8;
+    const vh = window.innerHeight;
+    const vw = window.innerWidth;
+    const spaceBelow = vh - r.bottom - margin;
+    const spaceAbove = r.top - margin;
+    const cap = Math.min(vh * 0.55, 360);
+    let top = r.bottom + 4;
+    let maxH = Math.min(cap, spaceBelow - 4);
+    if (maxH < 160 && spaceAbove > spaceBelow) {
+      maxH = Math.min(cap, spaceAbove - 4);
+      top = Math.max(margin, r.top - maxH - 4);
+    } else {
+      maxH = Math.min(cap, spaceBelow - 4);
+    }
+    maxH = Math.max(140, maxH);
+    const width = Math.min(Math.max(r.width, 200), vw - 2 * margin);
+    const left = Math.max(margin, Math.min(r.left, vw - width - margin));
+    setPanel({ top, left, width, maxH });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setPanel(null);
+      return;
+    }
+    measure();
+    const onScrollResize = () => measure();
+    window.addEventListener('scroll', onScrollResize, true);
+    window.addEventListener('resize', onScrollResize);
+    return () => {
+      window.removeEventListener('scroll', onScrollResize, true);
+      window.removeEventListener('resize', onScrollResize);
+    };
+  }, [open, measure]);
+
+  useEffect(() => {
+    if (!open) return;
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [open]);
+
+  const selected = options.find((c) => c.id === value);
+  const label =
+    value === '' ? '연결 안 함' : selected ? `${selected.serial_number} · ${selected.tag_uid}` : '선택됨';
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        id={buttonId}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className="w-full h-12 bg-white rounded-xl px-3 font-bold border border-amber-100 text-left flex items-center justify-between gap-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-200/80"
+      >
+        <span className="truncate min-w-0">{label}</span>
+        <ChevronDown className={`w-5 h-5 shrink-0 text-amber-600 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open &&
+        panel &&
+        createPortal(
+          <>
+            <div className="fixed inset-0 z-[280] touch-none" aria-hidden onClick={() => setOpen(false)} />
+            <div
+              role="listbox"
+              aria-labelledby={buttonId}
+              className="fixed z-[290] overflow-y-auto overscroll-y-contain rounded-xl border border-amber-200 bg-white py-1 shadow-2xl [scrollbar-width:thin]"
+              style={{
+                top: panel.top,
+                left: panel.left,
+                width: panel.width,
+                maxHeight: panel.maxH,
+              }}
+            >
+              <button
+                type="button"
+                role="option"
+                aria-selected={value === ''}
+                onClick={() => {
+                  onChange('');
+                  setOpen(false);
+                }}
+                className={`w-full text-left px-3 py-2.5 text-sm font-bold hover:bg-amber-50 ${
+                  value === '' ? 'bg-amber-50 text-amber-900' : 'text-slate-800'
+                }`}
+              >
+                연결 안 함
+              </button>
+              {options.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  role="option"
+                  aria-selected={value === c.id}
+                  onClick={() => {
+                    onChange(c.id);
+                    setOpen(false);
+                  }}
+                  className={`w-full text-left px-3 py-2.5 text-sm font-bold hover:bg-amber-50 border-t border-slate-100 ${
+                    value === c.id ? 'bg-amber-50 text-amber-900' : 'text-slate-800'
+                  }`}
+                >
+                  <span className="font-sans">{c.serial_number}</span>
+                  <span className="text-slate-400"> · </span>
+                  <span className="font-mono text-xs break-all">{c.tag_uid}</span>
+                </button>
+              ))}
+            </div>
+          </>,
+          document.body
+        )}
+    </>
+  );
 }
 
 export default function AdminDashboard() {
@@ -2142,23 +2284,12 @@ export default function AdminDashboard() {
                  <p className="text-[11px] font-bold text-slate-500 pl-1 leading-relaxed">
                    골드바 정품인증 관리에서 NFC가 연결된 인증서만 표시됩니다. 없으면 먼저 골드바·보증서를 등록하세요.
                  </p>
-                 <select
-                   value={productFormData.certificate_id === '' ? '' : String(productFormData.certificate_id)}
-                   onChange={(e) =>
-                     setProductFormData({
-                       ...productFormData,
-                       certificate_id: e.target.value === '' ? '' : Number(e.target.value),
-                     })
-                   }
-                   className="w-full h-12 bg-white rounded-xl px-3 font-bold outline-none border border-amber-100 focus:border-amber-400/60 focus:ring-2 focus:ring-amber-100 transition-all cursor-pointer text-sm"
-                 >
-                   <option value="">연결 안 함</option>
-                   {certificateCatalog.map((c) => (
-                     <option key={c.id} value={c.id}>
-                       {c.serial_number} · {c.tag_uid}
-                     </option>
-                   ))}
-                 </select>
+                 <ProductCertificatePicker
+                   buttonId="product-cert-picker-create"
+                   value={productFormData.certificate_id}
+                   options={certificateCatalog}
+                   onChange={(v) => setProductFormData({ ...productFormData, certificate_id: v })}
+                 />
                </div>
 
                <div className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3 space-y-1.5">
@@ -2280,23 +2411,12 @@ export default function AdminDashboard() {
                  <p className="text-[11px] font-bold text-slate-500 pl-1 leading-relaxed">
                    골드바 정품인증 관리에서 등록된 인증서 중 선택합니다.
                  </p>
-                 <select
-                   value={editProductFormData.certificate_id === '' ? '' : String(editProductFormData.certificate_id)}
-                   onChange={(e) =>
-                     setEditProductFormData({
-                       ...editProductFormData,
-                       certificate_id: e.target.value === '' ? '' : Number(e.target.value),
-                     })
-                   }
-                   className="w-full h-12 bg-white rounded-xl px-3 font-bold outline-none border border-amber-100 focus:border-amber-400/60 focus:ring-2 focus:ring-amber-100 transition-all cursor-pointer text-sm"
-                 >
-                   <option value="">연결 안 함</option>
-                   {certificateCatalog.map((c) => (
-                     <option key={c.id} value={c.id}>
-                       {c.serial_number} · {c.tag_uid}
-                     </option>
-                   ))}
-                 </select>
+                 <ProductCertificatePicker
+                   buttonId="product-cert-picker-edit"
+                   value={editProductFormData.certificate_id}
+                   options={certificateCatalog}
+                   onChange={(v) => setEditProductFormData({ ...editProductFormData, certificate_id: v })}
+                 />
                </div>
 
                <label className="flex items-start gap-3 rounded-xl border border-rose-100 bg-rose-50/40 px-4 py-3 cursor-pointer">
