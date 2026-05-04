@@ -1,16 +1,21 @@
 {
+  "id": "/",
   "short_name": "Gold SyncTag",
   "name": "Gold SyncTag - 프리미엄 정품인증",
+  "lang": "ko",
+  "scope": "/",
   "icons": [
     {
       "src": "/icon-192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any"
     },
     {
       "src": "/icon-512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any"
     }
   ],
   "start_url": "/",

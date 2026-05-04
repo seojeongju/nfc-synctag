@@ -8,7 +8,8 @@ self.addEventListener('activate', (e) => {
   e.waitUntil(self.clients.claim());
 });
 
-self.addEventListener('fetch', (e) => {
-  // Pass-through: Do not cache to avoid caching issues during continuous updates
-  return;
+self.addEventListener('fetch', (event) => {
+  // Chrome/Android 설치 가능 조건: fetch 핸들러에서 respondWith 호출 필요.
+  // 캐시 없이 네트워크만 사용(항상 최신 배포 반영).
+  event.respondWith(fetch(event.request));
 });
