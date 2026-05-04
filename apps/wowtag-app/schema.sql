@@ -69,4 +69,19 @@ VALUES ('GB2026-0001', '10g', '99.99%', '2026-05-01');
 INSERT OR IGNORE INTO certificates (goldbar_id, tag_uid, cert_file_path)
 VALUES (1, 'NFC_GB_TEST_001', 'certificates/GB2026-0001.pdf');
 
+-- Digital Albums Tables
+CREATE TABLE IF NOT EXISTS digital_albums (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    goldbar_id INTEGER NOT NULL REFERENCES goldbars(id) ON DELETE CASCADE,
+    title TEXT DEFAULT '나의 소중한 추억 앨범',
+    description TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 
+CREATE TABLE IF NOT EXISTS album_images (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    album_id INTEGER NOT NULL REFERENCES digital_albums(id) ON DELETE CASCADE,
+    image_url TEXT NOT NULL,
+    caption TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);

@@ -528,6 +528,139 @@ app.get('/admin/stats', async (c) => {
     return c.json({ error: err.message }, 500);
   }
 });
+// --- 전자 앨범 API ---
+
+// 1. 특정 골드바의 전자 앨범 조회 및 자동 생성
+app.get('/albums/:goldbarId', async (c) => {
+  try {
+    const goldbarId = c.req.param('goldbarId');
+    
+    // 자동 마이그레이션
+    try {
+      await c.env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS digital_albums (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          goldbar_id INTEGER NOT NULL REFERENCES goldbars(id) ON DELETE CASCADE,
+          title TEXT DEFAULT '나의 소중한 추억 앨범',
+          description TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `).run();
+      await c.env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS album_images (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          album_id INTEGER NOT NULL REFERENCES digital_albums(id) ON DELETE CASCADE,
+          image_url TEXT NOT NULL,
+          caption TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `).run();
+    } catch (_) {}
+
+    let album = await c.env.DB.prepare('SELECT * FROM digital_albums WHERE goldbar_id = ?').bind(goldbarId).first();
+    
+    if (!album) {
+      await c.env.DB.prepare('INSERT INTO digital_albums (goldbar_id, title) VALUES (?, ?)')
+        .bind(goldbarId, '나의 소중한 추억 앨범')
+        .run();
+      album = await c.env.DB.prepare('SELECT * FROM digital_albums WHERE goldbar_id = ?').bind(goldbarId).first();
+    }
+
+    const { results: images } = await c.env.DB.prepare('SELECT * FROM album_images WHERE album_id = ? ORDER BY created_at ASC')
+      .bind((album as any).id)
+      .all();
+
+    return c.json({ album, images });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// 2. 전자 앨범 사진 추가
+app.post('/albums/:goldbarId/images', async (c) => {
+  try {
+    const goldbarId = c.req.param('goldbarId');
+    const { image_file_base64, file_name, caption } = await c.req.json();
+
+    if (!image_file_base64) {
+      return c.json({ error: 'Image file is required' }, 400);
+    }
+
+    let album = await c.env.DB.prepare('SELECT * FROM digital_albums WHERE goldbar_id = ?').bind(goldbarId).first();
+    if (!album) {
+      await c.env.DB.prepare('INSERT INTO digital_albums (goldbar_id, title) VALUES (?, ?)')
+        .bind(goldbarId, '나의 소중한 추억 앨범')
+        .run();
+      album = await c.env.DB.prepare('SELECT * FROM digital_albums WHERE goldbar_id = ?').bind(goldbarId).first();
+    }
+
+    // 사진 개수 제한 체크 (5장)
+    const imagesCount = await c.env.DB.prepare('SELECT COUNT(*) as cnt FROM album_images WHERE album_id = ?')
+      .bind((album as any).id)
+      .first();
+    if (imagesCount && (imagesCount as any).cnt >= 5) {
+      return c.json({ error: '최대 5장까지만 등록 가능합니다.' }, 400);
+    }
+
+    // Base64 데이터를 ArrayBuffer로 변환 후 R2에 저장
+    const base64Data = image_file_base64.split(',')[1] || image_file_base64;
+    const binaryString = atob(base64Data);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    const ext = file_name ? file_name.split('.').pop() : 'png';
+    const r2Path = `albums/images/${Date.now()}.${ext}`;
+    await c.env.BUCKET.put(r2Path, bytes.buffer, {
+      httpMetadata: { contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}` },
+    });
+
+    const savedImageUrl = `/api/albums/image/${r2Path}`;
+
+    await c.env.DB.prepare('INSERT INTO album_images (album_id, image_url, caption) VALUES (?, ?, ?)')
+      .bind((album as any).id, savedImageUrl, caption || '')
+      .run();
+
+    return c.json({ success: true, savedImageUrl });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// 3. 앨범 사진 조회 API
+app.get('/albums/image/albums/images/:filename', async (c) => {
+  try {
+    const filename = c.req.param('filename');
+    const path = `albums/images/${filename}`;
+    const object = await c.env.BUCKET.get(path);
+
+    if (object === null) {
+      return c.json({ error: 'Image not found in R2' }, 404);
+    }
+
+    const headers = new Headers();
+    object.writeHttpMetadata(headers);
+    headers.set('etag', object.httpEtag);
+    headers.set('Content-Type', filename.endsWith('png') ? 'image/png' : 'image/jpeg');
+
+    return new Response(object.body, { headers });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// 4. 전자 앨범 사진 삭제
+app.delete('/albums/images/:imageId', async (c) => {
+  try {
+    const imageId = c.req.param('imageId');
+    await c.env.DB.prepare('DELETE FROM album_images WHERE id = ?').bind(imageId).run();
+    return c.json({ success: true });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
 
 app.get('/hello', (c) => {
   return c.json({

@@ -25,6 +25,82 @@ export default function UserLanding() {
   const [purchaseSuccess, setPurchaseSuccess] = useState(false);
   const [showGuideModal, setShowGuideModal] = useState(false);
 
+  // 전자 앨범 관련 상태
+  const [isAlbumModalOpen, setIsAlbumModalOpen] = useState(false);
+  const [currentGoldbarForAlbum, setCurrentGoldbarForAlbum] = useState<any>(null);
+  const [albumData, setAlbumData] = useState<{ album: any; images: any[] }>({ album: null, images: [] });
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [albumCaption, setAlbumCaption] = useState('');
+
+  // 앨범 데이터 패치
+  const fetchAlbum = async (goldbarId: any) => {
+    try {
+      const res = await fetch(`/api/albums/${goldbarId}`);
+      if (res.ok) {
+        const d = await res.json();
+        setAlbumData(d);
+      }
+    } catch (err) {}
+  };
+
+  // 앨범 모달 오픈
+  const handleOpenAlbum = (g: any) => {
+    setCurrentGoldbarForAlbum(g);
+    setIsAlbumModalOpen(true);
+    fetchAlbum(g.id || g.serial_number);
+  };
+
+  // 앨범 사진 파일 선택 & 업로드
+  const handleAlbumImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentGoldbarForAlbum) return;
+
+    if (albumData.images.length >= 5) {
+      alert('최대 5장까지만 등록 가능합니다.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const base64 = ev.target?.result as string;
+      setUploadingImage(true);
+      try {
+        const res = await fetch(`/api/albums/${currentGoldbarForAlbum.id || currentGoldbarForAlbum.serial_number}/images`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            image_file_base64: base64,
+            file_name: file.name,
+            caption: albumCaption
+          })
+        });
+        if (res.ok) {
+          setAlbumCaption('');
+          fetchAlbum(currentGoldbarForAlbum.id || currentGoldbarForAlbum.serial_number);
+        } else {
+          const d = await res.json();
+          alert(d.error || '업로드에 실패했습니다.');
+        }
+      } catch (err: any) {
+        alert('업로드 요청 실패');
+      } finally {
+        setUploadingImage(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // 앨범 사진 삭제
+  const handleDeleteAlbumImage = async (imageId: any) => {
+    if (!confirm('정말 이 사진을 삭제하시겠습니까?')) return;
+    try {
+      const res = await fetch(`/api/albums/images/${imageId}`, { method: 'DELETE' });
+      if (res.ok) {
+        fetchAlbum(currentGoldbarForAlbum.id || currentGoldbarForAlbum.serial_number);
+      }
+    } catch (err) {}
+  };
+
   useEffect(() => {
     try {
       const stored = localStorage.getItem('my_scanned_goldbars');
@@ -329,6 +405,17 @@ export default function UserLanding() {
                     <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400">제조일자</span><span className="text-xs font-black text-slate-700">{g.minted_at || '-'}</span></div>
                   </div>
 
+                  {/* 추억 전자 앨범 보기 버튼 */}
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenAlbum(g);
+                    }}
+                    className="w-full h-11 bg-amber-50 border border-amber-200/40 hover:bg-amber-100 hover:border-amber-300 rounded-xl flex items-center justify-center text-xs font-black text-amber-700 transition-all gap-1.5 mt-2"
+                  >
+                    📸 추억 전자 앨범 보기
+                  </button>
+
                   {g.cert_url && (
                     <a href={g.cert_url} target="_blank" rel="noreferrer" className="w-full h-11 bg-slate-50 border border-slate-100 hover:bg-amber-50 hover:border-amber-200/60 rounded-xl flex items-center justify-center text-xs font-black text-slate-600 hover:text-amber-700 transition-all gap-1.5 no-underline mt-1">
                       <ShieldCheck className="w-4 h-4" /> 정품인증서 확인 (URL)
@@ -441,6 +528,82 @@ export default function UserLanding() {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* 추억 전자 앨범 모달 */}
+        {isAlbumModalOpen && currentGoldbarForAlbum && (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 lg:p-4">
+            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setIsAlbumModalOpen(false)}></div>
+            <div className="relative w-full max-w-md bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh] overflow-hidden">
+              <header className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/40">
+                <div>
+                  <h4 className="text-lg font-black text-slate-800 tracking-tight">📸 추억 전자 앨범</h4>
+                  <p className="text-[10px] font-bold text-slate-400 mt-0.5">제품과 함께한 소중한 기록을 담아보세요</p>
+                </div>
+                <button onClick={() => setIsAlbumModalOpen(false)} className="p-2 bg-white rounded-xl text-slate-400 hover:text-rose-600 transition-colors shadow-sm">
+                  <X className="w-5 h-5" />
+                </button>
+              </header>
+
+              <div className="p-6 overflow-y-auto space-y-6 flex-1 pb-10">
+                {/* 사진 개수 표시 및 설명 */}
+                <div className="bg-amber-50/50 border border-amber-100 rounded-2xl p-4 flex justify-between items-center">
+                  <div>
+                    <h5 className="font-black text-amber-800 text-xs">앨범 이미지 ({albumData.images.length}/5)</h5>
+                    <p className="text-[10px] font-bold text-amber-600 mt-0.5">최대 5장까지의 소중한 순간을 등록 가능</p>
+                  </div>
+                  <span className="text-[10px] font-black bg-amber-100 text-amber-700 px-2 py-1 rounded-xl uppercase tracking-wider">Storage Status</span>
+                </div>
+
+                {/* 앨범 이미지 리스트 */}
+                {albumData.images && albumData.images.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    {albumData.images.map((img: any, idx: number) => (
+                      <div key={idx} className="relative group bg-slate-50 border border-slate-100/60 rounded-2xl overflow-hidden aspect-square flex flex-col shadow-sm">
+                        <img src={img.image_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-all" />
+                        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-2">
+                          <button 
+                            onClick={() => handleDeleteAlbumImage(img.id)}
+                            className="p-2.5 bg-white/90 hover:bg-rose-50 rounded-xl text-rose-500 transition-all hover:scale-110 shadow-lg"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed border-slate-100 p-10 rounded-2xl flex flex-col items-center justify-center text-center">
+                    <Award className="w-10 h-10 text-slate-200 mb-3" />
+                    <p className="text-xs font-black text-slate-400">등록된 추억 사진이 없습니다.</p>
+                  </div>
+                )}
+
+                {/* 사진 업로드 폼 */}
+                {albumData.images.length < 5 && (
+                  <div className="border-t border-slate-100/60 pt-5 space-y-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">추억 사진 추가</label>
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        onChange={handleAlbumImageUpload}
+                        disabled={uploadingImage}
+                        className="text-xs text-slate-500 font-bold file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100 file:cursor-pointer cursor-pointer"
+                      />
+                    </div>
+                    {uploadingImage && (
+                      <p className="text-[10px] font-bold text-amber-600 animate-pulse">이미지 등록 중입니다...</p>
+                    )}
+                  </div>
+                )}
+
+                <button onClick={() => setIsAlbumModalOpen(false)} className="w-full h-12 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black rounded-xl text-xs transition-all">
+                  닫기
+                </button>
+              </div>
             </div>
           </div>
         )}
