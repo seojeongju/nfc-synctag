@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Download, Loader2 } from 'lucide-react';
 
@@ -6,8 +6,12 @@ import { ProductGuaranteeCertificate } from './ProductGuaranteeCertificate';
 import { downloadProductGuaranteePdf } from '../lib/exportGuaranteePdf';
 import type { GuaranteeCertificateData } from '../lib/guaranteeCertificateData';
 
+const CERT_W = 794;
+const CERT_H = 1123;
+
 /**
  * 제품 보증서 A4 미리보기 + 같은 화면에서 PDF 저장
+ * 화면 너비에 맞춰 축소 후, 슬라이더로 추가 조절 (뷰포트 밖으로 넘치지 않음)
  */
 export function GuaranteeCertificatePreviewModal({
   data,
@@ -17,9 +21,26 @@ export function GuaranteeCertificatePreviewModal({
   onClose: () => void;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [viewportW, setViewportW] = useState(360);
+  /** 40~100: 화면 맞춤 비율 기준 추가 조절 */
+  const [sizePercent, setSizePercent] = useState(100);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !data) return;
+    const ro = new ResizeObserver(() => setViewportW(el.clientWidth));
+    ro.observe(el);
+    setViewportW(el.clientWidth);
+    return () => ro.disconnect();
+  }, [data]);
 
   if (!data) return null;
+
+  const pad = 28;
+  const maxFit = Math.min(1, Math.max(0.22, (viewportW - pad) / CERT_W));
+  const scale = maxFit * (sizePercent / 100);
 
   const handleDownloadPdf = async () => {
     const root = wrapRef.current?.querySelector('[data-guarantee-pdf-root="1"]') as HTMLElement | null;
@@ -73,16 +94,55 @@ export function GuaranteeCertificatePreviewModal({
           </button>
         </header>
 
-        <div className="flex-1 min-h-0 overflow-auto bg-slate-100/90 p-3 sm:p-6">
-          <p className="text-[10px] font-bold text-slate-500 mb-2 sm:hidden">
-            좌우로 스크롤하여 전체 보증서를 확인하세요.
-          </p>
-          <div className="flex justify-center">
+        <div className="shrink-0 px-3 sm:px-6 pt-3 pb-1 flex flex-wrap items-center gap-2">
+          <span className="text-[10px] font-black text-slate-600 shrink-0">화면 맞춤 크기</span>
+          <input
+            type="range"
+            min={40}
+            max={100}
+            step={1}
+            value={sizePercent}
+            onChange={(e) => setSizePercent(Number(e.target.value))}
+            className="flex-1 min-w-[120px] max-w-sm h-2 accent-amber-600 rounded-full"
+            aria-label="보증서 표시 크기"
+          />
+          <span className="text-[10px] font-mono font-bold text-slate-500 w-10 text-right tabular-nums">{sizePercent}%</span>
+          <button
+            type="button"
+            onClick={() => setSizePercent(100)}
+            className="text-[10px] font-black text-amber-900 bg-amber-100 hover:bg-amber-200 rounded-lg px-2.5 py-1.5 transition-colors"
+          >
+            맞춤 100%
+          </button>
+        </div>
+        <p className="px-3 sm:px-6 text-[10px] font-bold text-slate-400 pb-2">
+          슬라이더로 크기를 줄이면 한 화면에 더 많이 보입니다. 넓은 화면에서는 자동으로 최대 맞춤됩니다.
+        </p>
+
+        <div
+          ref={scrollRef}
+          className="flex-1 min-h-0 overflow-auto overscroll-contain bg-gradient-to-b from-slate-200/50 to-slate-300/30 px-2 sm:px-4 pb-4"
+        >
+          <div className="flex justify-center py-2">
             <div
-              ref={wrapRef}
-              className="inline-block rounded-lg shadow-lg ring-1 ring-slate-200/80 bg-white overflow-hidden"
+              className="rounded-[10px] shadow-xl ring-1 ring-black/10 overflow-hidden bg-neutral-900/5"
+              style={{
+                width: CERT_W * scale,
+                height: CERT_H * scale,
+                maxWidth: '100%',
+              }}
             >
-              <ProductGuaranteeCertificate data={data} />
+              <div
+                ref={wrapRef}
+                style={{
+                  width: CERT_W,
+                  height: CERT_H,
+                  transform: `scale(${scale})`,
+                  transformOrigin: 'top left',
+                }}
+              >
+                <ProductGuaranteeCertificate data={data} />
+              </div>
             </div>
           </div>
         </div>

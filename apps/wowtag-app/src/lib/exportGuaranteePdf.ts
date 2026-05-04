@@ -41,18 +41,7 @@ function sanitizeCloneForHtml2Canvas(clonedDoc: Document, clonedElement: HTMLEle
     }
   });
 
-  const root = clonedDoc.querySelector('[data-guarantee-pdf-root="1"]') as HTMLElement | null;
-  if (root) {
-    root.style.cssText = [
-      'width:794px',
-      'min-height:1123px',
-      'box-sizing:border-box',
-      'padding:44px 52px 48px',
-      'background-color:#ffffff',
-      'font-family:"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif',
-      'color:#0f172a',
-    ].join(';');
-  }
+  /** 보증서 루트는 컴포넌트 인라인 스타일(배경 이미지 등) 유지 — 여기서 덮어쓰지 않음 */
 }
 
 async function renderToCanvas(el: HTMLElement, scale: number) {
