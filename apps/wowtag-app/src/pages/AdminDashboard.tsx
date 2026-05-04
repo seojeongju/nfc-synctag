@@ -596,17 +596,23 @@ export default function AdminDashboard() {
               </div>
 
               {/* 통계 카드 */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6">
                 {[
-                  { label: '전체 제품', value: products.length, icon: Package, color: 'text-blue-600', bg: 'bg-blue-50' },
-                  { label: '골드바 개수', value: goldbars.length, icon: Award, color: 'text-amber-600', bg: 'bg-amber-50' },
-                  { label: '활성 태그', value: stats.activeTags, icon: Tag, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                  { label: '가동률', value: usageRate, icon: ArrowUpRight, color: 'text-rose-600', bg: 'bg-rose-50' },
+                  { label: '전체 제품', value: products.length, icon: Package, color: 'text-blue-600', bg: 'bg-blue-50', tab: 'products' },
+                  { label: '골드바 개수', value: goldbars.length, icon: Award, color: 'text-amber-600', bg: 'bg-amber-50', tab: 'goldbars' },
+                  { label: '활성 태그', value: stats.activeTags, icon: Tag, color: 'text-emerald-600', bg: 'bg-emerald-50', tab: 'nfc' },
+                  { label: '가동률', value: usageRate, icon: ArrowUpRight, color: 'text-rose-600', bg: 'bg-rose-50', tab: 'nfc' },
                 ].map((stat, i) => (
-                  <div key={i} className="bg-white p-5 lg:p-8 rounded-[2rem] shadow-sm border border-slate-50 hover:shadow-xl transition-all">
-                    <div className={`w-12 h-12 rounded-2xl ${stat.bg} ${stat.color} flex items-center justify-center mb-6`}><stat.icon className="w-6 h-6" /></div>
-                    <p className="text-slate-400 text-xs font-black uppercase tracking-widest">{stat.label}</p>
-                    <h3 className="text-2xl lg:text-3xl font-black text-slate-900 mt-1">{stat.value}</h3>
+                  <div 
+                    key={i} 
+                    onClick={() => stat.tab && setCurrentTab(stat.tab as any)}
+                    className="bg-white p-5 lg:p-8 rounded-[2rem] shadow-sm border border-slate-50 hover:border-slate-200/60 hover:shadow-xl transition-all cursor-pointer group hover:scale-[1.02] active:scale-[0.98] flex flex-col justify-between min-h-[160px]"
+                  >
+                    <div className={`w-12 h-12 rounded-2xl ${stat.bg} ${stat.color} flex items-center justify-center mb-4 transition-transform group-hover:scale-105`}><stat.icon className="w-6 h-6" /></div>
+                    <div>
+                      <p className="text-slate-400 text-xs font-black uppercase tracking-widest">{stat.label}</p>
+                      <h3 className="text-2xl lg:text-3xl font-black text-slate-900 mt-1">{stat.value}</h3>
+                    </div>
                   </div>
                 ))}
               </div>
