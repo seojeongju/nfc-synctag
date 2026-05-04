@@ -3,6 +3,7 @@ import { LayoutDashboard, Tag, Package, Plus, Scan, Bell, ArrowUpRight, Loader2,
 
 export default function AdminDashboard() {
   const [currentTab, setCurrentTab] = useState<'dashboard' | 'products' | 'nfc' | 'goldbars'>('dashboard');
+  const [isAdminGuideOpen, setIsAdminGuideOpen] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
   const [goldbars, setGoldbars] = useState<any[]>([]);
   const [stats, setStats] = useState<any>({ scanCount: 0, activeTags: 0, recentLogs: [], topGoldbars: [] });
@@ -555,20 +556,36 @@ export default function AdminDashboard() {
           {/* 1. 대시보드 탭 */}
           {currentTab === 'dashboard' && (
             <>
-              {/* PWA & NFC 실행 환경 안전장치 가이드 배너 */}
-              <div className="bg-amber-50/60 border border-amber-200/50 p-5 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in fade-in duration-300">
-                <div className="flex items-start gap-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600 shrink-0 border border-amber-200/40"><Bell className="w-5 h-5" /></div>
-                  <div>
-                    <h4 className="font-black text-amber-800 text-sm flex items-center gap-2">
-                      💡 모바일 앱(PWA) NFC 실행 전 필수 확인 사항
-                    </h4>
-                    <p className="text-xs font-bold text-amber-700/80 mt-1 leading-relaxed">
+              {/* PWA & NFC 실행 환경 안내 배너 (사용설명 아이콘 및 토글 기능) */}
+              <div className="bg-white border border-slate-100 rounded-3xl p-4 flex flex-col gap-3 shadow-sm select-none transition-all duration-300">
+                <div 
+                  onClick={() => setIsAdminGuideOpen(!isAdminGuideOpen)} 
+                  className="flex items-center justify-between cursor-pointer group"
+                >
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-xl bg-amber-50 group-hover:bg-amber-100 flex items-center justify-center text-amber-600 border border-amber-200/30 transition-colors">
+                      <Smartphone className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-black text-slate-800 text-sm flex items-center gap-2 group-hover:text-amber-700 transition-colors">
+                        📱 모바일 앱(PWA) NFC 사용방법 및 주의사항
+                      </h4>
+                      <p className="text-[10px] font-bold text-slate-400 mt-0.5">NFC 발행 및 안정적인 백그라운드 작동 가이드</p>
+                    </div>
+                  </div>
+                  <div className="w-8 h-8 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 group-hover:text-slate-600 group-hover:bg-slate-100 transition-all">
+                    {isAdminGuideOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </div>
+                </div>
+
+                {isAdminGuideOpen && (
+                  <div className="bg-amber-50/50 border border-amber-100/50 p-4 rounded-2xl animate-in slide-in-from-top duration-300">
+                    <p className="text-xs font-bold text-amber-700/90 leading-relaxed">
                       1. 안드로이드 스마트폰 상단 바의 <strong className="text-amber-900 font-black">NFC를 "기본 모드(읽기/쓰기)"</strong>로 활성화했는지 확인해 주세요.<br />
                       2. 이 페이지를 홈 화면에 앱(PWA)으로 설치하여 실행하면 백그라운드 끊김 없이 더욱 안정적으로 동작합니다.
                     </p>
                   </div>
-                </div>
+                )}
               </div>
 
               <div className="flex items-end justify-between">
