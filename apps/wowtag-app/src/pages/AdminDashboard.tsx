@@ -172,6 +172,11 @@ export default function AdminDashboard() {
     () => nfcProductTags.filter((t: any) => t.target_id != null && t.target_id !== ''),
     [nfcProductTags]
   );
+  const goldbarPoolList = useMemo(
+    () => allTags.filter((t: any) => t.target_type === 'goldbar_pool'),
+    [allTags]
+  );
+  const [goldbarPoolUidInput, setGoldbarPoolUidInput] = useState('');
 
   const closeAllAdminModals = useCallback(() => {
     setIsProductModalOpen(false);
@@ -226,6 +231,28 @@ export default function AdminDashboard() {
       return;
     }
     void executeTagUnmap(t.tag_uid);
+  };
+
+  const handleGoldbarPoolRegister = async () => {
+    const uid = goldbarPoolUidInput.trim();
+    if (!uid) return alert('NFC 태그 UID를 입력하세요.');
+    try {
+      const res = await fetch('/api/goldbar-tag-pool', {
+        method: 'POST',
+        headers: adminAuthHeaders(),
+        body: JSON.stringify({ tag_uid: uid }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        alert('골드바 자산 풀에 등록되었습니다. 인증서 연결 후 정품 스캔 화면으로 연결됩니다.');
+        setGoldbarPoolUidInput('');
+        fetchTags();
+      } else {
+        alert(typeof data.error === 'string' ? data.error : '등록에 실패했습니다.');
+      }
+    } catch (e: any) {
+      alert(e?.message || '요청 실패');
+    }
   };
 
   const copyUnmapScanUrl = async (tagUid: string) => {
@@ -451,6 +478,12 @@ export default function AdminDashboard() {
         if (target === 'nfc') {
           const res = await fetch(`/api/tags/${encodeURIComponent(serialNumber)}`);
           const existingData = await res.json();
+
+          if (existingData?.message === 'goldbar_pool') {
+            alert('이 UID는 골드바 자산 풀(인증서 연결 전)에 등록되어 있습니다. 골드바 탭에서 관리하세요.');
+            setNfcScanning(false);
+            return;
+          }
 
           if (existingData?.reserved || existingData?.message === 'goldbar_tag') {
             alert('이 UID는 골드바 정품 태그로 이미 사용 중입니다.');
@@ -1570,6 +1603,36 @@ export default function AdminDashboard() {
                   <p className="text-xs font-bold text-slate-400 mt-1">골드바의 정보를 편집하고 정품인증서를 통합 관리합니다.</p>
                 </div>
                 <button onClick={() => setIsGoldbarModalOpen(true)} className="bg-amber-600 hover:bg-amber-700 text-white font-black py-3.5 px-6 rounded-2xl shadow-lg shadow-amber-500/20 flex items-center gap-2 transition-all"><Award className="w-5 h-5" /> 골드바 & 보증서 등록</button>
+              </div>
+
+              <div className="bg-amber-50/50 border border-amber-100 rounded-2xl p-4 sm:p-5 w-full">
+                <h3 className="text-sm font-black text-amber-900">골드바 NFC 자산 (인증서 연결 전)</h3>
+                <p className="text-[11px] font-bold text-amber-800/80 mt-1 mb-3 leading-relaxed">
+                  출고·인증서 매칭 전 UID만 등록합니다. 고객이 태그 시 앱 홈이 열리며, 인증서 연결 후에는 정품 인증 화면으로 연결됩니다.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2 max-w-2xl">
+                  <input
+                    type="text"
+                    value={goldbarPoolUidInput}
+                    onChange={(e) => setGoldbarPoolUidInput(e.target.value)}
+                    placeholder="NFC 태그 UID"
+                    className="flex-1 h-11 rounded-xl border border-amber-200/80 bg-white px-3 text-xs font-bold outline-none focus:border-amber-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void handleGoldbarPoolRegister()}
+                    className="h-11 px-5 rounded-xl bg-amber-900 text-white text-xs font-black hover:bg-amber-950 shrink-0"
+                  >
+                    자산 풀에 등록
+                  </button>
+                </div>
+                {goldbarPoolList.length > 0 && (
+                  <ul className="mt-3 space-y-1 text-[11px] font-mono font-bold text-slate-600 max-h-28 overflow-y-auto border-t border-amber-100/80 pt-3">
+                    {goldbarPoolList.map((t: any) => (
+                      <li key={`pool-${t.tag_uid}`}>· {t.tag_uid}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
 
               {/* 검색 및 필터 패널 */}

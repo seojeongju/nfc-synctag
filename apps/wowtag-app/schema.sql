@@ -44,6 +44,12 @@ CREATE TABLE IF NOT EXISTS goldbars (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 골드바 NFC 자산 풀 (인증서 연결 전 UID만 등록 — 스캔 시에도 홈 오픈용)
+CREATE TABLE IF NOT EXISTS goldbar_tag_pool (
+    tag_uid TEXT PRIMARY KEY NOT NULL,
+    created_at TEXT NOT NULL
+);
+
 -- Certificates Table (정품인증서 및 NFC 태그 매핑)
 CREATE TABLE IF NOT EXISTS certificates (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
