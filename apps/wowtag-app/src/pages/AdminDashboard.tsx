@@ -624,7 +624,7 @@ export default function AdminDashboard() {
         </header>
 
         {/* 탭 기반 콘텐츠 */}
-        <div className="p-4 lg:p-10 space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="p-4 lg:p-10 pb-28 lg:pb-10 space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
           
           {/* 1. 대시보드 탭 */}
           {currentTab === 'dashboard' && (
@@ -1552,19 +1552,20 @@ export default function AdminDashboard() {
       )}
 
       {/* 하단 네비게이션 (모바일전용) */}
-      <div className="lg:hidden fixed bottom-0 inset-x-0 h-20 bg-white/90 backdrop-blur-xl border-t border-slate-50 z-20 flex items-center px-4 gap-2">
+      <div className="lg:hidden fixed left-0 right-0 bottom-0 bg-white/95 backdrop-blur-3xl border-t border-slate-100/80 z-[100] flex items-center justify-around px-2 h-[68px] pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_rgba(0,0,0,0.06)] select-none">
          {[
            { id: 'dashboard', icon: LayoutDashboard, label: '통계' },
            { id: 'products', icon: Package, label: '제품' },
            { id: 'nfc', icon: Tag, label: '태그' },
            { id: 'goldbars', icon: Award, label: '인증' },
+           { id: 'userGoldbars', icon: Hash, label: '시세' },
          ].map((nav) => (
            <button 
-            key={nav.id} onClick={() => setCurrentTab(nav.id as any)}
-            className={`flex-1 h-14 flex flex-col items-center justify-center rounded-2xl transition-all ${currentTab === nav.id ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-105' : 'text-slate-400'}`}
+             key={nav.id} onClick={() => { setCurrentTab(nav.id as any); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+             className={`flex flex-col items-center justify-center w-14 h-12 rounded-xl transition-all cursor-pointer ${currentTab === nav.id ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/25 scale-105 font-black' : 'text-slate-400 hover:text-slate-600'}`}
            >
              <nav.icon className="w-5 h-5" />
-             <span className="text-[10px] font-black mt-1 uppercase tracking-tighter">{nav.label}</span>
+             <span className="text-[9px] font-bold mt-1 tracking-tighter whitespace-nowrap">{nav.label}</span>
            </button>
          ))}
       </div>
