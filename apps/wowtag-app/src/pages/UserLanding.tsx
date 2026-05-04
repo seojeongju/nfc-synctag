@@ -9,7 +9,9 @@ import {
   readTagSession,
   readWalletTagUid,
   rememberWalletTagUid,
-  setTagSessionActive
+  setTagSessionActive,
+  hydrateWalletGoldbarsFromStorage,
+  persistWalletGoldbars
 } from '../lib/tagSession';
 
 /** Chrome BeforeInstallPromptEvent (lib.dom에 없을 수 있음) */
@@ -17,6 +19,18 @@ type AnyBeforeInstallPrompt = {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 };
+
+/** 헤더 우측 — 통합 로그인(/login)에서 관리자 계정으로 접속 */
+function AdminLoginHeaderLink({ className = '' }: { className?: string }) {
+  return (
+    <Link
+      to="/login"
+      className={`shrink-0 text-[10px] sm:text-[11px] font-black text-slate-500 hover:text-purple-600 border border-slate-200/80 bg-white/90 rounded-xl px-2.5 py-1.5 no-underline transition-colors shadow-sm ${className}`.trim()}
+    >
+      관리자 로그인
+    </Link>
+  );
+}
 
 export default function UserLanding() {
   const { tagId } = useParams();
@@ -327,10 +341,8 @@ export default function UserLanding() {
       if (storedUser) {
         setCurrentUser(JSON.parse(storedUser));
       }
-      const stored = localStorage.getItem('my_scanned_goldbars');
-      if (stored) {
-        setMyGoldbars(JSON.parse(stored));
-      }
+      // 내 지갑: NFC 세션(sessionStorage)과 동일 수명 — 앱 종료·새 접속 시 태그 미스캔이면 목록 없음 (localStorage 미사용)
+      setMyGoldbars(hydrateWalletGoldbarsFromStorage() as any[]);
     } catch (e) {
       console.error(e);
     }
@@ -422,11 +434,7 @@ export default function UserLanding() {
       setMyGoldbars((prev) => {
         if (prev.some((g) => g.id === wid)) return prev;
         const next = [...prev, { ...goldbarData, scanned_at: new Date().toLocaleDateString() }];
-        try {
-          localStorage.setItem('my_scanned_goldbars', JSON.stringify(next));
-        } catch {
-          /* ignore */
-        }
+        persistWalletGoldbars(next);
         return next;
       });
     })();
@@ -456,7 +464,10 @@ export default function UserLanding() {
   // 관리자 매칭 해제용 NFC 인증 (판매 완료 제품)
   if (tagId && adminUnmapScanOk) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F0FDF4] p-6 text-center">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F0FDF4] p-6 text-center relative">
+        <div className="absolute top-4 right-4 sm:top-6 sm:right-6">
+          <AdminLoginHeaderLink />
+        </div>
         <div className="w-16 h-16 bg-emerald-100 border border-emerald-200 rounded-3xl flex items-center justify-center text-emerald-600 mb-4">
           <CheckCircle2 className="w-9 h-9" />
         </div>
@@ -481,12 +492,13 @@ export default function UserLanding() {
     return (
       <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden box-border bg-[#F6F7FB] flex flex-col items-center px-4 py-5 pb-24 sm:p-5 font-sans leading-relaxed text-slate-900 animate-in fade-in duration-500 select-none">
         
-        {/* 헤더 */}
-        <header className="w-full max-w-md flex justify-center items-center h-16 px-2 mb-2">
-          <div className="flex items-center gap-2 select-none">
-            <img src="/gold_synctag_logo_v2.png" alt="Logo" className="w-7 h-7 object-contain rounded-lg" />
-            <span className="text-xl font-extrabold text-slate-800 tracking-tight">Gold SyncTag</span>
+        {/* 헤더: 로고 + 우측 관리자 로그인 */}
+        <header className="w-full max-w-md flex justify-between items-center h-16 px-1 mb-2 gap-2">
+          <div className="flex items-center gap-2 select-none min-w-0">
+            <img src="/gold_synctag_logo_v2.png" alt="Logo" className="w-7 h-7 object-contain rounded-lg shrink-0" />
+            <span className="text-lg sm:text-xl font-extrabold text-slate-800 tracking-tight truncate">Gold SyncTag</span>
           </div>
+          <AdminLoginHeaderLink />
         </header>
 
         {nfcWelcome?.message && (
@@ -519,7 +531,8 @@ export default function UserLanding() {
         )}
 
         {/* 상단 탭 전환 바 */}
-        <div className="w-full max-w-md bg-white p-1.5 rounded-2xl border border-slate-100/80 flex gap-1 mb-5 shadow-sm relative z-[140]">
+        {/* z-index: 모달(z-150)보다 낮게 — 전체 상품 상세 열릴 때 탭이 콘텐츠를 덮지 않음 */}
+        <div className="w-full max-w-md bg-white p-1.5 rounded-2xl border border-slate-100/80 flex gap-1 mb-5 shadow-sm relative z-10">
           <button 
             onClick={() => goToUserTab('home')} 
             className={`flex-1 h-12 rounded-xl text-[11px] font-black transition-all flex items-center justify-center gap-1.5 ${activeTab === 'home' ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-md shadow-purple-500/20' : 'text-slate-400 hover:bg-slate-50'}`}
@@ -728,7 +741,7 @@ export default function UserLanding() {
                         if (confirm('정말 내 지갑에서 이 골드바를 제거하시겠습니까?')) {
                           const updated = myGoldbars.filter((_, i) => i !== index);
                           setMyGoldbars(updated);
-                          localStorage.setItem('my_scanned_goldbars', JSON.stringify(updated));
+                          persistWalletGoldbars(updated);
                         }
                       }}
                       className="p-2 bg-slate-50 text-slate-400 hover:text-rose-500 hover:bg-rose-50 border border-slate-100 rounded-xl transition-all shadow-sm"
@@ -817,10 +830,10 @@ export default function UserLanding() {
 
         {/* 제품 상세 & 구매 문의 폼 모달 */}
         {selectedProduct && (
-          <div className="fixed inset-0 z-[130] flex items-end sm:items-center justify-center p-0 lg:p-4">
+          <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center p-0 lg:p-4">
             <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setSelectedProduct(null)}></div>
-            <div className="relative w-full max-w-md bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh] overflow-hidden">
-              <header className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/40">
+            <div className="relative w-full max-w-md bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh] min-h-0 overflow-hidden">
+              <header className="shrink-0 p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/40">
                 <h4 className="text-lg font-black text-slate-800 tracking-tight">제품 상세 및 구매 신청</h4>
                 <button onClick={() => setSelectedProduct(null)} className="p-2 bg-white rounded-xl text-slate-400 hover:text-rose-600 transition-colors shadow-sm">
                   <X className="w-5 h-5" />
@@ -828,15 +841,16 @@ export default function UserLanding() {
               </header>
 
               {!purchaseSuccess ? (
-                <div className="p-6 overflow-y-auto space-y-6 flex-1 pb-10">
+                <div className="p-6 overflow-y-auto overflow-x-hidden min-h-0 flex-1 space-y-6 pb-10">
+                  {/* 상단: 제품 이미지·이름·설명 */}
                   <div className="flex items-start gap-4">
-                    <div className="w-24 h-24 bg-slate-50 border border-slate-100 rounded-3xl overflow-hidden shadow-sm flex-shrink-0">
+                    <div className="w-24 h-24 sm:w-28 sm:h-28 bg-slate-50 border border-slate-100 rounded-3xl overflow-hidden shadow-sm flex-shrink-0">
                       <img src={selectedProduct.image_url} alt={selectedProduct.name} className="w-full h-full object-cover" />
                     </div>
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <span className="text-[10px] font-black bg-purple-100 text-purple-700 px-2.5 py-1 rounded-xl uppercase tracking-wider">NEW ARRIVAL</span>
-                      <h5 className="font-black text-slate-800 text-lg mt-1">{selectedProduct.name}</h5>
-                      <p className="text-xs font-bold text-slate-400 leading-relaxed mt-1">
+                      <h5 className="font-black text-slate-800 text-lg mt-1 break-words">{selectedProduct.name}</h5>
+                      <p className="text-xs font-bold text-slate-400 leading-relaxed mt-1 break-words">
                         {selectedProduct.description || '상세 정보가 등록되지 않았습니다.'}
                       </p>
                     </div>
@@ -937,7 +951,7 @@ export default function UserLanding() {
 
         {/* 추억 전자 앨범 모달 */}
         {isAlbumModalOpen && currentGoldbarForAlbum && (
-          <div className="fixed inset-0 z-[130] flex items-end sm:items-center justify-center p-0 lg:p-4">
+          <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center p-0 lg:p-4">
             <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setIsAlbumModalOpen(false)}></div>
             <div className="relative w-full max-w-md bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh] overflow-hidden">
               <header className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/40">
@@ -1013,7 +1027,7 @@ export default function UserLanding() {
 
         {/* 사용방법 가이드 모달 */}
         {showGuideModal && (
-          <div className="fixed inset-0 z-[130] flex items-end sm:items-center justify-center p-0 lg:p-4">
+          <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center p-0 lg:p-4">
             <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setShowGuideModal(false)}></div>
             <div className="relative w-full max-w-md bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh] overflow-hidden">
               <header className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/40">
@@ -1102,7 +1116,10 @@ export default function UserLanding() {
   // ==========================================
   if (error || (!product && !goldbar && tagId)) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC] p-6 text-center">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC] p-6 text-center relative">
+        <div className="absolute top-4 right-4 sm:top-6 sm:right-6">
+          <AdminLoginHeaderLink />
+        </div>
         <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-3xl flex items-center justify-center text-rose-500 mb-4 animate-bounce">
           <Award className="w-8 h-8" />
         </div>
@@ -1123,13 +1140,18 @@ export default function UserLanding() {
   if (goldbar) {
     return (
       <div className="min-h-screen bg-[#FDFBF7] flex flex-col items-center p-6 pb-20 font-sans leading-relaxed text-slate-900 animate-in fade-in duration-500 select-none">
-        <header className="w-full max-w-md flex justify-between items-center mb-8">
-          <Link to="/" className="text-xs font-black text-amber-600 bg-amber-50 px-4 py-2 rounded-xl border border-amber-200/60 hover:bg-amber-100 transition-all no-underline">
-            ← 홈으로
-          </Link>
-          <span className="text-xs font-black text-emerald-600 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl flex items-center gap-1">
-            <ShieldCheck className="w-4 h-4" /> 정품인증 완료
-          </span>
+        <header className="w-full max-w-md flex flex-col gap-2 mb-8">
+          <div className="flex justify-between items-center gap-2">
+            <Link to="/" className="text-xs font-black text-amber-600 bg-amber-50 px-4 py-2 rounded-xl border border-amber-200/60 hover:bg-amber-100 transition-all no-underline shrink-0">
+              ← 홈으로
+            </Link>
+            <AdminLoginHeaderLink />
+          </div>
+          <div className="flex justify-end">
+            <span className="text-xs font-black text-emerald-600 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl inline-flex items-center gap-1">
+              <ShieldCheck className="w-4 h-4" /> 정품인증 완료
+            </span>
+          </div>
         </header>
 
         <div className="w-full max-w-md bg-white rounded-[2.5rem] border border-amber-100/80 shadow-xl p-8 mb-6 relative overflow-hidden flex flex-col items-center text-center">
@@ -1179,13 +1201,18 @@ export default function UserLanding() {
 
   return (
     <div className="min-h-screen bg-[#F6F7FB] flex flex-col items-center p-6 pb-20 font-sans leading-relaxed text-slate-900 animate-in fade-in duration-500 select-none">
-      <header className="w-full max-w-md flex justify-between items-center mb-8">
-        <Link to="/" className="text-xs font-black text-purple-600 bg-purple-50 px-4 py-2 rounded-xl border border-purple-200/60 hover:bg-purple-100 transition-all no-underline">
-          ← 홈으로
-        </Link>
-        <span className="text-xs font-black text-emerald-600 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl flex items-center gap-1">
-          <ShieldCheck className="w-4 h-4" /> 정품인증 완료
-        </span>
+      <header className="w-full max-w-md flex flex-col gap-2 mb-8">
+        <div className="flex justify-between items-center gap-2">
+          <Link to="/" className="text-xs font-black text-purple-600 bg-purple-50 px-4 py-2 rounded-xl border border-purple-200/60 hover:bg-purple-100 transition-all no-underline shrink-0">
+            ← 홈으로
+          </Link>
+          <AdminLoginHeaderLink />
+        </div>
+        <div className="flex justify-end">
+          <span className="text-xs font-black text-emerald-600 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl inline-flex items-center gap-1">
+            <ShieldCheck className="w-4 h-4" /> 정품인증 완료
+          </span>
+        </div>
       </header>
 
       <div className="w-full max-w-md bg-white rounded-[2.5rem] border border-slate-100/60 shadow-xl p-6 mb-6 flex flex-col items-center text-center">
