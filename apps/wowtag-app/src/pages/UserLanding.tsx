@@ -171,6 +171,43 @@ export default function UserLanding() {
     alert('로그아웃 되었습니다.');
   };
 
+  // 해시 기반 탭 네비게이션 구현 (모바일 뒤로가기 대응)
+  useEffect(() => {
+    // 1. 초기 로드 시 해시가 있으면 해당 탭으로 이동
+    const initialHash = window.location.hash.replace('#', '');
+    if (initialHash === 'products' || initialHash === 'myWallet') {
+      setActiveTab(initialHash as any);
+    } else {
+      setActiveTab('home');
+    }
+
+    // 2. popstate(뒤로가기/앞으로가기) 이벤트 핸들러 등록
+    const handlePopState = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (hash === 'products' || hash === 'myWallet') {
+        setActiveTab(hash as any);
+      } else {
+        setActiveTab('home');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // activeTab이 바뀔 때 URL 해시를 변경
+  useEffect(() => {
+    if (activeTab === 'home') {
+      if (window.location.hash !== '' && window.location.hash !== '#home') {
+        window.history.pushState(null, '', '#home');
+      }
+    } else {
+      if (window.location.hash !== `#${activeTab}`) {
+        window.history.pushState(null, '', `#${activeTab}`);
+      }
+    }
+  }, [activeTab]);
+
   useEffect(() => {
     try {
       const storedUser = localStorage.getItem('wowtag_current_user');
