@@ -124,7 +124,7 @@ export default function AdminDashboard() {
   // --- NFC 로직 ---
   const handleNFCScan = async (target: 'nfc' | 'goldbar' | 'edit') => {
     if (!('NDEFReader' in window)) {
-      alert('이 브라우저는 Web NFC를 지원하지 않습니다.');
+      alert('⚠️ 현재 환경에서 Web NFC를 지원하지 않습니다.\n\n해결 방법:\n1. 삼성 안드로이드 기기의 Chrome 브라우저로 접속해 주세요.\n2. 반드시 HTTPS(보안 연결) 환경이어야 합니다.\n3. 홈 화면에 설치된 앱(PWA) 형태로 실행해 주세요.');
       return;
     }
 
@@ -165,11 +165,18 @@ export default function AdminDashboard() {
       setNfcWriting(true);
       const ndef = new (window as any).NDEFReader();
       const url = `${window.location.origin}/t/${nfcFormData.tag_uid}`;
+
+      // 삼성폰 전용 가이드
+      if (!confirm('NFC 쓰기를 시작합니다.\n\n⚠️ 주의 사항:\n삼성폰 상단 바의 NFC 설정이 "기본 모드(읽기/쓰기)"인지 확인해 주세요. "카드 모드"인 경우 작동하지 않습니다.')) {
+        setNfcWriting(false);
+        return;
+      }
+
       await ndef.write({ records: [{ recordType: "url", data: url }] });
       if ('vibrate' in navigator) navigator.vibrate([100, 50, 100]);
       alert('태그 쓰기 성공!');
     } catch (err) {
-      alert('쓰기 실패');
+      alert('쓰기 실패: 태그를 단말기 뒷면에 정확하게 대어 주시거나, NFC가 "기본 모드"인지 다시 한 번 확인해 주세요.');
     } finally {
       setNfcWriting(false);
     }
@@ -542,6 +549,22 @@ export default function AdminDashboard() {
           {/* 1. 대시보드 탭 */}
           {currentTab === 'dashboard' && (
             <>
+              {/* PWA & NFC 실행 환경 안전장치 가이드 배너 */}
+              <div className="bg-amber-50/60 border border-amber-200/50 p-5 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in fade-in duration-300">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600 shrink-0 border border-amber-200/40"><Bell className="w-5 h-5" /></div>
+                  <div>
+                    <h4 className="font-black text-amber-800 text-sm flex items-center gap-2">
+                      💡 모바일 앱(PWA) NFC 실행 전 필수 확인 사항
+                    </h4>
+                    <p className="text-xs font-bold text-amber-700/80 mt-1 leading-relaxed">
+                      1. 안드로이드 스마트폰 상단 바의 <strong className="text-amber-900 font-black">NFC를 "기본 모드(읽기/쓰기)"</strong>로 활성화했는지 확인해 주세요.<br />
+                      2. 이 페이지를 홈 화면에 앱(PWA)으로 설치하여 실행하면 백그라운드 끊김 없이 더욱 안정적으로 동작합니다.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex items-end justify-between">
                 <div>
                   <h2 className="text-2xl lg:text-4xl font-black text-slate-900 tracking-tight">현황 요약</h2>
