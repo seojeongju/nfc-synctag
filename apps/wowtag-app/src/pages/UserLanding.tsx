@@ -292,8 +292,27 @@ export default function UserLanding() {
         
         {/* 헤더 */}
         <header className="w-full max-w-md flex justify-between items-center h-16 px-2 mb-2">
-          <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center border border-slate-100 shadow-sm opacity-0"></div>
+          {/* 내 소지품 전체 삭제 버튼 */}
+          <button 
+            onClick={() => {
+              if (myGoldbars.length === 0) {
+                alert('내 소지품 목록이 이미 비어 있습니다.');
+                return;
+              }
+              if (confirm('내 소지품 목록에 있는 모든 골드바를 제거하시겠습니까?')) {
+                setMyGoldbars([]);
+                localStorage.setItem('my_scanned_goldbars', JSON.stringify([]));
+                alert('소지품 목록이 모두 비워졌습니다.');
+              }
+            }}
+            className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center border border-slate-100 shadow-sm text-slate-400 hover:text-rose-500 hover:border-rose-300 transition-all cursor-pointer"
+            title="내 소지품 전체 비우기"
+          >
+            <X className="w-4.5 h-4.5" />
+          </button>
+
           <span className="text-xl font-extrabold text-slate-800 tracking-tight">Gold SyncTag</span>
+
           {currentUser ? (
             <button 
               onClick={handleUserLogout} 
@@ -354,33 +373,55 @@ export default function UserLanding() {
               </div>
             </div>
 
-            {/* 하단 화이트 카드 리스트 */}
-            <div className="w-full max-w-md space-y-3.5 mb-6">
-              <div onClick={() => setActiveTab('myWallet')} className="bg-white border border-slate-100/80 rounded-2xl p-4 flex items-center justify-between hover:border-amber-400 hover:shadow-lg transition-all cursor-pointer group shadow-sm">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 group-hover:scale-105 transition-all">
-                    <Award className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h5 className="font-black text-slate-800 text-sm">나의 제품 목록(정품인증서) 바로가기</h5>
-                    <p className="text-[11px] font-bold text-slate-400 mt-0.5">내가 스캔하고 등록한 정품 확인</p>
-                  </div>
+            {/* 히어로 섹션 아래 1x2 그리드 메뉴 */}
+            <div className="w-full max-w-md grid grid-cols-2 gap-3.5 mb-5">
+              {/* 내 소지품 바로가기 */}
+              <div 
+                onClick={() => setActiveTab('myWallet')} 
+                className="bg-white border border-slate-100/80 rounded-[2rem] p-5 flex flex-col justify-between hover:border-amber-400 hover:shadow-lg transition-all cursor-pointer group shadow-sm min-h-[140px]"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 group-hover:scale-105 transition-all mb-auto border border-amber-200/40">
+                  <Award className="w-5 h-5" />
                 </div>
-                <ChevronRight className="w-5 h-5 text-slate-300 group-hover:translate-x-1 transition-all" />
+                <div>
+                  <h5 className="font-black text-slate-800 text-sm group-hover:text-amber-700 transition-colors">내 소지품</h5>
+                  <p className="text-[10px] font-bold text-slate-400 mt-0.5 leading-tight">정품인증서 및 자산 확인</p>
+                </div>
               </div>
 
-              <div onClick={() => setShowGuideModal(true)} className="bg-white border border-slate-100/80 rounded-2xl p-4 flex items-center justify-between hover:border-purple-300 hover:shadow-lg transition-all cursor-pointer group shadow-sm">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600 group-hover:scale-105 transition-all">
-                    <BookOpen className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h5 className="font-black text-slate-800 text-sm">프로그램 사용방법</h5>
-                    <p className="text-[11px] font-bold text-slate-400 mt-0.5">NFC 스캔 및 정품확인 가이드</p>
-                  </div>
+              {/* 추억 전자앨범 바로가기 */}
+              <div 
+                onClick={() => {
+                  if (myGoldbars.length > 0) {
+                    handleOpenAlbum(myGoldbars[0]);
+                  } else {
+                    setActiveTab('myWallet');
+                  }
+                }} 
+                className="bg-white border border-slate-100/80 rounded-[2rem] p-5 flex flex-col justify-between hover:border-emerald-400 hover:shadow-lg transition-all cursor-pointer group shadow-sm min-h-[140px]"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 group-hover:scale-105 transition-all mb-auto border border-emerald-200/40">
+                  <BookOpen className="w-5 h-5" />
                 </div>
-                <ChevronRight className="w-5 h-5 text-slate-300 group-hover:translate-x-1 transition-all" />
+                <div>
+                  <h5 className="font-black text-slate-800 text-sm group-hover:text-emerald-700 transition-colors">추억 전자 앨범</h5>
+                  <p className="text-[10px] font-bold text-slate-400 mt-0.5 leading-tight">추억 앨범 감상 및 기록</p>
+                </div>
               </div>
+            </div>
+
+            {/* 프로그램 사용방법 카드 */}
+            <div onClick={() => setShowGuideModal(true)} className="w-full max-w-md bg-white border border-slate-100/80 rounded-2xl p-4 flex items-center justify-between hover:border-purple-300 hover:shadow-lg transition-all cursor-pointer group shadow-sm mb-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600 group-hover:scale-105 transition-all">
+                  <BookOpen className="w-5 h-5" />
+                </div>
+                <div>
+                  <h5 className="font-black text-slate-800 text-sm group-hover:text-purple-700 transition-colors">프로그램 사용방법 가이드</h5>
+                  <p className="text-[11px] font-bold text-slate-400 mt-0.5">Gold SyncTag 이용방법 확인</p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-slate-300 group-hover:translate-x-1 transition-all" />
             </div>
           </>
         )}
