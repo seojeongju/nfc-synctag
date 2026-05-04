@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LayoutDashboard, Tag, Package, Plus, Scan, Bell, ArrowUpRight, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut, Eye } from 'lucide-react';
+import { LayoutDashboard, Tag, Package, Plus, Scan, Bell, ArrowUpRight, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut, Eye, ChevronDown, ChevronUp } from 'lucide-react';
 
 export default function AdminDashboard() {
   const [currentTab, setCurrentTab] = useState<'dashboard' | 'products' | 'nfc' | 'goldbars'>('dashboard');
@@ -77,6 +77,7 @@ export default function AdminDashboard() {
     cert_url: ''
   });
 
+  const [activeGuide, setActiveGuide] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [nfcScanning, setNfcScanning] = useState(false);
   const [nfcWriting, setNfcWriting] = useState(false);
@@ -595,50 +596,86 @@ export default function AdminDashboard() {
                   <h3 className="text-lg font-black text-slate-800">정품인증 태그(NFC) 등록 및 출고 프로세스 가이드</h3>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 gap-4">
                   {/* 1단계 */}
-                  <div className="bg-slate-50/60 p-6 rounded-3xl border border-slate-100 flex flex-col gap-4 relative overflow-hidden hover:border-purple-200/60 hover:shadow-md transition-all group">
-                    <span className="absolute -right-4 -bottom-4 text-8xl font-black text-slate-100/60 tracking-tighter select-none">01</span>
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center border border-amber-100/60 shadow-sm"><FileText className="w-6 h-6" /></div>
-                      <div>
-                        <span className="text-xs font-black uppercase text-amber-600 tracking-widest block">STEP 01</span>
-                        <h4 className="font-black text-slate-800">카탈로그(제품) 생성</h4>
+                  <div 
+                    onClick={() => setActiveGuide(activeGuide === 1 ? null : 1)}
+                    className="bg-slate-50/60 p-5 rounded-3xl border border-slate-100 flex flex-col gap-4 relative overflow-hidden hover:border-purple-200/60 hover:shadow-md transition-all group cursor-pointer"
+                  >
+                    <span className="absolute -right-4 -bottom-4 text-7xl font-black text-slate-100/60 tracking-tighter select-none">01</span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center border border-amber-100/60 shadow-sm transition-transform group-hover:scale-105">
+                          <FileText className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-black uppercase text-amber-600 tracking-widest block">STEP 01</span>
+                          <h4 className="font-black text-slate-800 text-base">카탈로그(제품) 생성</h4>
+                        </div>
+                      </div>
+                      <div className="text-slate-400">
+                        {activeGuide === 1 ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                       </div>
                     </div>
-                    <p className="text-xs font-bold text-slate-400 leading-relaxed pr-12">
-                      골드바의 <strong className="text-slate-600">일련번호, 중량, 순도, 제조일자</strong> 등의 제원 정보를 등록하여 정품인증서 카탈로그를 생성합니다.
-                    </p>
+                    {activeGuide === 1 && (
+                      <p className="text-xs font-bold text-slate-400 leading-relaxed pr-12 pt-2 border-t border-slate-100 animate-in fade-in slide-in-from-top-1 duration-300">
+                        골드바의 <strong className="text-slate-600">일련번호, 중량, 순도, 제조일자</strong> 등의 제원 정보를 등록하여 정품인증서 카탈로그를 생성합니다.
+                      </p>
+                    )}
                   </div>
 
                   {/* 2단계 */}
-                  <div className="bg-slate-50/60 p-6 rounded-3xl border border-slate-100 flex flex-col gap-4 relative overflow-hidden hover:border-purple-200/60 hover:shadow-md transition-all group">
-                    <span className="absolute -right-4 -bottom-4 text-8xl font-black text-slate-100/60 tracking-tighter select-none">02</span>
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center border border-blue-100/60 shadow-sm"><Smartphone className="w-6 h-6" /></div>
-                      <div>
-                        <span className="text-xs font-black uppercase text-blue-600 tracking-widest block">STEP 02</span>
-                        <h4 className="font-black text-slate-800">신규 NFC 태그 등록</h4>
+                  <div 
+                    onClick={() => setActiveGuide(activeGuide === 2 ? null : 2)}
+                    className="bg-slate-50/60 p-5 rounded-3xl border border-slate-100 flex flex-col gap-4 relative overflow-hidden hover:border-purple-200/60 hover:shadow-md transition-all group cursor-pointer"
+                  >
+                    <span className="absolute -right-4 -bottom-4 text-7xl font-black text-slate-100/60 tracking-tighter select-none">02</span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center border border-blue-100/60 shadow-sm transition-transform group-hover:scale-105">
+                          <Smartphone className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-black uppercase text-blue-600 tracking-widest block">STEP 02</span>
+                          <h4 className="font-black text-slate-800 text-base">신규 NFC 태그 등록</h4>
+                        </div>
+                      </div>
+                      <div className="text-slate-400">
+                        {activeGuide === 2 ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                       </div>
                     </div>
-                    <p className="text-xs font-bold text-slate-400 leading-relaxed pr-12">
-                      실물 NFC 태그의 고유 <strong className="text-slate-600">UID를 스캔하여 매핑</strong>하고, 카탈로그와 연결하여 데이터가 태그에 반영될 수 있도록 준비합니다.
-                    </p>
+                    {activeGuide === 2 && (
+                      <p className="text-xs font-bold text-slate-400 leading-relaxed pr-12 pt-2 border-t border-slate-100 animate-in fade-in slide-in-from-top-1 duration-300">
+                        실물 NFC 태그의 고유 <strong className="text-slate-600">UID를 스캔하여 매핑</strong>하고, 카탈로그와 연결하여 데이터가 태그에 반영될 수 있도록 준비합니다.
+                      </p>
+                    )}
                   </div>
 
                   {/* 3단계 */}
-                  <div className="bg-slate-50/60 p-6 rounded-3xl border border-slate-100 flex flex-col gap-4 relative overflow-hidden hover:border-purple-200/60 hover:shadow-md transition-all group">
-                    <span className="absolute -right-4 -bottom-4 text-8xl font-black text-slate-100/60 tracking-tighter select-none">03</span>
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center border border-emerald-100/60 shadow-sm"><LinkIcon className="w-6 h-6" /></div>
-                      <div>
-                        <span className="text-xs font-black uppercase text-emerald-600 tracking-widest block">STEP 03</span>
-                        <h4 className="font-black text-slate-800">정품인증 및 출고 연동</h4>
+                  <div 
+                    onClick={() => setActiveGuide(activeGuide === 3 ? null : 3)}
+                    className="bg-slate-50/60 p-5 rounded-3xl border border-slate-100 flex flex-col gap-4 relative overflow-hidden hover:border-purple-200/60 hover:shadow-md transition-all group cursor-pointer"
+                  >
+                    <span className="absolute -right-4 -bottom-4 text-7xl font-black text-slate-100/60 tracking-tighter select-none">03</span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center border border-emerald-100/60 shadow-sm transition-transform group-hover:scale-105">
+                          <LinkIcon className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-black uppercase text-emerald-600 tracking-widest block">STEP 03</span>
+                          <h4 className="font-black text-slate-800 text-base">정품인증 및 출고 연동</h4>
+                        </div>
+                      </div>
+                      <div className="text-slate-400">
+                        {activeGuide === 3 ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                       </div>
                     </div>
-                    <p className="text-xs font-bold text-slate-400 leading-relaxed pr-12">
-                      출고 시점에 <strong className="text-slate-600">정품인증서 URL을 등록</strong>하면 최종 출고 처리가 되며, 사용자는 태그 스캔 시 웹 보증서로 바로 연결됩니다.
-                    </p>
+                    {activeGuide === 3 && (
+                      <p className="text-xs font-bold text-slate-400 leading-relaxed pr-12 pt-2 border-t border-slate-100 animate-in fade-in slide-in-from-top-1 duration-300">
+                        출고 시점에 <strong className="text-slate-600">정품인증서 URL을 등록</strong>하면 최종 출고 처리가 되며, 사용자는 태그 스캔 시 웹 보증서로 바로 연결됩니다.
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
