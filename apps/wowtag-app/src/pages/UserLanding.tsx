@@ -24,6 +24,14 @@ type AnyBeforeInstallPrompt = {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 };
 
+/** 실시간 시세 계산기: 중량(g) * 1g당 매입 시세 */
+function calculateCurrentPrice(weightStr: string, pricePerGram: number | null | undefined) {
+  const w = parseFloat(String(weightStr || '').replace(/[^0-9.]/g, ''));
+  const p = Number(pricePerGram);
+  if (isNaN(w) || isNaN(p) || p <= 0) return null;
+  return Math.floor(w * p);
+}
+
 /** 헤더 우측 — 통합 로그인(/login)에서 관리자 계정으로 접속 */
 function AdminLoginHeaderLink({ className = '' }: { className?: string }) {
   return (
@@ -761,6 +769,16 @@ export default function UserLanding() {
                     <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400">중량</span><span className="text-xs font-black text-slate-700">{g.weight || '-'}</span></div>
                     <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400">순도</span><span className="text-xs font-black text-slate-700">{g.purity || '-'}</span></div>
                     <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400">{isCatalog ? '유형' : '제조일자'}</span><span className="text-xs font-black text-slate-700">{isCatalog ? '카탈로그 매칭' : g.minted_at || '-'}</span></div>
+                    
+                    {/* 관리자가 설정한 현재 시세 노출 */}
+                    {Number(g.show_market_price) === 1 && calculateCurrentPrice(g.weight, g.market_price_per_gram) !== null && (
+                      <div className="flex flex-col bg-amber-50/60 px-2 py-1 rounded-lg border border-amber-100/50">
+                        <span className="text-[9px] font-black text-amber-700 uppercase tracking-tighter">실시간 자산 가치</span>
+                        <span className="text-xs font-black text-amber-900 tabular-nums">
+                          {calculateCurrentPrice(g.weight, g.market_price_per_gram)?.toLocaleString()}원
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="relative z-10 grid grid-cols-3 gap-1.5">
@@ -1402,6 +1420,14 @@ export default function UserLanding() {
             <div className="flex justify-between items-center"><span className="text-slate-400 font-bold">중량</span><span className="font-black text-slate-800">{goldbar.weight}</span></div>
             <div className="flex justify-between items-center"><span className="text-slate-400 font-bold">순도</span><span className="font-black text-amber-600 text-base">{goldbar.purity}</span></div>
             <div className="flex justify-between items-center"><span className="text-slate-400 font-bold">제조일자</span><span className="font-black text-slate-800">{goldbar.minted_at || '-'}</span></div>
+            {Number(goldbar.show_market_price) === 1 && calculateCurrentPrice(goldbar.weight, goldbar.market_price_per_gram) !== null && (
+              <div className="pt-3 border-t border-slate-200 flex justify-between items-center">
+                <span className="text-amber-700 font-black">실시간 자산 가치</span>
+                <span className="font-black text-amber-900 text-lg tabular-nums">
+                  {calculateCurrentPrice(goldbar.weight, goldbar.market_price_per_gram)?.toLocaleString()}원
+                </span>
+              </div>
+            )}
           </div>
 
           <a 

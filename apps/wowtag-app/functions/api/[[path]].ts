@@ -432,7 +432,8 @@ app.get('/certificates/download/:tagId', async (c) => {
     const headers = new Headers();
     object.writeHttpMetadata(headers);
     headers.set('etag', object.httpEtag);
-    headers.set('Content-Disposition', `attachment; filename="${cert.cert_file_path.split('/').pop()}"`);
+    const certPath = String(cert.cert_file_path);
+    headers.set('Content-Disposition', `attachment; filename="${certPath.split('/').pop()}"`);
 
     return new Response(object.body, { headers });
   } catch (err: any) {
@@ -1108,13 +1109,17 @@ app.get('/t/:tagId', async (c) => {
 
   let row: {
     tag_uid: string;
-    product_id: unknown;
-    product_pk: unknown;
+    product_id: any;
+    product_pk: any;
   } | null = null;
   for (const v of variants) {
-    const r = await c.env.DB.prepare(tagSql).bind(v).first();
+    const r = (await c.env.DB.prepare(tagSql).bind(v).first()) as any;
     if (r) {
-      row = r as typeof row;
+      row = {
+        tag_uid: String(r.tag_uid),
+        product_id: r.product_id,
+        product_pk: r.product_pk
+      };
       break;
     }
   }
@@ -1153,7 +1158,7 @@ app.get('/t/:tagId', async (c) => {
     return c.json({ error: 'not_found' }, 404);
   }
 
-  const canonicalUid = row?.tag_uid ?? poolRow?.tag_uid ?? certOnlyUid ?? param;
+  const canonicalUid: string = (row?.tag_uid || poolRow?.tag_uid || certOnlyUid || param) as string;
 
   c.executionCtx.waitUntil(
     c.env.DB
@@ -1192,7 +1197,9 @@ app.get('/t/:tagId', async (c) => {
     return c.json({ error: 'not_found' }, 404);
   }
 
-  if (row.product_id == null || row.product_pk == null) {
+  // row가 존재하는 경우 (위에서 !row 체크로 걸러짐)
+  const activeRow = row!;
+  if (activeRow.product_id == null || activeRow.product_pk == null) {
     return c.json({
       nfc_mode: 'asset',
       tag_uid: canonicalUid,
@@ -1451,7 +1458,7 @@ app.get('/admin/stats', async (c) => {
         ) AS display_label
       FROM tag_cnt
       ORDER BY tag_cnt.scan_count DESC
-      LIMIT 5
+      LIMIT 3
     `).all();
 
     const recentLogs = (recentLogsRaw.results || []).map((row: Record<string, unknown>) => ({

@@ -375,9 +375,9 @@ export default function AdminDashboard() {
   const [currentPageNfcAsset, setCurrentPageNfcAsset] = useState(1);
   const [currentPageNfcLinked, setCurrentPageNfcLinked] = useState(1);
   const [currentPageGoldbars, setCurrentPageGoldbars] = useState(1);
-  const ITEMS_PER_PAGE = 5;
+  const ITEMS_PER_PAGE = 3;
   /** 골드바 카드 펼침: 인증서 기준 UID 목록 페이지 크기 */
-  const GOLDBAR_TAG_UID_PAGE_SIZE = 5;
+  const GOLDBAR_TAG_UID_PAGE_SIZE = 3;
   const [expandedGoldbarId, setExpandedGoldbarId] = useState<number | null>(null);
   const [goldbarTagUidsMap, setGoldbarTagUidsMap] = useState<Record<number, string[]>>({});
   const [goldbarTagUidsLoadingId, setGoldbarTagUidsLoadingId] = useState<number | null>(null);
