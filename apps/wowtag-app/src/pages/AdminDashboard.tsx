@@ -8,7 +8,7 @@ import { GuaranteeCertificatePreviewModal } from '../components/GuaranteeCertifi
 import { mapProductToGuaranteeData } from '../lib/guaranteeCertificateData';
 import type { GuaranteeCertificateData } from '../lib/guaranteeCertificateData';
 
-const ADMIN_TAB_IDS = ['dashboard', 'products', 'nfc', 'goldbars', 'userGoldbars', 'releaseRequests'] as const;
+const ADMIN_TAB_IDS = ['dashboard', 'products', 'nfc', 'goldbars', 'assetMarket', 'releaseRequests'] as const;
 type AdminTabId = (typeof ADMIN_TAB_IDS)[number];
 
 /** 제품 폼: 등록가·중량 기준 g당 환산 (표시용) */
@@ -384,6 +384,9 @@ export default function AdminDashboard() {
   const [goldbarTagUidPage, setGoldbarTagUidPage] = useState<Record<number, number>>({});
   const [activeReleaseRequests, setActiveReleaseRequests] = useState<any[]>([]);
   const [loadingRelease, setLoadingRelease] = useState(false);
+  const [assets, setAssets] = useState<any[]>([]);
+  const [loadingAssets, setLoadingAssets] = useState(false);
+  const [currentPageAssets, setCurrentPageAssets] = useState(1);
 
 
   const [activeGuide, setActiveGuide] = useState<number | null>(null);
@@ -715,75 +718,46 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleToggleMarketPrice = async (userId: string, goldbarId: number, currentShow: boolean, price: number) => {
+  const fetchAssets = async () => {
+    setLoadingAssets(true);
     try {
-      const res = await fetch('/api/admin/user-goldbars', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          goldbarId,
-          showMarketPrice: !currentShow,
-          marketPricePerGram: price,
-          showStart: userGoldbars.find(u => u.user_id === userId && u.goldbar_id === goldbarId)?.show_start_at || null,
-          showEnd: userGoldbars.find(u => u.user_id === userId && u.goldbar_id === goldbarId)?.show_end_at || null
-        })
-
+      const res = await fetch('/api/admin/assets', {
+        headers: adminAuthHeaders(),
       });
       if (res.ok) {
-        alert('시세 노출 상태가 성공적으로 변경되었습니다.');
-        fetchUserGoldbars();
+        const data = await res.json();
+        setAssets(Array.isArray(data) ? data : []);
       }
-    } catch (err: any) {
-      alert(`수정 실패: ${err.message}`);
+    } catch (err) {
+      console.error('Failed to fetch assets', err);
+    } finally {
+      setLoadingAssets(false);
     }
   };
 
-  const handleUpdatePriceValue = async (userId: string, goldbarId: number, currentShow: boolean, newPrice: number) => {
+  const handleUpdateAssetMarket = async (goldbarId: number, updateData: any) => {
     try {
-      const res = await fetch('/api/admin/user-goldbars', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          goldbarId,
-          showMarketPrice: currentShow,
-          marketPricePerGram: newPrice,
-          showStart: userGoldbars.find(u => u.user_id === userId && u.goldbar_id === goldbarId)?.show_start_at || null,
-          showEnd: userGoldbars.find(u => u.user_id === userId && u.goldbar_id === goldbarId)?.show_end_at || null
-        })
+      const asset = assets.find(a => a.id === goldbarId);
+      if (!asset) return;
 
-      });
-      if (res.ok) {
-        alert('1g당 시세가 변경되었습니다.');
-        fetchUserGoldbars();
-      }
-    } catch (err: any) {
-      alert(`수정 실패: ${err.message}`);
-    }
-  };
-
-  const handleUpdateDateValue = async (userId: string, goldbarId: number, currentShow: boolean, price: number, field: 'showStart' | 'showEnd', newValue: string) => {
-    try {
-      const ug = userGoldbars.find(u => u.user_id === userId && u.goldbar_id === goldbarId);
-      const res = await fetch('/api/admin/user-goldbars', {
+      const res = await fetch(`/api/goldbars/${goldbarId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: adminAuthHeaders(),
         body: JSON.stringify({
-          userId,
-          goldbarId,
-          showMarketPrice: currentShow,
-          marketPricePerGram: price,
-          showStart: field === 'showStart' ? newValue : (ug?.show_start_at || null),
-          showEnd: field === 'showEnd' ? newValue : (ug?.show_end_at || null)
+          ...asset,
+          ...updateData
         })
       });
+
       if (res.ok) {
-        alert('노출 기간이 변경되었습니다.');
-        fetchUserGoldbars();
+        alert('시세 정보가 업데이트되었습니다.');
+        fetchAssets();
+      } else {
+        const d = await res.json();
+        alert(d.error || '업데이트 실패');
       }
     } catch (err: any) {
-      alert(`수정 실패: ${err.message}`);
+      alert(`오류 발생: ${err.message}`);
     }
   };
 
@@ -816,7 +790,7 @@ export default function AdminDashboard() {
       if (res.ok) {
         alert('처리되었습니다.');
         fetchReleaseRequests();
-        fetchUserGoldbars(); // 목록 갱신
+        fetchAssets(); // 목록 갱신
       } else {
         const d = await res.json();
         alert(d.error || '처리에 실패했습니다.');
@@ -830,7 +804,7 @@ export default function AdminDashboard() {
     fetchProducts();
     fetchGoldbars();
     fetchStats();
-    fetchUserGoldbars();
+    fetchAssets();
     fetchAdminUsers();
     fetchTags();
     fetchReleaseRequests();
@@ -1358,7 +1332,7 @@ export default function AdminDashboard() {
             { id: 'products', icon: Package, label: '제품 정보 관리' },
             { id: 'nfc', icon: Tag, label: 'NFC 태그 관리' },
             { id: 'goldbars', icon: Award, label: '골드바 정품인증 관리' },
-            { id: 'userGoldbars', icon: Hash, label: '골드바 시세 및 유저 관리' },
+            { id: 'assetMarket', icon: Hash, label: '자산별 시세 및 유통 관리' },
           ].map((item) => (
             <button 
               key={item.id}
@@ -1581,17 +1555,17 @@ export default function AdminDashboard() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => goToTab('userGoldbars')}
+                  onClick={() => goToTab('assetMarket')}
                   className="bg-white rounded-2xl border border-slate-100 p-4 sm:p-5 shadow-sm hover:border-purple-200 hover:shadow-md transition-all text-left"
                 >
                   <div className="flex items-center gap-2 text-purple-600 mb-2">
-                    <Users className="w-4 h-4 shrink-0" />
-                    <span className="text-[10px] font-black uppercase tracking-wider">가입 회원</span>
+                    <Activity className="w-4 h-4 shrink-0" />
+                    <span className="text-[10px] font-black uppercase tracking-wider">자산별 시세 관리</span>
                   </div>
                   <p className="text-2xl font-black text-slate-900 tabular-nums">
-                    {statsLoading ? '…' : Number(stats.userCount ?? adminUsers.length).toLocaleString()}
+                    {loadingAssets ? '…' : assets.length.toLocaleString()}
                   </p>
-                  <p className="text-[10px] font-bold text-slate-400 mt-1">간편가입 등록 사용자</p>
+                  <p className="text-[10px] font-bold text-slate-400 mt-1">시세 설정 가능 자산(보증서)</p>
                 </button>
               </div>
 
@@ -2411,238 +2385,110 @@ export default function AdminDashboard() {
             </>
           )}
 
-          {/* 5. 골드바 시세 및 유저 관리 탭 (신설) */}
-          {currentTab === 'userGoldbars' && (
+          {currentTab === 'assetMarket' && (
             <>
               <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
                 <div>
-                  <h2 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">골드바 시세 및 유저 관리</h2>
+                  <h2 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">자산별 시세 및 유통 관리</h2>
                   <p className="text-xs font-bold text-slate-400 mt-1">
-                    각 골드바를 구매한 사용자에게 오늘의 시세를 노출할지 여부와 1g당 매입 시세를 직접 설정할 수 있습니다.
+                    실물 태그와 연결된 자산별로 시세를 설정하고 유통 현황(제품 매칭, 출고일)을 관리합니다.
                   </p>
                 </div>
                 <button
-                  onClick={() => {
-                    fetchUserGoldbars();
-                    fetchAdminUsers();
-                  }}
+                  onClick={fetchAssets}
                   className="px-4 py-2.5 bg-white border border-slate-200 text-slate-600 font-black text-xs rounded-xl hover:bg-slate-50 transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
                 >
-                  🔄 새로고침
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingAssets ? 'animate-spin' : ''}`} /> 새로고침
                 </button>
               </div>
 
-              {/* 시세 입력 → 사용자·골드바 선택 후 일괄 적용 */}
-              <div className="mt-6 bg-white rounded-3xl border border-amber-100 shadow-sm p-5 lg:p-6 space-y-4">
-                <div>
-                  <h3 className="text-base font-black text-slate-900">시세 입력 및 적용 대상 선택</h3>
-                  <p className="text-[11px] font-bold text-slate-400 mt-1">
-                    1g당 매입 시세를 입력한 뒤, 시세를 반영할 사용자와 골드바를 고르고 적용합니다.
-                  </p>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">1g당 매입 시세 (원)</label>
-                    <input
-                      type="number"
-                      min={1}
-                      step={100}
-                      placeholder="예: 110000"
-                      value={bulkMarketPrice}
-                      onChange={(e) => setBulkMarketPrice(e.target.value)}
-                      className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 font-black text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-50"
-                    />
-                  </div>
-                  <div className="space-y-2 flex flex-col justify-end">
-                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">시세 화면 노출</span>
-                    <div className="flex h-12 items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setBulkShowMarket(true)}
-                        className={`flex-1 h-10 rounded-xl text-xs font-black transition-all ${
-                          bulkShowMarket ? 'bg-amber-500 text-white shadow-md' : 'bg-slate-100 text-slate-500'
-                        }`}
-                      >
-                        노출
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setBulkShowMarket(false)}
-                        className={`flex-1 h-10 rounded-xl text-xs font-black transition-all ${
-                          !bulkShowMarket ? 'bg-slate-600 text-white shadow-md' : 'bg-slate-100 text-slate-500'
-                        }`}
-                      >
-                        숨김
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">사용자 선택</label>
-                    <select
-                      value={bulkUserId}
-                      onChange={(e) => {
-                        setBulkUserId(e.target.value);
-                        setBulkGoldbarId('');
-                      }}
-                      className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 font-bold text-sm outline-none focus:border-amber-400 cursor-pointer"
-                    >
-                      <option value="">사용자를 선택하세요</option>
-                      {adminUsers.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.email}
-                          {u.name ? ` · ${u.name}` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">골드바 선택</label>
-                    <select
-                      value={bulkGoldbarId === '' ? '' : String(bulkGoldbarId)}
-                      onChange={(e) =>
-                        setBulkGoldbarId(e.target.value ? Number(e.target.value) : '')
-                      }
-                      disabled={!bulkUserId || bulkOwnedGoldbars.length === 0}
-                      className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 font-bold text-sm outline-none focus:border-amber-400 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <option value="">
-                        {!bulkUserId
-                          ? '먼저 사용자를 선택하세요'
-                          : bulkOwnedGoldbars.length === 0
-                            ? '해당 사용자 지갑에 등록된 골드바가 없습니다'
-                            : '골드바를 선택하세요'}
-                      </option>
-                      {bulkOwnedGoldbars.map((ug: any) => (
-                        <option key={`${ug.user_id}-${ug.goldbar_id}`} value={ug.goldbar_id}>
-                          {ug.serial_number} · {ug.weight}
-                          {ug.purity ? ` · ${ug.purity}` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">노출 시작일 (선택)</label>
-                    <input
-                      type="date"
-                      value={bulkShowStart}
-                      onChange={(e) => setBulkShowStart(e.target.value)}
-                      className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 font-bold text-sm outline-none focus:border-amber-400"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">노출 종료일 (선택)</label>
-                    <input
-                      type="date"
-                      value={bulkShowEnd}
-                      onChange={(e) => setBulkShowEnd(e.target.value)}
-                      className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 font-bold text-sm outline-none focus:border-amber-400"
-                    />
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleBulkApplyMarket}
-                  className="w-full h-12 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-sm shadow-lg shadow-amber-500/25 hover:opacity-95 active:scale-[0.99] transition-all"
-                >
-                  시세 적용하기
-                </button>
-
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mt-6 w-full min-w-0">
-                {userGoldbars && userGoldbars.map((ug) => (
-                  <div key={ug.id} className="bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between hover:border-amber-400 hover:shadow-md transition-all gap-4 sm:gap-5 select-none relative overflow-hidden group w-full min-w-0 max-w-full">
-                    <div className="absolute -right-4 -top-4 w-20 h-20 bg-amber-50/40 rounded-full blur-2xl group-hover:bg-amber-100/40 transition-colors"></div>
-                    <div>
-                      {/* 카드 상단: 유저 정보 및 골드바 정보 */}
-                      <div className="flex justify-between items-start gap-4">
-                        <div className="space-y-1 flex-1">
-                          <span className="text-[10px] font-black uppercase text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200/40 tracking-widest block max-w-fit">
-                            OWNER INFO
+              <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {assets.length > 0 ? (
+                  assets.map((asset) => (
+                    <div key={asset.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:border-amber-400 hover:shadow-md transition-all flex flex-col justify-between gap-5 relative overflow-hidden group">
+                      <div className="absolute -right-4 -top-4 w-20 h-20 bg-amber-50/40 rounded-full blur-2xl group-hover:bg-amber-100/40 transition-colors"></div>
+                      <div>
+                        <div className="flex justify-between items-start mb-4">
+                          <span className="text-[10px] font-black uppercase text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200/40 tracking-widest">
+                            ASSET INFO
                           </span>
-                          <h4 className="text-sm font-black text-slate-800 break-all pt-1 leading-tight">{ug.user_email}</h4>
+                          <span className="text-[11px] font-bold text-slate-400">
+                            {asset.matching_date ? `매칭일: ${new Date(asset.matching_date).toLocaleDateString()}` : '출고 대기'}
+                          </span>
                         </div>
-                        <div className="text-right flex-shrink-0">
-                          <span className="text-[10px] font-black text-slate-400 uppercase block tracking-widest">WEIGHT</span>
-                          <span className="text-sm font-black text-slate-700">{ug.weight}g</span>
-                        </div>
-                      </div>
+                        
+                        <div className="space-y-4">
+                          <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">SERIAL & TAG</p>
+                            <h4 className="text-sm font-black text-slate-800 break-all">{asset.serial_number}</h4>
+                            <p className="text-xs font-mono font-bold text-amber-600 mt-0.5">{formatCertTagForUi(asset.tag_uid || '')}</p>
+                          </div>
+                          
+                          <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100/60">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">MATCHED PRODUCT</p>
+                            <p className="text-xs font-black text-slate-800">{asset.product_name || '매칭된 제품 없음'}</p>
+                            <p className="text-[10px] font-bold text-slate-500">{asset.weight}g · {asset.purity}</p>
+                          </div>
 
-                      {/* 카드 중단: 골드바 디테일 */}
-                      <div className="mt-4 bg-slate-50/60 border border-slate-100/60 p-4 rounded-2xl space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-400">일련번호</span>
-                          <span className="text-sm font-black text-slate-800">{ug.serial_number}</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-400">구매일</span>
-                          <span className="text-xs font-black text-slate-600">{ug.added_at ? new Date(ug.added_at).toLocaleDateString() : '보증서 보유'}</span>
+                          <div className="pt-4 border-t border-slate-100 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-black text-slate-500 uppercase tracking-widest">1g당 시세</span>
+                              <div className="flex items-center gap-2">
+                                <input 
+                                  type="number" 
+                                  defaultValue={asset.market_price_per_gram || 0} 
+                                  onBlur={(e) => handleUpdateAssetMarket(asset.id, { market_price_per_gram: Number(e.target.value) })}
+                                  className="w-24 h-9 bg-white border border-slate-200 rounded-lg text-center font-black text-xs outline-none focus:border-amber-500 transition-all" 
+                                />
+                                <span className="text-[10px] font-black text-slate-400">원</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-black text-slate-500 uppercase tracking-widest">시세 노출</span>
+                              <button
+                                onClick={() => handleUpdateAssetMarket(asset.id, { show_market_price: !asset.show_market_price })}
+                                className={`px-3 py-1.5 rounded-lg font-black text-[10px] transition-all ${
+                                  asset.show_market_price
+                                    ? 'bg-amber-500 text-white shadow-sm'
+                                    : 'bg-slate-100 text-slate-400'
+                                }`}
+                              >
+                                {asset.show_market_price ? 'ON' : 'OFF'}
+                              </button>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 pt-1">
+                              <div className="space-y-1">
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">시작일</label>
+                                <input 
+                                  type="date" 
+                                  value={asset.show_start_at ? asset.show_start_at.split('T')[0] : ''} 
+                                  onChange={(e) => handleUpdateAssetMarket(asset.id, { show_start_at: e.target.value })}
+                                  className="w-full h-8 bg-slate-50 border border-slate-100 rounded-lg px-2 font-bold text-[10px] outline-none"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">종료일</label>
+                                <input 
+                                  type="date" 
+                                  value={asset.show_end_at ? asset.show_end_at.split('T')[0] : ''} 
+                                  onChange={(e) => handleUpdateAssetMarket(asset.id, { show_end_at: e.target.value })}
+                                  className="w-full h-8 bg-slate-50 border border-slate-100 rounded-lg px-2 font-bold text-[10px] outline-none"
+                                />
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
-
-                    {/* 카드 하단: 1g당 매입 시세 수정 및 노출 설정 */}
-                    <div className="border-t border-slate-50/80 pt-4 flex flex-col gap-3">
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between min-w-0">
-                        <span className="text-xs font-black text-slate-500 uppercase tracking-widest shrink-0">1g당 시세</span>
-                        <div className="flex items-center gap-2 min-w-0 w-full sm:w-auto justify-end">
-                          <input 
-                            type="number" 
-                            defaultValue={ug.market_price_per_gram || 110000} 
-                            onBlur={(e) => handleUpdatePriceValue(ug.user_id, ug.goldbar_id, ug.show_market_price === 1, Number(e.target.value))}
-                            className="w-full min-w-0 max-w-[11rem] sm:w-28 h-10 bg-white border border-slate-200 rounded-xl text-center font-black text-sm outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-50 transition-all shadow-sm" 
-                          />
-                          <span className="text-xs font-black text-slate-400 shrink-0">원</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-black text-slate-500 uppercase tracking-widest">시세 노출 여부</span>
-                        <button
-                          onClick={() => handleToggleMarketPrice(ug.user_id, ug.goldbar_id, ug.show_market_price === 1, ug.market_price_per_gram || 110000)}
-                          className={`px-4 py-2.5 rounded-xl font-black text-xs transition-all shadow-sm flex items-center gap-1.5 cursor-pointer ${
-                            ug.show_market_price === 1 
-                              ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20 hover:bg-amber-600' 
-                              : 'bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-500'
-                          }`}
-                        >
-                          {ug.show_market_price === 1 ? '노출 중' : '숨김 중'}
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 mt-1">
-                        <div className="space-y-1">
-                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-tighter pl-1">시작일</label>
-                          <input 
-                            type="date" 
-                            value={ug.show_start_at ? ug.show_start_at.split('T')[0] : ''} 
-                            onChange={(e) => handleUpdateDateValue(ug.user_id, ug.goldbar_id, ug.show_market_price === 1, ug.market_price_per_gram || 110000, 'showStart', e.target.value)}
-                            className="w-full h-9 bg-slate-50 border border-slate-100 rounded-lg px-2 font-bold text-[11px] outline-none focus:border-amber-400 transition-all"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-tighter pl-1">종료일</label>
-                          <input 
-                            type="date" 
-                            value={ug.show_end_at ? ug.show_end_at.split('T')[0] : ''} 
-                            onChange={(e) => handleUpdateDateValue(ug.user_id, ug.goldbar_id, ug.show_market_price === 1, ug.market_price_per_gram || 110000, 'showEnd', e.target.value)}
-                            className="w-full h-9 bg-slate-50 border border-slate-100 rounded-lg px-2 font-bold text-[11px] outline-none focus:border-amber-400 transition-all"
-                          />
-                        </div>
-                      </div>
+                  ))
+                ) : (
+                  <div className="col-span-full py-20 bg-white rounded-3xl border border-dashed border-slate-200 flex flex-col items-center justify-center text-center">
+                    <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300 mb-4">
+                      <Package className="w-8 h-8" />
                     </div>
-
-                  </div>
-                ))}
-
-                {(!userGoldbars || userGoldbars.length === 0) && (
-                  <div className="col-span-1 md:col-span-2 lg:col-span-3 bg-white p-12 text-center rounded-[2.5rem] border border-slate-100/60 shadow-sm">
-                    <p className="text-sm font-bold text-slate-400">현재 골드바를 소유한 사용자 정보가 없습니다.</p>
+                    <p className="font-black text-slate-400 text-sm">등록된 자산이 없습니다.</p>
                   </div>
                 )}
               </div>
@@ -3611,7 +3457,7 @@ export default function AdminDashboard() {
            { id: 'products', icon: Package, label: '제품' },
            { id: 'nfc', icon: Tag, label: '태그' },
            { id: 'goldbars', icon: Award, label: '인증' },
-           { id: 'userGoldbars', icon: Hash, label: '시세' },
+           { id: 'assetMarket', icon: Hash, label: '시세' },
          ].map((nav) => (
            <button 
              key={nav.id} onClick={() => { goToTab(nav.id as AdminTabId); window.scrollTo({ top: 0, behavior: 'smooth' }); }}

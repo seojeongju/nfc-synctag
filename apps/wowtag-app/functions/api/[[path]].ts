@@ -301,16 +301,15 @@ app.get('/goldbars/t/:tagId', async (c) => {
       SELECT 
         g.*, c.tag_uid, c.cert_file_path,
         CASE 
-          WHEN ug.show_market_price = 1 
-               AND (ug.show_start_at IS NULL OR ug.show_start_at <= ?)
-               AND (ug.show_end_at IS NULL OR ug.show_end_at >= ?)
+          WHEN g.show_market_price = 1 
+               AND (g.show_start_at IS NULL OR g.show_start_at = '' OR g.show_start_at <= ?)
+               AND (g.show_end_at IS NULL OR g.show_end_at = '' OR g.show_end_at >= ?)
           THEN 1 
           ELSE 0 
         END as show_market_price,
-        ug.market_price_per_gram
+        g.market_price_per_gram
       FROM goldbars g
       JOIN certificates c ON g.id = c.goldbar_id
-      LEFT JOIN user_goldbars ug ON g.id = ug.goldbar_id
       WHERE c.tag_uid = ?
     `;
 
@@ -1232,6 +1231,10 @@ app.put('/goldbars/:id', async (c) => {
       status,
       cert_url,
       display_name,
+      show_market_price,
+      market_price_per_gram,
+      show_start_at,
+      show_end_at,
     } = body;
 
     if (!serial_number || !weight) {
@@ -1248,11 +1251,24 @@ app.put('/goldbars/:id', async (c) => {
     try {
       await c.env.DB.prepare('ALTER TABLE goldbars ADD COLUMN display_name TEXT').run();
     } catch (_) {}
+    try {
+      await c.env.DB.prepare('ALTER TABLE goldbars ADD COLUMN show_market_price INTEGER DEFAULT 0').run();
+    } catch (_) {}
+    try {
+      await c.env.DB.prepare('ALTER TABLE goldbars ADD COLUMN market_price_per_gram REAL').run();
+    } catch (_) {}
+    try {
+      await c.env.DB.prepare('ALTER TABLE goldbars ADD COLUMN show_start_at TEXT').run();
+    } catch (_) {}
+    try {
+      await c.env.DB.prepare('ALTER TABLE goldbars ADD COLUMN show_end_at TEXT').run();
+    } catch (_) {}
 
     // 1. 골드바 정보 갱신
     await c.env.DB.prepare(`
       UPDATE goldbars 
-      SET serial_number = ?, weight = ?, purity = ?, minted_at = ?, status = ?, cert_url = ?, display_name = ?
+      SET serial_number = ?, weight = ?, purity = ?, minted_at = ?, status = ?, cert_url = ?, display_name = ?,
+          show_market_price = ?, market_price_per_gram = ?, show_start_at = ?, show_end_at = ?
       WHERE id = ?
     `)
       .bind(
@@ -1263,6 +1279,10 @@ app.put('/goldbars/:id', async (c) => {
         status || 'CATALOG',
         cert_url || '',
         typeof display_name === 'string' ? display_name : '',
+        show_market_price ? 1 : 0,
+        market_price_per_gram || null,
+        show_start_at || null,
+        show_end_at || null,
         id
       )
       .run();
@@ -1484,6 +1504,32 @@ app.get('/admin/stats', async (c) => {
       topGoldbars,
       topScanned: topRows
     });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// 관리자: 자산(태그+보증서+매칭제품) 통합 조회 API
+app.get('/admin/assets', async (c) => {
+  try {
+    if (!verifyAdminToken(c)) {
+      return c.json({ error: '관리자 인증이 필요합니다.' }, 401);
+    }
+    const { results } = await c.env.DB.prepare(`
+      SELECT 
+        g.*,
+        c.tag_uid,
+        c.issued_at as cert_issued_at,
+        p.name as product_name,
+        t.created_at as matching_date
+      FROM goldbars g
+      LEFT JOIN certificates c ON g.id = c.goldbar_id
+      LEFT JOIN tags t ON c.tag_uid = t.tag_uid
+      LEFT JOIN products p ON t.target_id = p.id
+      ORDER BY g.created_at DESC
+    `).all();
+
+    return c.json(results);
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
   }
