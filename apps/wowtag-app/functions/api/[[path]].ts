@@ -573,6 +573,64 @@ async function removeTagFromGoldbarPool(db: D1Database, tagUid: string) {
   }
 }
 
+/**
+ * [신규] 태그 매칭(제품 연동) 시 해당 태그를 위한 자산(Goldbar) 레코드를 보장합니다.
+ * '태그가 매칭되었다는 것은 자산이 생성되었다'는 원칙을 구현합니다.
+ */
+async function ensureAssetForTag(db: D1Database, tagUid: string, productId?: number | null) {
+  // 1. 이미 certificates에 연결된 goldbar가 있는지 확인
+  const existing = await db.prepare(`
+    SELECT g.id FROM goldbars g
+    INNER JOIN certificates c ON g.id = c.goldbar_id
+    WHERE c.tag_uid = ?
+    LIMIT 1
+  `).bind(tagUid).first();
+
+  if (existing) return (existing as any).id;
+
+  let name = "";
+  let weight = "0";
+  let purity = "24K";
+
+  if (productId) {
+    const product = await db.prepare("SELECT name, weight, purity FROM products WHERE id = ?").bind(productId).first();
+    if (product) {
+      name = (product as any).name;
+      weight = (product as any).weight || "0";
+      purity = (product as any).purity || "24K";
+    }
+  }
+
+  // 2. 새로운 goldbar 생성 (자산화)
+  // 일련번호는 중복 방지를 위해 태그 UID와 시간을 조합
+  const serial = `ASSET-${tagUid.slice(-6).toUpperCase()}-${Date.now().toString().slice(-4)}`;
+  
+  const result = await db.prepare(`
+    INSERT INTO goldbars (serial_number, weight, purity, status, display_name)
+    VALUES (?, ?, ?, ?, ?)
+  `)
+  .bind(
+    serial,
+    weight,
+    purity,
+    'TAGGED',
+    name || '신규 매칭 자산'
+  )
+  .run();
+
+  const newGoldbarId = result.meta.last_row_id;
+
+  // 3. certificates 테이블에 연결 (보증서 파일은 기본값 처리)
+  await db.prepare(`
+    INSERT OR REPLACE INTO certificates (goldbar_id, tag_uid, issued_at, cert_file_path)
+    VALUES (?, ?, ?, ?)
+  `)
+  .bind(newGoldbarId, tagUid, new Date().toISOString(), `certificates/auto_${serial}.pdf`)
+  .run();
+
+  return newGoldbarId;
+}
+
 function verifyAdminToken(c: { req: { header: (name: string) => string | undefined }; env: Bindings }): boolean {
   const auth = c.req.header('Authorization');
   const alt = c.req.header('X-Admin-Token');
@@ -686,6 +744,9 @@ app.post('/products', async (c) => {
       await c.env.DB.prepare(
         'INSERT OR REPLACE INTO tags (tag_uid, product_id) VALUES (?, ?)'
       ).bind(tag_uid, productId).run();
+      
+      // 자산 생성 보장
+      await ensureAssetForTag(c.env.DB, tag_uid, productId);
     }
 
     return c.json({ success: true, productId }, 201);
@@ -926,6 +987,9 @@ app.post('/tags', async (c) => {
 
     await c.env.DB.prepare('INSERT OR REPLACE INTO tags (tag_uid, product_id) VALUES (?, ?)').bind(rawUid, pid).run();
 
+    // 자산 생성 보장 (매칭 = 자산 생성)
+    await ensureAssetForTag(c.env.DB, rawUid, pid);
+
     return c.json({ success: true, mode: 'mapped' });
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
@@ -960,6 +1024,9 @@ app.put('/tags/link-product', async (c) => {
       }
       return c.json({ error: '이미 제품이 연결된 태그이거나 연동할 수 없습니다.' }, 400);
     }
+
+    // 자산 생성 보장 (매칭 = 자산 생성)
+    await ensureAssetForTag(c.env.DB, rawUid, pid);
 
     return c.json({ success: true });
   } catch (err: any) {
