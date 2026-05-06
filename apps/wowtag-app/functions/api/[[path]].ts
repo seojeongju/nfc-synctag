@@ -591,7 +591,7 @@ async function ensureGoldbarsAssetColumns(db: D1Database) {
 
 /**
  * [신규] 태그 매칭(제품 연동) 시 해당 태그를 위한 자산(Goldbar) 레코드를 보장합니다.
- * '태그가 매칭되었다는 것은 자산이 생성되었다'는 원칙을 구현합니다.
+ * '태그가 매칭되었다는 것은 자산이 생성되었다'는 원칙을 구현하며, 제품에 연결된 보증서 템플릿이 있다면 이를 자동 상속합니다.
  */
 async function ensureAssetForTag(db: D1Database, tagUid: string, productId?: number | null) {
   // 스키마 보장
@@ -599,29 +599,45 @@ async function ensureAssetForTag(db: D1Database, tagUid: string, productId?: num
 
   // 1. 이미 certificates에 연결된 goldbar가 있는지 확인
   const existing = await db.prepare(`
-    SELECT g.id FROM goldbars g
+    SELECT g.id, g.status FROM goldbars g
     INNER JOIN certificates c ON g.id = c.goldbar_id
     WHERE c.tag_uid = ?
     LIMIT 1
   `).bind(tagUid).first();
 
+  // 이미 보증서가 발행된(CERTIFIED) 상태라면 기존 ID 반환
   if (existing) return (existing as any).id;
 
   let name = "";
   let weight = "0";
   let purity = "24K";
+  let templateCertPath = "";
 
   if (productId) {
-    const product = await db.prepare("SELECT name, weight, purity FROM products WHERE id = ?").bind(productId).first();
+    // 제품 정보 및 카탈로그 보증서 템플릿 정보 조회
+    const product = await db.prepare(`
+      SELECT p.name, p.weight, p.purity,
+             c.cert_file_path as template_cert_path,
+             g.weight as template_weight,
+             g.purity as template_purity
+      FROM products p
+      LEFT JOIN certificates c ON p.certificate_id = c.id
+      LEFT JOIN goldbars g ON c.goldbar_id = g.id
+      WHERE p.id = ?
+    `).bind(productId).first();
+
     if (product) {
-      name = (product as any).name;
-      weight = (product as any).weight || "0";
-      purity = (product as any).purity || "24K";
+      const p = product as any;
+      name = p.name;
+      // 제품 자체 정보 우선, 없으면 템플릿(카탈로그) 정보 사용
+      weight = p.weight || p.template_weight || "0";
+      purity = p.purity || p.template_purity || "24K";
+      templateCertPath = p.template_cert_path || "";
     }
   }
 
   // 2. 새로운 goldbar 생성 (자산화)
-  // 일련번호는 중복 방지를 위해 태그 UID와 시간을 조합
+  // 제품과 매칭된 상태이므로 상태를 'SHIPPED'(출고/정품인증)로 설정합니다.
   const serial = `ASSET-${tagUid.slice(-6).toUpperCase()}-${Date.now().toString().slice(-4)}`;
   
   const result = await db.prepare(`
@@ -632,20 +648,26 @@ async function ensureAssetForTag(db: D1Database, tagUid: string, productId?: num
     serial,
     weight,
     purity,
-    'TAGGED',
+    'SHIPPED', // 제품 매칭 시 즉시 출고/인증 상태로 전환
     name || '신규 매칭 자산'
   )
   .run();
 
   const newGoldbarId = result.meta.last_row_id;
 
-  // 3. certificates 테이블에 연결 (보증서 파일은 기본값 처리)
+  // 3. certificates 테이블에 연결 (자동 발행)
+  // 템플릿 보증서 파일이 있다면 해당 경로를 사용하고, 없으면 기본 경로를 생성합니다.
+  const certFilePath = templateCertPath || `certificates/auto_${serial}.pdf`;
+
   await db.prepare(`
     INSERT OR REPLACE INTO certificates (goldbar_id, tag_uid, issued_at, cert_file_path)
     VALUES (?, ?, ?, ?)
   `)
-  .bind(newGoldbarId, tagUid, new Date().toISOString(), `certificates/auto_${serial}.pdf`)
+  .bind(newGoldbarId, tagUid, new Date().toISOString(), certFilePath)
   .run();
+
+  // 골드바 자산 풀에서 해당 태그 제거 (풀에 있었을 경우)
+  await removeTagFromGoldbarPool(db, tagUid);
 
   return newGoldbarId;
 }

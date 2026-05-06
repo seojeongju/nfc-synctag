@@ -1052,6 +1052,8 @@ export default function AdminDashboard() {
         alert(data.mode === 'asset' ? '자산 태그로 등록되었습니다.' : '태그 매핑이 완료되었습니다.');
         fetchProducts();
         fetchTags();
+        fetchAssets();
+        fetchGoldbars();
       } else {
         alert(typeof data.error === 'string' ? data.error : '등록에 실패했습니다.');
       }
@@ -1071,10 +1073,12 @@ export default function AdminDashboard() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        alert('출고 시 제품 연동이 완료되었습니다.');
+        alert('출고 시 제품 연동이 완료되었습니다.\n보증서가 자동으로 발행되었습니다.');
         setExpandedUnlinkedTagUid(null);
         fetchTags();
         fetchProducts();
+        fetchAssets();
+        fetchGoldbars();
       } else {
         alert(typeof data.error === 'string' ? data.error : '연동에 실패했습니다.');
       }
