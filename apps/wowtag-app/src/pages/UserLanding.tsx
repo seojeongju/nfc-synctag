@@ -131,10 +131,6 @@ export default function UserLanding() {
     [closeAllUserModals]
   );
 
-  useEffect(() => {
-    closeAllUserModals();
-  }, [activeTab, closeAllUserModals]);
-
   // 앨범 데이터 패치
   const fetchAlbum = async (goldbarId: any) => {
     try {
@@ -159,6 +155,51 @@ export default function UserLanding() {
     setCurrentGoldbarForAlbum(g);
     setIsAlbumModalOpen(true);
     fetchAlbum(g.id || g.serial_number);
+  };
+
+  /** [신규] 소유권 해지 요청 */
+  const handleReleaseRequest = async (goldbarId: number) => {
+    if (!currentUser) {
+      alert('로그인이 필요한 서비스입니다.');
+      return;
+    }
+    if (!confirm('소유권을 해지 요청하시겠습니까? 관리자 승인 후 재판매 가능한 상태가 됩니다.')) return;
+
+    try {
+      const res = await fetch('/api/user/goldbars/release-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: currentUser.id,
+          goldbarId: goldbarId,
+          message: '재판매를 위한 소유권 해지 요청'
+        }),
+      });
+
+      if (res.ok) {
+        alert('소유권 해지 요청이 완료되었습니다. 관리자 승인 후 목록에서 삭제됩니다.');
+        // 목록 갱신 (sync 호출)
+        const st = location.state as { nfcScan?: { tag_uid?: string } } | null;
+        const tagUid = st?.nfcScan?.tag_uid || readWalletTagUid();
+        if (tagUid) {
+          const syncRes = await fetch(`/api/user/sync`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: currentUser.id, goldbarIds: [] }),
+          });
+          if (syncRes.ok) {
+            const syncData = await syncRes.json();
+            setMyGoldbars(syncData.syncGoldbars || []);
+            persistWalletGoldbars(syncData.syncGoldbars || []);
+          }
+        }
+      } else {
+        const d = await res.json();
+        alert(d.error || '요청 처리에 실패했습니다.');
+      }
+    } catch (err) {
+      alert('오류가 발생했습니다.');
+    }
   };
 
   // 앨범 사진 파일 선택 & 업로드
@@ -1238,7 +1279,7 @@ export default function UserLanding() {
                       )}
                     </div>
                     <div className="space-y-2">
-                      {walletDetailItem.video_url && (
+                      {walletDetailItem.video_url ? (
                         <a
                           href={walletDetailItem.video_url}
                           target="_blank"
@@ -1247,8 +1288,12 @@ export default function UserLanding() {
                         >
                           <Play className="w-4 h-4 fill-white" /> 사용 설명 영상
                         </a>
+                      ) : (
+                        <div className="w-full py-3.5 bg-slate-50 text-slate-400 font-bold rounded-2xl flex items-center justify-center gap-2 border border-dashed border-slate-200 text-sm">
+                          사용 설명 영상 데이터가 없습니다.
+                        </div>
                       )}
-                      {walletDetailItem.manual_url && (
+                      {walletDetailItem.manual_url ? (
                         <a
                           href={walletDetailItem.manual_url}
                           target="_blank"
@@ -1257,6 +1302,10 @@ export default function UserLanding() {
                         >
                           <Download className="w-4 h-4" /> 제품 설명서
                         </a>
+                      ) : (
+                        <div className="w-full py-3.5 bg-slate-50 text-slate-400 font-bold rounded-2xl flex items-center justify-center gap-2 border border-dashed border-slate-200 text-sm">
+                          제품 설명서 데이터가 없습니다.
+                        </div>
                       )}
                     </div>
                   </>
@@ -1303,6 +1352,25 @@ export default function UserLanding() {
                         <ShieldCheck className="w-4 h-4" /> 정품인증서 URL
                       </a>
                     )}
+
+                    {/* 소유권 해지 요청 버튼 추가 */}
+                    <div className="pt-2">
+                      {walletDetailItem.release_status === 'PENDING' ? (
+                        <div className="w-full py-3.5 bg-slate-100 text-slate-400 font-black rounded-2xl flex items-center justify-center gap-2 border border-slate-200 text-sm">
+                          ⏳ 소유권 해지 승인 대기 중
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleReleaseRequest(walletDetailItem.id || walletDetailItem.goldbar_id)}
+                          className="w-full py-3.5 bg-rose-50 text-rose-600 font-black rounded-2xl flex items-center justify-center gap-2 hover:bg-rose-100 border border-rose-200 transition-all text-sm"
+                        >
+                          📦 소유권 해지 요청 (재판매용)
+                        </button>
+                      )}
+                      <p className="text-[10px] font-bold text-slate-400 text-center mt-2 px-4 leading-relaxed">
+                        재판매를 위해 소유권을 해지하려면 관리자 승인이 필요합니다. 승인 즉시 내 지갑과 앨범에서 삭제됩니다.
+                      </p>
+                    </div>
                   </>
                 )}
                 <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
@@ -1494,15 +1562,23 @@ export default function UserLanding() {
         )}
 
         <div className="w-full space-y-3">
-          {displayData.video_url && (
+          {displayData.video_url ? (
             <a href={displayData.video_url} target="_blank" rel="noreferrer" className="w-full py-3.5 bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-black rounded-2xl flex items-center justify-center gap-3 shadow-lg shadow-purple-500/20 hover:from-purple-600 hover:to-indigo-600 transition-all text-sm no-underline">
               <Play className="w-4.5 h-4.5 fill-white" /> 사용 설명 영상 보기
             </a>
+          ) : (
+            <div className="w-full py-3.5 bg-slate-50 text-slate-400 font-bold rounded-2xl flex items-center justify-center gap-2 border border-dashed border-slate-200 text-sm">
+              사용 설명 영상 데이터가 없습니다.
+            </div>
           )}
-          {displayData.manual_url && (
+          {displayData.manual_url ? (
             <a href={displayData.manual_url} target="_blank" rel="noreferrer" className="w-full py-3.5 bg-slate-100 text-slate-700 font-black rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-200 transition-all text-sm no-underline">
               <Download className="w-4.5 h-4.5" /> 제품 설명서 확인
             </a>
+          ) : (
+            <div className="w-full py-3.5 bg-slate-50 text-slate-400 font-bold rounded-2xl flex items-center justify-center gap-2 border border-dashed border-slate-200 text-sm">
+              제품 설명서 데이터가 없습니다.
+            </div>
           )}
         </div>
       </div>

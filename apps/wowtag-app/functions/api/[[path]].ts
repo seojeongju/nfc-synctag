@@ -1819,6 +1819,78 @@ app.put('/admin/user-goldbars', async (c) => {
   }
 });
 
+/** [신규] 관리자: 소유권 해지 요청 목록 조회 */
+app.get('/admin/release-requests', async (c) => {
+  try {
+    // 자동 마이그레이션
+    try {
+      await c.env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS ownership_release_requests (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id TEXT NOT NULL,
+          goldbar_id INTEGER NOT NULL,
+          status TEXT DEFAULT 'PENDING',
+          message TEXT,
+          requested_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          handled_at DATETIME
+        )
+      `).run();
+    } catch (_) {}
+
+    const { results } = await c.env.DB.prepare(`
+      SELECT 
+        orr.*, u.email as user_email, u.name as user_name, 
+        g.serial_number, g.weight
+      FROM ownership_release_requests orr
+      JOIN users u ON orr.user_id = u.id
+      JOIN goldbars g ON orr.goldbar_id = g.id
+      WHERE orr.status = 'PENDING'
+      ORDER BY orr.requested_at DESC
+    `).all();
+
+    return c.json(results || []);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+/** [신규] 관리자: 소유권 해지 요청 승인 또는 반려 */
+app.put('/admin/release-requests/:id', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const { action } = await c.req.json(); // 'APPROVE' or 'REJECT'
+
+    const request = await c.env.DB.prepare('SELECT * FROM ownership_release_requests WHERE id = ?')
+      .bind(id)
+      .first() as any;
+
+    if (!request) return c.json({ error: '요청을 찾을 수 없습니다.' }, 404);
+
+    const now = new Date().toISOString();
+
+    if (action === 'APPROVE') {
+      // 1. 실제 소유권 데이터 삭제 (user_goldbars)
+      await c.env.DB.prepare('DELETE FROM user_goldbars WHERE user_id = ? AND goldbar_id = ?')
+        .bind(request.user_id, request.goldbar_id)
+        .run();
+      
+      // 2. 요청 상태 업데이트
+      await c.env.DB.prepare('UPDATE ownership_release_requests SET status = ?, handled_at = ? WHERE id = ?')
+        .bind('APPROVED', now, id)
+        .run();
+    } else {
+      // 반려
+      await c.env.DB.prepare('UPDATE ownership_release_requests SET status = ?, handled_at = ? WHERE id = ?')
+        .bind('REJECTED', now, id)
+        .run();
+    }
+
+    return c.json({ success: true });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 // 관리자 대시보드에서 유저별 소유 골드바를 조회하는 API
 app.get('/admin/user-goldbars', async (c) => {
   try {
@@ -1908,7 +1980,7 @@ app.post('/user/sync', async (c) => {
       }
     }
 
-    // 최종 동기화된 모든 골드바 목록 반환 (시세 노출 날짜 조건 추가)
+    // 최종 동기화된 모든 골드바 목록 반환 (시세 노출 날짜 조건 추가 및 해지 요청 상태 JOIN)
     const now = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     const { results } = await c.env.DB.prepare(`
       SELECT 
@@ -1920,7 +1992,8 @@ app.post('/user/sync', async (c) => {
           THEN 1 
           ELSE 0 
         END as show_market_price,
-        ug.market_price_per_gram
+        ug.market_price_per_gram,
+        (SELECT status FROM ownership_release_requests WHERE user_id = ug.user_id AND goldbar_id = ug.goldbar_id AND status = 'PENDING' LIMIT 1) as release_status
       FROM user_goldbars ug
       JOIN goldbars g ON ug.goldbar_id = g.id
       LEFT JOIN certificates c ON g.id = c.goldbar_id
@@ -1928,9 +2001,33 @@ app.post('/user/sync', async (c) => {
       ORDER BY ug.id DESC
     `).bind(now, now, userId).all();
 
-
-
     return c.json({ success: true, syncGoldbars: results });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+/** [신규] 사용자: 소유권 해지 요청 전송 */
+app.post('/user/goldbars/release-request', async (c) => {
+  try {
+    const { userId, goldbarId, message } = await c.req.json();
+    if (!userId || !goldbarId) return c.json({ error: '필수 정보가 누락되었습니다.' }, 400);
+
+    // 중복 요청 확인
+    const existing = await c.env.DB.prepare('SELECT id FROM ownership_release_requests WHERE user_id = ? AND goldbar_id = ? AND status = ?')
+      .bind(userId, goldbarId, 'PENDING')
+      .first();
+    
+    if (existing) {
+      return c.json({ error: '이미 처리 대기 중인 해지 요청이 있습니다.' }, 400);
+    }
+
+    await c.env.DB.prepare(`
+      INSERT INTO ownership_release_requests (user_id, goldbar_id, message)
+      VALUES (?, ?, ?)
+    `).bind(userId, goldbarId, message || '').run();
+
+    return c.json({ success: true });
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
   }

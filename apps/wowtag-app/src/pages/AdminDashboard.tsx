@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Tag, Package, Plus, Bell, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Link2Off, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut, Eye, ChevronDown, ChevronUp, RefreshCw, Download, Box, User, Activity, Users, ScanLine } from 'lucide-react';
+import { LayoutDashboard, Tag, Package, Plus, Bell, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Link2Off, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut, Eye, ChevronDown, ChevronUp, RefreshCw, Download, Box, User, Activity, Users, ScanLine, Bookmark } from 'lucide-react';
 import { ImeTextInput } from '../components/ImeTextInput';
 import { GuaranteePdfHost } from '../components/ProductGuaranteeCertificate';
 import { GuaranteeCertificatePreviewModal } from '../components/GuaranteeCertificatePreviewModal';
 import { mapProductToGuaranteeData } from '../lib/guaranteeCertificateData';
 import type { GuaranteeCertificateData } from '../lib/guaranteeCertificateData';
 
-const ADMIN_TAB_IDS = ['dashboard', 'products', 'nfc', 'goldbars', 'userGoldbars'] as const;
+const ADMIN_TAB_IDS = ['dashboard', 'products', 'nfc', 'goldbars', 'userGoldbars', 'releaseRequests'] as const;
 type AdminTabId = (typeof ADMIN_TAB_IDS)[number];
 
 /** 제품 폼: 등록가·중량 기준 g당 환산 (표시용) */
@@ -382,6 +382,9 @@ export default function AdminDashboard() {
   const [goldbarTagUidsMap, setGoldbarTagUidsMap] = useState<Record<number, string[]>>({});
   const [goldbarTagUidsLoadingId, setGoldbarTagUidsLoadingId] = useState<number | null>(null);
   const [goldbarTagUidPage, setGoldbarTagUidPage] = useState<Record<number, number>>({});
+  const [activeReleaseRequests, setActiveReleaseRequests] = useState<any[]>([]);
+  const [loadingRelease, setLoadingRelease] = useState(false);
+
 
   const [activeGuide, setActiveGuide] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -771,6 +774,44 @@ export default function AdminDashboard() {
   };
 
 
+  const fetchReleaseRequests = async () => {
+    setLoadingRelease(true);
+    try {
+      const res = await fetch('/api/admin/release-requests', {
+        headers: adminAuthHeaders(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setActiveReleaseRequests(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch release requests', err);
+    } finally {
+      setLoadingRelease(false);
+    }
+  };
+
+  const handleHandleRelease = async (id: number, action: 'APPROVE' | 'REJECT') => {
+    if (!confirm(`정말 이 요청을 ${action === 'APPROVE' ? '승인' : '반려'}하시겠습니까?`)) return;
+    try {
+      const res = await fetch(`/api/admin/release-requests/${id}`, {
+        method: 'PUT',
+        headers: adminAuthHeaders(),
+        body: JSON.stringify({ action }),
+      });
+      if (res.ok) {
+        alert('처리되었습니다.');
+        fetchReleaseRequests();
+        fetchUserGoldbars(); // 목록 갱신
+      } else {
+        const d = await res.json();
+        alert(d.error || '처리에 실패했습니다.');
+      }
+    } catch (err) {
+      alert('오류 발생');
+    }
+  };
+
   useEffect(() => {
     fetchProducts();
     fetchGoldbars();
@@ -778,6 +819,7 @@ export default function AdminDashboard() {
     fetchUserGoldbars();
     fetchAdminUsers();
     fetchTags();
+    fetchReleaseRequests();
   }, []);
 
   useEffect(() => {
@@ -2683,6 +2725,87 @@ export default function AdminDashboard() {
                 {(!userGoldbars || userGoldbars.length === 0) && (
                   <div className="col-span-1 md:col-span-2 lg:col-span-3 bg-white p-12 text-center rounded-[2.5rem] border border-slate-100/60 shadow-sm">
                     <p className="text-sm font-bold text-slate-400">현재 골드바를 소유한 사용자 정보가 없습니다.</p>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* 6. 소유권 해지 요청 관리 탭 */}
+          {currentTab === 'releaseRequests' && (
+            <>
+              <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+                <div>
+                  <h2 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">소유권 해지(재판매) 요청 관리</h2>
+                  <p className="text-xs font-bold text-slate-400 mt-1">
+                    사용자가 신청한 소유권 해지 요청을 검토하고 승인합니다. 승인 시 사용자의 지갑에서 제품이 제거됩니다.
+                  </p>
+                </div>
+                <button
+                  onClick={fetchReleaseRequests}
+                  className="px-4 py-2.5 bg-white border border-slate-200 text-slate-600 font-black text-xs rounded-xl hover:bg-slate-50 transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingRelease ? 'animate-spin' : ''}`} /> 새로고침
+                </button>
+              </div>
+
+              <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {activeReleaseRequests.length > 0 ? (
+                  activeReleaseRequests.map((req) => (
+                    <div key={req.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:border-rose-400/50 hover:shadow-md transition-all flex flex-col justify-between gap-5 relative overflow-hidden group">
+                      <div className="absolute -right-4 -top-4 w-20 h-20 bg-rose-50/40 rounded-full blur-2xl group-hover:bg-rose-100/40 transition-colors"></div>
+                      <div>
+                        <div className="flex justify-between items-start mb-4">
+                          <span className="text-[10px] font-black uppercase text-rose-600 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200/40 tracking-widest">
+                            RELEASE REQUEST
+                          </span>
+                          <span className="text-[11px] font-bold text-slate-400">{new Date(req.requested_at).toLocaleDateString()}</span>
+                        </div>
+                        
+                        <div className="space-y-3">
+                          <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">USER</p>
+                            <h4 className="text-sm font-black text-slate-800 break-all">{req.user_email}</h4>
+                            <p className="text-xs font-bold text-slate-500">{req.user_name || '이름 없음'}</p>
+                          </div>
+                          
+                          <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100/60">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">GOLDBAR</p>
+                            <p className="text-xs font-black text-slate-800">{req.serial_number}</p>
+                            <p className="text-[10px] font-bold text-slate-500">{req.weight}g</p>
+                          </div>
+
+                          {req.message && (
+                            <div className="bg-amber-50/40 p-3 rounded-2xl border border-amber-100/40">
+                              <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest mb-1">MESSAGE</p>
+                              <p className="text-xs font-bold text-slate-600 italic">"{req.message}"</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleHandleRelease(req.id, 'APPROVE')}
+                          className="flex-1 h-11 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs rounded-xl transition-all shadow-lg shadow-emerald-500/20"
+                        >
+                          승인
+                        </button>
+                        <button
+                          onClick={() => handleHandleRelease(req.id, 'REJECT')}
+                          className="flex-1 h-11 bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-xs rounded-xl transition-all"
+                        >
+                          반려
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="col-span-full py-20 bg-white rounded-3xl border border-dashed border-slate-200 flex flex-col items-center justify-center text-center">
+                    <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300 mb-4">
+                      <Bookmark className="w-8 h-8" />
+                    </div>
+                    <p className="font-black text-slate-400 text-sm">대기 중인 해지 요청이 없습니다.</p>
                   </div>
                 )}
               </div>
