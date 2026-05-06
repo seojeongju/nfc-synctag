@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Tag, Package, Plus, Bell, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Link2Off, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut, Eye, ChevronDown, ChevronUp, RefreshCw, Download, Box, User, Activity, Users, ScanLine, Bookmark } from 'lucide-react';
+import { LayoutDashboard, Tag, Package, Plus, Bell, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Link2Off, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut, Eye, ChevronDown, ChevronUp, RefreshCw, Download, Box, User, Activity, ScanLine, Bookmark } from 'lucide-react';
 import { ImeTextInput } from '../components/ImeTextInput';
 import { GuaranteePdfHost } from '../components/ProductGuaranteeCertificate';
 import { GuaranteeCertificatePreviewModal } from '../components/GuaranteeCertificatePreviewModal';
@@ -246,14 +246,8 @@ export default function AdminDashboard() {
   /** 보증서 피커 검색 (일련번호·표시명·UID) — API q 파라미터 */
   const [certificateSearchQuery, setCertificateSearchQuery] = useState('');
   const [goldbars, setGoldbars] = useState<any[]>([]);
-  const [userGoldbars, setUserGoldbars] = useState<any[]>([]);
-  const [adminUsers, setAdminUsers] = useState<{ id: string; email: string; name: string | null }[]>([]);
   const [bulkMarketPrice, setBulkMarketPrice] = useState('');
-  const [bulkShowMarket, setBulkShowMarket] = useState(true);
-  const [bulkUserId, setBulkUserId] = useState('');
   const [bulkGoldbarId, setBulkGoldbarId] = useState<number | ''>('');
-  const [bulkShowStart, setBulkShowStart] = useState('');
-  const [bulkShowEnd, setBulkShowEnd] = useState('');
 
   const [stats, setStats] = useState<any>({
     scanCount: 0,
@@ -377,16 +371,12 @@ export default function AdminDashboard() {
   const [currentPageGoldbars, setCurrentPageGoldbars] = useState(1);
   const ITEMS_PER_PAGE = 3;
   /** 골드바 카드 펼침: 인증서 기준 UID 목록 페이지 크기 */
-  const GOLDBAR_TAG_UID_PAGE_SIZE = 3;
   const [expandedGoldbarId, setExpandedGoldbarId] = useState<number | null>(null);
   const [goldbarTagUidsMap, setGoldbarTagUidsMap] = useState<Record<number, string[]>>({});
-  const [goldbarTagUidsLoadingId, setGoldbarTagUidsLoadingId] = useState<number | null>(null);
-  const [goldbarTagUidPage, setGoldbarTagUidPage] = useState<Record<number, number>>({});
   const [activeReleaseRequests, setActiveReleaseRequests] = useState<any[]>([]);
   const [loadingRelease, setLoadingRelease] = useState(false);
   const [assets, setAssets] = useState<any[]>([]);
   const [loadingAssets, setLoadingAssets] = useState(false);
-  const [currentPageAssets, setCurrentPageAssets] = useState(1);
 
 
   const [activeGuide, setActiveGuide] = useState<number | null>(null);
@@ -568,35 +558,6 @@ export default function AdminDashboard() {
     }
   };
 
-  const toggleGoldbarUidPanel = async (g: { id: number }) => {
-    const id = g.id;
-    if (expandedGoldbarId === id) {
-      setExpandedGoldbarId(null);
-      return;
-    }
-    setExpandedGoldbarId(id);
-    setGoldbarTagUidPage((prev) => ({ ...prev, [id]: prev[id] ?? 1 }));
-    if (goldbarTagUidsMap[id]) return;
-    setGoldbarTagUidsLoadingId(id);
-    try {
-      const res = await fetch(`/api/goldbars/${id}/tag-uids`, { headers: adminAuthHeaders() });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && Array.isArray(data?.tag_uids)) {
-        setGoldbarTagUidsMap((m) => ({ ...m, [id]: data.tag_uids }));
-      } else {
-        setGoldbarTagUidsMap((m) => ({ ...m, [id]: [] }));
-        if (!res.ok && data?.error) {
-          console.error(data.error);
-        }
-      }
-    } catch (e) {
-      console.error(e);
-      setGoldbarTagUidsMap((m) => ({ ...m, [id]: [] }));
-    } finally {
-      setGoldbarTagUidsLoadingId(null);
-    }
-  };
-
   const fetchStats = async () => {
     setStatsLoading(true);
     try {
@@ -632,91 +593,7 @@ export default function AdminDashboard() {
     }
   }, [LOGS_PER_PAGE]);
 
-  const fetchUserGoldbars = async () => {
-    try {
-      const res = await fetch('/api/admin/user-goldbars');
-      if (res.ok) {
-        const data = await res.json();
-        setUserGoldbars(data);
-      }
-    } catch (err) {
-      console.error('Failed to fetch user goldbars', err);
-    }
-  };
 
-  const fetchAdminUsers = async () => {
-    try {
-      const res = await fetch('/api/admin/users');
-      if (res.ok) {
-        const data = await res.json();
-        setAdminUsers(Array.isArray(data) ? data : []);
-      }
-    } catch (err) {
-      console.error('Failed to fetch admin users', err);
-    }
-  };
-
-  const bulkOwnedGoldbars = bulkUserId
-    ? userGoldbars.filter((ug) => ug.user_id === bulkUserId)
-    : [];
-
-  useEffect(() => {
-    if (!bulkUserId) {
-      setBulkGoldbarId('');
-      return;
-    }
-    const owned = userGoldbars.filter((ug: any) => ug.user_id === bulkUserId);
-    if (owned.length === 0) {
-      setBulkGoldbarId('');
-      return;
-    }
-    if (owned.length === 1) {
-      setBulkGoldbarId(owned[0].goldbar_id);
-      return;
-    }
-    setBulkGoldbarId((prev) => {
-      if (prev === '') return prev;
-      const ok = owned.some((o: any) => o.goldbar_id === prev);
-      return ok ? prev : '';
-    });
-  }, [bulkUserId, userGoldbars]);
-
-  const handleBulkApplyMarket = async () => {
-    if (!bulkUserId || bulkGoldbarId === '') {
-      alert('사용자와 골드바를 선택해 주세요.');
-      return;
-    }
-    const price = Number(String(bulkMarketPrice).replace(/,/g, '').trim());
-    if (!Number.isFinite(price) || price <= 0) {
-      alert('유효한 1g당 매입 시세를 입력해 주세요.');
-      return;
-    }
-    try {
-      const res = await fetch('/api/admin/user-goldbars', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: bulkUserId,
-          goldbarId: bulkGoldbarId,
-          showMarketPrice: bulkShowMarket,
-          marketPricePerGram: price,
-          showStart: bulkShowStart,
-          showEnd: bulkShowEnd
-        })
-
-      });
-      if (res.ok) {
-        alert('시세가 선택한 사용자에게 적용되었습니다.');
-        setBulkMarketPrice('');
-        fetchUserGoldbars();
-      } else {
-        const data = await res.json().catch(() => ({}));
-        alert((data as any).error || '적용에 실패했습니다.');
-      }
-    } catch (err: any) {
-      alert(err.message || '적용에 실패했습니다.');
-    }
-  };
 
   const fetchAssets = async () => {
     setLoadingAssets(true);
@@ -805,7 +682,6 @@ export default function AdminDashboard() {
     fetchGoldbars();
     fetchStats();
     fetchAssets();
-    fetchAdminUsers();
     fetchTags();
     fetchReleaseRequests();
   }, []);
