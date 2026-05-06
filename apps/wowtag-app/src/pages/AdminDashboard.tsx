@@ -246,7 +246,11 @@ export default function AdminDashboard() {
   /** 보증서 피커 검색 (일련번호·표시명·UID) — API q 파라미터 */
   const [certificateSearchQuery, setCertificateSearchQuery] = useState('');
   const [goldbars, setGoldbars] = useState<any[]>([]);
-
+  const [bulkMarketPrice, setBulkMarketPrice] = useState('');
+  const [bulkShowMarket, setBulkShowMarket] = useState(true);
+  const [bulkShowStart, setBulkShowStart] = useState('');
+  const [bulkShowEnd, setBulkShowEnd] = useState('');
+  const [selectedAssetIds, setSelectedAssetIds] = useState<number[]>([]);
 
   const [stats, setStats] = useState<any>({
     scanCount: 0,
@@ -589,6 +593,52 @@ export default function AdminDashboard() {
   }, [LOGS_PER_PAGE]);
 
 
+
+  const handleBulkApplyAssetMarket = async () => {
+    if (selectedAssetIds.length === 0) {
+      alert('적용할 자산을 최소 하나 이상 선택해 주세요.');
+      return;
+    }
+    const price = Number(String(bulkMarketPrice).replace(/,/g, '').trim());
+    if (!Number.isFinite(price) || price <= 0) {
+      alert('유효한 1g당 매입 시세를 입력해 주세요.');
+      return;
+    }
+
+    if (!confirm(`${selectedAssetIds.length}개의 자산에 시세를 일괄 적용하시겠습니까?`)) return;
+
+    setSubmitting(true);
+    try {
+      // 순차적으로 업데이트 (D1은 트랜잭션이 있지만 여기서는 간단히 루프 처리)
+      let successCount = 0;
+      for (const id of selectedAssetIds) {
+        const asset = assets.find(a => a.id === id);
+        if (!asset) continue;
+
+        const res = await fetch(`/api/goldbars/${id}`, {
+          method: 'PUT',
+          headers: adminAuthHeaders(),
+          body: JSON.stringify({
+            ...asset,
+            market_price_per_gram: price,
+            show_market_price: bulkShowMarket,
+            show_start_at: bulkShowStart || null,
+            show_end_at: bulkShowEnd || null
+          })
+        });
+        if (res.ok) successCount++;
+      }
+
+      alert(`${successCount}개의 자산 시세 정보가 업데이트되었습니다.`);
+      setSelectedAssetIds([]);
+      setBulkMarketPrice('');
+      fetchAssets();
+    } catch (err: any) {
+      alert(`오류 발생: ${err.message}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const fetchAssets = async () => {
     setLoadingAssets(true);
@@ -2273,10 +2323,115 @@ export default function AdminDashboard() {
                 </button>
               </div>
 
+              {/* 일괄 시세 설정 패널 */}
+              <div className="mt-6 bg-white p-6 sm:p-8 rounded-[2.5rem] border border-amber-100 shadow-sm space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-amber-50 rounded-2xl flex items-center justify-center">
+                      <Activity className="w-5 h-5 text-amber-500" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black text-slate-800">일괄 시세 설정</h3>
+                      <p className="text-[10px] font-bold text-slate-400">선택한 여러 자산에 동일한 시세를 한 번에 적용합니다.</p>
+                    </div>
+                  </div>
+                  {selectedAssetIds.length > 0 && (
+                    <span className="px-3 py-1 bg-amber-500 text-white text-[10px] font-black rounded-full animate-pulse">
+                      {selectedAssetIds.length}개 선택됨
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">1g당 매입 시세 (원)</label>
+                    <input
+                      type="number"
+                      placeholder="예: 115000"
+                      value={bulkMarketPrice}
+                      onChange={(e) => setBulkMarketPrice(e.target.value)}
+                      className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 font-black text-sm outline-none focus:border-amber-400"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">시세 노출</label>
+                    <div className="flex h-12 items-center gap-2">
+                      <button
+                        onClick={() => setBulkShowMarket(true)}
+                        className={`flex-1 h-full rounded-xl font-black text-xs transition-all ${bulkShowMarket ? 'bg-amber-500 text-white shadow-md' : 'bg-slate-100 text-slate-400'}`}
+                      >
+                        ON
+                      </button>
+                      <button
+                        onClick={() => setBulkShowMarket(false)}
+                        className={`flex-1 h-full rounded-xl font-black text-xs transition-all ${!bulkShowMarket ? 'bg-slate-600 text-white shadow-md' : 'bg-slate-100 text-slate-400'}`}
+                      >
+                        OFF
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">시작일 (선택)</label>
+                    <input
+                      type="date"
+                      value={bulkShowStart}
+                      onChange={(e) => setBulkShowStart(e.target.value)}
+                      className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 font-bold text-sm outline-none"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">종료일 (선택)</label>
+                    <input
+                      type="date"
+                      value={bulkShowEnd}
+                      onChange={(e) => setBulkShowEnd(e.target.value)}
+                      className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 font-bold text-sm outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  <button
+                    onClick={() => {
+                      if (selectedAssetIds.length === assets.length) setSelectedAssetIds([]);
+                      else setSelectedAssetIds(assets.map(a => a.id));
+                    }}
+                    className="px-6 h-12 bg-slate-100 text-slate-600 font-black text-xs rounded-xl hover:bg-slate-200 transition-all"
+                  >
+                    {selectedAssetIds.length === assets.length ? '전체 해제' : '전체 선택'}
+                  </button>
+                  <button
+                    onClick={handleBulkApplyAssetMarket}
+                    disabled={submitting || selectedAssetIds.length === 0}
+                    className="flex-1 h-12 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-sm rounded-xl shadow-lg shadow-amber-500/25 hover:opacity-95 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                  >
+                    {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {selectedAssetIds.length}개 자산에 시세 적용하기
+                  </button>
+                </div>
+              </div>
+
               <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {assets.length > 0 ? (
                   assets.map((asset) => (
-                    <div key={asset.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:border-amber-400 hover:shadow-md transition-all flex flex-col justify-between gap-5 relative overflow-hidden group">
+                    <div 
+                      key={asset.id} 
+                      onClick={() => {
+                        setSelectedAssetIds(prev => 
+                          prev.includes(asset.id) ? prev.filter(id => id !== asset.id) : [...prev, asset.id]
+                        );
+                      }}
+                      className={`bg-white p-6 rounded-3xl border transition-all flex flex-col justify-between gap-5 relative overflow-hidden group cursor-pointer ${
+                        selectedAssetIds.includes(asset.id) ? 'border-amber-500 shadow-lg ring-2 ring-amber-200' : 'border-slate-100 shadow-sm hover:border-amber-300'
+                      }`}
+                    >
+                      {selectedAssetIds.includes(asset.id) && (
+                        <div className="absolute right-4 top-4 z-10">
+                          <div className="w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center shadow-sm">
+                            <Plus className="w-4 h-4 text-white rotate-45" />
+                          </div>
+                        </div>
+                      )}
                       <div className="absolute -right-4 -top-4 w-20 h-20 bg-amber-50/40 rounded-full blur-2xl group-hover:bg-amber-100/40 transition-colors"></div>
                       <div>
                         <div className="flex justify-between items-start mb-4">
@@ -2301,7 +2456,7 @@ export default function AdminDashboard() {
                             <p className="text-[10px] font-bold text-slate-500">{asset.weight}g · {asset.purity}</p>
                           </div>
 
-                          <div className="pt-4 border-t border-slate-100 space-y-3">
+                          <div className="pt-4 border-t border-slate-100 space-y-3" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-between">
                               <span className="text-xs font-black text-slate-500 uppercase tracking-widest">1g당 시세</span>
                               <div className="flex items-center gap-2">
