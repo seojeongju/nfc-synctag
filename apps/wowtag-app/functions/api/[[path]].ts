@@ -1372,6 +1372,80 @@ app.put('/goldbars/:id', async (c) => {
   }
 });
 
+// 특정 태그(NFC)를 기반으로 자산(Goldbar) 레코드 생성 또는 연결 API
+app.post('/goldbars/by-tag/:tagUid', async (c) => {
+  try {
+    if (!verifyAdminToken(c)) {
+      return c.json({ error: '관리자 인증이 필요합니다.' }, 401);
+    }
+    const tagUid = c.req.param('tagUid');
+    const body = await c.req.json();
+    const {
+      market_price_per_gram,
+      show_market_price,
+      show_start_at,
+      show_end_at,
+      serial_number,
+      weight,
+      purity,
+      display_name
+    } = body;
+
+    // 1. 이미 해당 태그에 연결된 goldbar가 있는지 확인
+    const existing = await c.env.DB.prepare(`
+      SELECT g.id FROM goldbars g
+      INNER JOIN certificates c ON g.id = c.goldbar_id
+      WHERE c.tag_uid = ?
+      LIMIT 1
+    `).bind(tagUid).first();
+
+    if (existing) {
+      // 이미 있으면 업데이트로 전환 (또는 오류 반환)
+      // 여기서는 편의상 업데이트 수행
+      await c.env.DB.prepare(`
+        UPDATE goldbars 
+        SET market_price_per_gram = ?, show_market_price = ?, show_start_at = ?, show_end_at = ?
+        WHERE id = ?
+      `)
+      .bind(market_price_per_gram || null, show_market_price ? 1 : 0, show_start_at || null, show_end_at || null, (existing as any).id)
+      .run();
+      return c.json({ success: true, id: (existing as any).id });
+    }
+
+    // 2. 새로운 goldbar 생성
+    const result = await c.env.DB.prepare(`
+      INSERT INTO goldbars (serial_number, weight, purity, status, display_name, market_price_per_gram, show_market_price, show_start_at, show_end_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `)
+    .bind(
+      serial_number || `AUTO-${Date.now()}`,
+      weight || '0',
+      purity || '24K',
+      'TAGGED',
+      display_name || '',
+      market_price_per_gram || null,
+      show_market_price ? 1 : 0,
+      show_start_at || null,
+      show_end_at || null
+    )
+    .run();
+
+    const newGoldbarId = result.meta.last_row_id;
+
+    // 3. certificates 테이블에 연결
+    await c.env.DB.prepare(`
+      INSERT INTO certificates (goldbar_id, tag_uid, issued_at)
+      VALUES (?, ?, ?)
+    `)
+    .bind(newGoldbarId, tagUid, new Date().toISOString())
+    .run();
+
+    return c.json({ success: true, id: newGoldbarId }, 201);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 // 골드바 정보 삭제 API
 app.delete('/goldbars/:id', async (c) => {
   try {
@@ -1515,18 +1589,32 @@ app.get('/admin/assets', async (c) => {
     if (!verifyAdminToken(c)) {
       return c.json({ error: '관리자 인증이 필요합니다.' }, 401);
     }
+    // 자산 중심 조회: 골드바(보증서) 기준 + 보증서가 없더라도 제품과 매칭된 태그를 모두 포함
     const { results } = await c.env.DB.prepare(`
       SELECT 
-        g.*,
-        c.tag_uid,
-        c.issued_at as cert_issued_at,
-        p.name as product_name,
-        t.created_at as matching_date
+        g.id, g.serial_number, g.weight, g.purity, g.status, g.display_name,
+        g.market_price_per_gram, g.show_market_price, g.show_start_at, g.show_end_at,
+        COALESCE(c.tag_uid, t.tag_uid) as tag_uid,
+        COALESCE(t.created_at, g.created_at) as matching_date,
+        COALESCE(p.name, g.display_name) as product_name
       FROM goldbars g
       LEFT JOIN certificates c ON g.id = c.goldbar_id
       LEFT JOIN tags t ON c.tag_uid = t.tag_uid
-      LEFT JOIN products p ON t.target_id = p.id
-      ORDER BY g.created_at DESC
+      LEFT JOIN products p ON t.product_id = p.id
+      
+      UNION ALL
+      
+      SELECT 
+        null as id, null as serial_number, p.weight, p.purity, 'TAGGED' as status, null as display_name,
+        null as market_price_per_gram, 0 as show_market_price, null as show_start_at, null as show_end_at,
+        t.tag_uid,
+        t.created_at as matching_date,
+        p.name as product_name
+      FROM tags t
+      JOIN products p ON t.product_id = p.id
+      WHERE t.tag_uid NOT IN (SELECT tag_uid FROM certificates WHERE tag_uid IS NOT NULL)
+      
+      ORDER BY matching_date DESC
     `).all();
 
     return c.json(results);

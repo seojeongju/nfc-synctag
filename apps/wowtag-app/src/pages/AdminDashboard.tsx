@@ -609,23 +609,34 @@ export default function AdminDashboard() {
 
     setSubmitting(true);
     try {
-      // 순차적으로 업데이트 (D1은 트랜잭션이 있지만 여기서는 간단히 루프 처리)
       let successCount = 0;
-      for (const id of selectedAssetIds) {
-        const asset = assets.find(a => a.id === id);
+      for (const idOrUid of selectedAssetIds) {
+        const asset = assets.find(a => (a.id === idOrUid || a.tag_uid === idOrUid));
         if (!asset) continue;
 
-        const res = await fetch(`/api/goldbars/${id}`, {
-          method: 'PUT',
+        // 개별 업데이트 함수 재활용
+        const goldbarId = asset.id;
+        const payload = {
+          ...asset,
+          market_price_per_gram: price,
+          show_market_price: bulkShowMarket,
+          show_start_at: bulkShowStart || null,
+          show_end_at: bulkShowEnd || null,
+          // 보증서가 없는 경우 기본값 설정
+          serial_number: asset.serial_number || `AUTO-${Date.now()}`,
+          weight: asset.weight || '0',
+          purity: asset.purity || '24K',
+          status: asset.status || 'TAGGED',
+          display_name: asset.product_name || asset.display_name || ''
+        };
+
+        const url = goldbarId ? `/api/goldbars/${goldbarId}` : `/api/goldbars/by-tag/${encodeURIComponent(asset.tag_uid)}`;
+        const res = await fetch(url, {
+          method: goldbarId ? 'PUT' : 'POST',
           headers: adminAuthHeaders(),
-          body: JSON.stringify({
-            ...asset,
-            market_price_per_gram: price,
-            show_market_price: bulkShowMarket,
-            show_start_at: bulkShowStart || null,
-            show_end_at: bulkShowEnd || null
-          })
+          body: JSON.stringify(payload)
         });
+
         if (res.ok) successCount++;
       }
 
@@ -657,18 +668,27 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleUpdateAssetMarket = async (goldbarId: number, updateData: any) => {
+  const handleUpdateAssetMarket = async (asset: any, updateData: any) => {
     try {
-      const asset = assets.find(a => a.id === goldbarId);
-      if (!asset) return;
+      let goldbarId = asset.id;
 
-      const res = await fetch(`/api/goldbars/${goldbarId}`, {
-        method: 'PUT',
+      // 만약 goldbar_id가 없다면 (제품 매칭 태그만 있는 경우), 보증서 레코드 생성을 위해 정보를 구성
+      const payload = {
+        ...asset,
+        ...updateData,
+        // 보증서가 없는 경우 기본값 설정
+        serial_number: asset.serial_number || `AUTO-${Date.now()}`,
+        weight: asset.weight || '0',
+        purity: asset.purity || '24K',
+        status: asset.status || 'TAGGED',
+        display_name: asset.product_name || asset.display_name || ''
+      };
+
+      const url = goldbarId ? `/api/goldbars/${goldbarId}` : `/api/goldbars/by-tag/${encodeURIComponent(asset.tag_uid)}`;
+      const res = await fetch(url, {
+        method: goldbarId ? 'PUT' : 'POST',
         headers: adminAuthHeaders(),
-        body: JSON.stringify({
-          ...asset,
-          ...updateData
-        })
+        body: JSON.stringify(payload)
       });
 
       if (res.ok) {
@@ -2393,12 +2413,13 @@ export default function AdminDashboard() {
                 <div className="flex flex-col sm:flex-row gap-3 pt-2">
                   <button
                     onClick={() => {
-                      if (selectedAssetIds.length === assets.length) setSelectedAssetIds([]);
-                      else setSelectedAssetIds(assets.map(a => a.id));
+                      const allIds = assets.map(a => a.id || a.tag_uid);
+                      if (selectedAssetIds.length === allIds.length) setSelectedAssetIds([]);
+                      else setSelectedAssetIds(allIds);
                     }}
                     className="px-6 h-12 bg-slate-100 text-slate-600 font-black text-xs rounded-xl hover:bg-slate-200 transition-all"
                   >
-                    {selectedAssetIds.length === assets.length ? '전체 해제' : '전체 선택'}
+                    {selectedAssetIds.length === (assets.length) ? '전체 해제' : '전체 선택'}
                   </button>
                   <button
                     onClick={handleBulkApplyAssetMarket}
@@ -2415,17 +2436,18 @@ export default function AdminDashboard() {
                 {assets.length > 0 ? (
                   assets.map((asset) => (
                     <div 
-                      key={asset.id} 
+                      key={asset.tag_uid || asset.id} 
                       onClick={() => {
+                        const id = asset.id || asset.tag_uid;
                         setSelectedAssetIds(prev => 
-                          prev.includes(asset.id) ? prev.filter(id => id !== asset.id) : [...prev, asset.id]
+                          prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]
                         );
                       }}
                       className={`bg-white p-6 rounded-3xl border transition-all flex flex-col justify-between gap-5 relative overflow-hidden group cursor-pointer ${
-                        selectedAssetIds.includes(asset.id) ? 'border-amber-500 shadow-lg ring-2 ring-amber-200' : 'border-slate-100 shadow-sm hover:border-amber-300'
+                        selectedAssetIds.includes(asset.id || asset.tag_uid) ? 'border-amber-500 shadow-lg ring-2 ring-amber-200' : 'border-slate-100 shadow-sm hover:border-amber-300'
                       }`}
                     >
-                      {selectedAssetIds.includes(asset.id) && (
+                      {selectedAssetIds.includes(asset.id || asset.tag_uid) && (
                         <div className="absolute right-4 top-4 z-10">
                           <div className="w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center shadow-sm">
                             <Plus className="w-4 h-4 text-white rotate-45" />
@@ -2436,7 +2458,7 @@ export default function AdminDashboard() {
                       <div>
                         <div className="flex justify-between items-start mb-4">
                           <span className="text-[10px] font-black uppercase text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200/40 tracking-widest">
-                            ASSET INFO
+                            {asset.id ? 'CERTIFIED ASSET' : 'PRODUCT TAG'}
                           </span>
                           <span className="text-[11px] font-bold text-slate-400">
                             {asset.matching_date ? `매칭일: ${new Date(asset.matching_date).toLocaleDateString()}` : '출고 대기'}
@@ -2446,7 +2468,7 @@ export default function AdminDashboard() {
                         <div className="space-y-4">
                           <div>
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">SERIAL & TAG</p>
-                            <h4 className="text-sm font-black text-slate-800 break-all">{asset.serial_number}</h4>
+                            <h4 className="text-sm font-black text-slate-800 break-all">{asset.serial_number || '보증서 미발행'}</h4>
                             <p className="text-xs font-mono font-bold text-amber-600 mt-0.5">{formatCertTagForUi(asset.tag_uid || '')}</p>
                           </div>
                           
@@ -2462,8 +2484,9 @@ export default function AdminDashboard() {
                               <div className="flex items-center gap-2">
                                 <input 
                                   type="number" 
+                                  key={asset.market_price_per_gram}
                                   defaultValue={asset.market_price_per_gram || 0} 
-                                  onBlur={(e) => handleUpdateAssetMarket(asset.id, { market_price_per_gram: Number(e.target.value) })}
+                                  onBlur={(e) => handleUpdateAssetMarket(asset, { market_price_per_gram: Number(e.target.value) })}
                                   className="w-24 h-9 bg-white border border-slate-200 rounded-lg text-center font-black text-xs outline-none focus:border-amber-500 transition-all" 
                                 />
                                 <span className="text-[10px] font-black text-slate-400">원</span>
@@ -2473,7 +2496,7 @@ export default function AdminDashboard() {
                             <div className="flex items-center justify-between">
                               <span className="text-xs font-black text-slate-500 uppercase tracking-widest">시세 노출</span>
                               <button
-                                onClick={() => handleUpdateAssetMarket(asset.id, { show_market_price: !asset.show_market_price })}
+                                onClick={() => handleUpdateAssetMarket(asset, { show_market_price: !asset.show_market_price })}
                                 className={`px-3 py-1.5 rounded-lg font-black text-[10px] transition-all ${
                                   asset.show_market_price
                                     ? 'bg-amber-500 text-white shadow-sm'
@@ -2490,7 +2513,7 @@ export default function AdminDashboard() {
                                 <input 
                                   type="date" 
                                   value={asset.show_start_at ? asset.show_start_at.split('T')[0] : ''} 
-                                  onChange={(e) => handleUpdateAssetMarket(asset.id, { show_start_at: e.target.value })}
+                                  onChange={(e) => handleUpdateAssetMarket(asset, { show_start_at: e.target.value })}
                                   className="w-full h-8 bg-slate-50 border border-slate-100 rounded-lg px-2 font-bold text-[10px] outline-none"
                                 />
                               </div>
@@ -2499,7 +2522,7 @@ export default function AdminDashboard() {
                                 <input 
                                   type="date" 
                                   value={asset.show_end_at ? asset.show_end_at.split('T')[0] : ''} 
-                                  onChange={(e) => handleUpdateAssetMarket(asset.id, { show_end_at: e.target.value })}
+                                  onChange={(e) => handleUpdateAssetMarket(asset, { show_end_at: e.target.value })}
                                   className="w-full h-8 bg-slate-50 border border-slate-100 rounded-lg px-2 font-bold text-[10px] outline-none"
                                 />
                               </div>
@@ -2514,7 +2537,7 @@ export default function AdminDashboard() {
                     <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300 mb-4">
                       <Package className="w-8 h-8" />
                     </div>
-                    <p className="font-black text-slate-400 text-sm">등록된 자산이 없습니다.</p>
+                    <p className="font-black text-slate-400 text-sm">매칭된 자산이 없거나 데이터를 불러오는 중입니다.</p>
                   </div>
                 )}
               </div>
