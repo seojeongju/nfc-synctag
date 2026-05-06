@@ -573,11 +573,30 @@ async function removeTagFromGoldbarPool(db: D1Database, tagUid: string) {
   }
 }
 
+async function ensureGoldbarsAssetColumns(db: D1Database) {
+  const stmts = [
+    "ALTER TABLE goldbars ADD COLUMN status TEXT DEFAULT 'TAGGED'",
+    "ALTER TABLE goldbars ADD COLUMN display_name TEXT",
+    "ALTER TABLE goldbars ADD COLUMN show_market_price INTEGER DEFAULT 0",
+    "ALTER TABLE goldbars ADD COLUMN market_price_per_gram REAL",
+    "ALTER TABLE goldbars ADD COLUMN show_start_at TEXT",
+    "ALTER TABLE goldbars ADD COLUMN show_end_at TEXT"
+  ];
+  for (const sql of stmts) {
+    try {
+      await db.prepare(sql).run();
+    } catch (_) {}
+  }
+}
+
 /**
  * [신규] 태그 매칭(제품 연동) 시 해당 태그를 위한 자산(Goldbar) 레코드를 보장합니다.
  * '태그가 매칭되었다는 것은 자산이 생성되었다'는 원칙을 구현합니다.
  */
 async function ensureAssetForTag(db: D1Database, tagUid: string, productId?: number | null) {
+  // 스키마 보장
+  await ensureGoldbarsAssetColumns(db);
+
   // 1. 이미 certificates에 연결된 goldbar가 있는지 확인
   const existing = await db.prepare(`
     SELECT g.id FROM goldbars g
@@ -1656,6 +1675,9 @@ app.get('/admin/assets', async (c) => {
     if (!verifyAdminToken(c)) {
       return c.json({ error: '관리자 인증이 필요합니다.' }, 401);
     }
+    // 스키마 보장
+    await ensureGoldbarsAssetColumns(c.env.DB);
+
     // 자산 중심 조회: 골드바(보증서) 기준 + 보증서가 없더라도 제품과 매칭된 태그를 모두 포함
     const { results } = await c.env.DB.prepare(`
       SELECT 
