@@ -756,7 +756,15 @@ export default function AdminDashboard() {
     fetchStats();
     fetchLogs(currentPageLogs);
     fetchTags();
+    fetchAssets(); // 대시보드 통계 계산을 위해 호출
   }, [currentTab, currentPageLogs, fetchLogs]);
+
+  // 자산 시장 탭 진입 시 데이터 로드
+  useEffect(() => {
+    if (currentTab === 'assetMarket') {
+      fetchAssets();
+    }
+  }, [currentTab]);
 
   useEffect(() => {
     if (!isProductModalOpen && !isEditProductModalOpen) {
@@ -1332,6 +1340,7 @@ export default function AdminDashboard() {
                 void fetchTags();
                 void fetchProducts();
                 void fetchGoldbars();
+                void fetchAssets();
               }}
               title="대시보드 데이터 새로고침"
               className="p-2.5 rounded-2xl text-slate-400 hover:bg-slate-50 hover:text-amber-600 transition-colors"

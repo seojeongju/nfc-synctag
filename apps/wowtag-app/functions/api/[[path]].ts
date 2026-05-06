@@ -1663,10 +1663,10 @@ app.get('/admin/assets', async (c) => {
         g.market_price_per_gram, g.show_market_price, g.show_start_at, g.show_end_at,
         COALESCE(c.tag_uid, t.tag_uid) as tag_uid,
         COALESCE(t.created_at, g.created_at) as matching_date,
-        COALESCE(p.name, g.display_name) as product_name
+        COALESCE(p.name, g.display_name, g.serial_number) as product_name
       FROM goldbars g
       LEFT JOIN certificates c ON g.id = c.goldbar_id
-      LEFT JOIN tags t ON c.tag_uid = t.tag_uid
+      LEFT JOIN tags t ON (c.tag_uid = t.tag_uid OR (c.tag_uid IS NULL AND t.tag_uid IS NULL))
       LEFT JOIN products p ON t.product_id = p.id
       
       UNION ALL
@@ -1679,7 +1679,8 @@ app.get('/admin/assets', async (c) => {
         p.name as product_name
       FROM tags t
       JOIN products p ON t.product_id = p.id
-      WHERE t.tag_uid NOT IN (SELECT tag_uid FROM certificates WHERE tag_uid IS NOT NULL)
+      WHERE t.product_id IS NOT NULL 
+        AND t.tag_uid NOT IN (SELECT tag_uid FROM certificates WHERE tag_uid IS NOT NULL)
       
       ORDER BY matching_date DESC
     `).all();
