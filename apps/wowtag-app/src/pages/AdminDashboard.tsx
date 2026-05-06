@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect, Fragment } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Tag, Package, Plus, Bell, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Link2Off, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut, Eye, ChevronDown, ChevronUp, RefreshCw, Download, Box, User, Activity, ScanLine, Bookmark } from 'lucide-react';
@@ -379,6 +379,8 @@ export default function AdminDashboard() {
   const [loadingRelease, setLoadingRelease] = useState(false);
   const [assets, setAssets] = useState<any[]>([]);
   const [loadingAssets, setLoadingAssets] = useState(false);
+  const [currentPageAssets, setCurrentPageAssets] = useState(1);
+  const [expandedAssetId, setExpandedAssetId] = useState<number | string | null>(null);
 
 
   const [activeGuide, setActiveGuide] = useState<number | null>(null);
@@ -2441,115 +2443,208 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {assets.length > 0 ? (
-                  assets.map((asset) => (
-                    <div 
-                      key={asset.tag_uid || asset.id} 
-                      onClick={() => {
-                        const id = asset.id || asset.tag_uid;
-                        setSelectedAssetIds(prev => 
-                          prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]
-                        );
-                      }}
-                      className={`bg-white p-6 rounded-3xl border transition-all flex flex-col justify-between gap-5 relative overflow-hidden group cursor-pointer ${
-                        selectedAssetIds.includes(asset.id || asset.tag_uid) ? 'border-amber-500 shadow-lg ring-2 ring-amber-200' : 'border-slate-100 shadow-sm hover:border-amber-300'
+              {/* 고도화된 아코디언 리스트 UI */}
+              <div className="mt-8 bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50/50 border-b border-slate-100">
+                        <th className="p-5 w-14 text-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedAssetIds.length === assets.length && assets.length > 0}
+                            onChange={() => {
+                              const allIds = assets.map(a => a.id || a.tag_uid);
+                              if (selectedAssetIds.length === allIds.length) setSelectedAssetIds([]);
+                              else setSelectedAssetIds(allIds);
+                            }}
+                            className="w-5 h-5 rounded-lg border-slate-200 text-amber-500 focus:ring-amber-500 cursor-pointer"
+                          />
+                        </th>
+                        <th className="p-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">상태 & 자산 정보</th>
+                        <th className="p-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest hidden sm:table-cell">매칭 제품</th>
+                        <th className="p-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest hidden lg:table-cell">태그 UID</th>
+                        <th className="p-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest w-24">상세설정</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {assets.length > 0 ? (
+                        assets.slice((currentPageAssets - 1) * ITEMS_PER_PAGE, currentPageAssets * ITEMS_PER_PAGE).map((asset) => {
+                          const assetKey = asset.id || asset.tag_uid;
+                          const isExpanded = expandedAssetId === assetKey;
+                          const isSelected = selectedAssetIds.includes(assetKey);
+                          
+                          return (
+                            <Fragment key={assetKey}>
+                              <tr 
+                                className={`group hover:bg-slate-50/80 transition-colors cursor-pointer ${isSelected ? 'bg-amber-50/30' : ''}`}
+                                onClick={() => setExpandedAssetId(isExpanded ? null : assetKey)}
+                              >
+                                <td className="p-5 text-center" onClick={(e) => e.stopPropagation()}>
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => {
+                                      setSelectedAssetIds(prev => 
+                                        prev.includes(assetKey) ? prev.filter(v => v !== assetKey) : [...prev, assetKey]
+                                      );
+                                    }}
+                                    className="w-5 h-5 rounded-lg border-slate-200 text-amber-500 focus:ring-amber-500 cursor-pointer"
+                                  />
+                                </td>
+                                <td className="p-5">
+                                  <div className="flex items-center gap-3">
+                                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border shrink-0 ${
+                                      asset.id ? 'text-amber-600 bg-amber-50 border-amber-200/50' : 'text-slate-500 bg-slate-50 border-slate-200/50'
+                                    }`}>
+                                      {asset.id ? 'CERTIFIED' : 'TAG ONLY'}
+                                    </span>
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-black text-slate-800 truncate">{asset.serial_number || '보증서 미발행'}</p>
+                                      <p className="text-[10px] font-bold text-slate-400">
+                                        {asset.matching_date ? `매칭일: ${new Date(asset.matching_date).toLocaleDateString()}` : '출고 대기'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="p-5 hidden sm:table-cell">
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-black text-slate-700 truncate">{asset.product_name || '-'}</p>
+                                    <p className="text-[10px] font-bold text-slate-400">{asset.weight}g · {asset.purity}</p>
+                                  </div>
+                                </td>
+                                <td className="p-5 hidden lg:table-cell">
+                                  <code className="text-[10px] font-mono font-bold text-slate-500 bg-slate-50 px-2 py-1 rounded-lg">
+                                    {formatCertTagForUi(asset.tag_uid || '')}
+                                  </code>
+                                </td>
+                                <td className="p-5 text-right">
+                                  <button className={`p-2 rounded-xl transition-all ${isExpanded ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200'}`}>
+                                    {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                  </button>
+                                </td>
+                              </tr>
+                              
+                              {isExpanded && (
+                                <tr className="bg-slate-50/30">
+                                  <td colSpan={5} className="p-8">
+                                    <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm flex flex-col lg:flex-row gap-8 items-start lg:items-center">
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 flex-1 w-full">
+                                        <div className="space-y-2">
+                                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">1g당 개별 시세 (원)</label>
+                                          <div className="relative flex items-center">
+                                            <input 
+                                              type="number" 
+                                              defaultValue={asset.market_price_per_gram || 0} 
+                                              onBlur={(e) => handleUpdateAssetMarket(asset, { market_price_per_gram: Number(e.target.value) })}
+                                              className="w-full h-11 bg-slate-50 border border-slate-100 rounded-xl px-4 font-black text-xs outline-none focus:border-amber-400 transition-all pr-10" 
+                                            />
+                                            <span className="absolute right-4 text-[10px] font-bold text-slate-400">원</span>
+                                          </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">시세 노출 상태</label>
+                                          <div className="flex h-11 items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
+                                            <button
+                                              onClick={() => handleUpdateAssetMarket(asset, { show_market_price: true })}
+                                              className={`flex-1 h-full rounded-lg font-black text-[10px] transition-all ${asset.show_market_price ? 'bg-white text-amber-600 shadow-sm' : 'text-slate-400 hover:text-slate-500'}`}
+                                            >
+                                              노출
+                                            </button>
+                                            <button
+                                              onClick={() => handleUpdateAssetMarket(asset, { show_market_price: false })}
+                                              className={`flex-1 h-full rounded-lg font-black text-[10px] transition-all ${!asset.show_market_price ? 'bg-white text-slate-600 shadow-sm' : 'text-slate-400 hover:text-slate-500'}`}
+                                            >
+                                              비노출
+                                            </button>
+                                          </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">시작일</label>
+                                          <input 
+                                            type="date" 
+                                            defaultValue={asset.show_start_at ? asset.show_start_at.split('T')[0] : ''} 
+                                            onChange={(e) => handleUpdateAssetMarket(asset, { show_start_at: e.target.value })}
+                                            className="w-full h-11 bg-slate-50 border border-slate-100 rounded-xl px-4 font-bold text-xs outline-none focus:border-amber-400" 
+                                          />
+                                        </div>
+                                        <div className="space-y-2">
+                                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">종료일</label>
+                                          <input 
+                                            type="date" 
+                                            defaultValue={asset.show_end_at ? asset.show_end_at.split('T')[0] : ''} 
+                                            onChange={(e) => handleUpdateAssetMarket(asset, { show_end_at: e.target.value })}
+                                            className="w-full h-11 bg-slate-50 border border-slate-100 rounded-xl px-4 font-bold text-xs outline-none focus:border-amber-400" 
+                                          />
+                                        </div>
+                                      </div>
+                                      
+                                      <div className="shrink-0 flex items-center gap-2 pt-4 lg:pt-0 border-t lg:border-t-0 lg:border-l border-slate-100 lg:pl-6 w-full lg:w-auto">
+                                        <button
+                                          onClick={() => {
+                                            setSelectedAssetIds(prev => 
+                                              prev.includes(assetKey) ? prev.filter(v => v !== assetKey) : [...prev, assetKey]
+                                            );
+                                          }}
+                                          className={`flex-1 lg:flex-none px-5 h-11 rounded-xl font-black text-xs transition-all border ${
+                                            isSelected ? 'bg-amber-500 text-white border-transparent shadow-md shadow-amber-500/20' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                                          }`}
+                                        >
+                                          {isSelected ? '선택 취소' : '항목 선택'}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </Fragment>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="p-20 text-center">
+                            <Box className="w-16 h-16 text-slate-200 mx-auto mb-4" />
+                            <p className="font-black text-slate-400">등록된 자산이 없거나 데이터를 불러오는 중입니다.</p>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* 자산 리스트 페이지네이션 */}
+              {assets.length > ITEMS_PER_PAGE && (
+                <div className="flex justify-center items-center gap-2 mt-8">
+                  <button
+                    disabled={currentPageAssets === 1}
+                    onClick={() => setCurrentPageAssets(p => p - 1)}
+                    className="h-11 px-4 text-xs font-black bg-white rounded-2xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm shrink-0"
+                  >
+                    이전
+                  </button>
+                  {Array.from({ length: Math.ceil(assets.length / ITEMS_PER_PAGE) }).map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setCurrentPageAssets(i + 1)}
+                      className={`w-11 h-11 text-xs font-black rounded-2xl border transition-all shrink-0 ${
+                        currentPageAssets === i + 1 
+                          ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-transparent shadow-md' 
+                          : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'
                       }`}
                     >
-                      {selectedAssetIds.includes(asset.id || asset.tag_uid) && (
-                        <div className="absolute right-4 top-4 z-10">
-                          <div className="w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center shadow-sm">
-                            <Plus className="w-4 h-4 text-white rotate-45" />
-                          </div>
-                        </div>
-                      )}
-                      <div className="absolute -right-4 -top-4 w-20 h-20 bg-amber-50/40 rounded-full blur-2xl group-hover:bg-amber-100/40 transition-colors"></div>
-                      <div>
-                        <div className="flex justify-between items-start mb-4">
-                          <span className="text-[10px] font-black uppercase text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200/40 tracking-widest">
-                            {asset.id ? 'CERTIFIED ASSET' : 'PRODUCT TAG'}
-                          </span>
-                          <span className="text-[11px] font-bold text-slate-400">
-                            {asset.matching_date ? `매칭일: ${new Date(asset.matching_date).toLocaleDateString()}` : '출고 대기'}
-                          </span>
-                        </div>
-                        
-                        <div className="space-y-4">
-                          <div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">SERIAL & TAG</p>
-                            <h4 className="text-sm font-black text-slate-800 break-all">{asset.serial_number || '보증서 미발행'}</h4>
-                            <p className="text-xs font-mono font-bold text-amber-600 mt-0.5">{formatCertTagForUi(asset.tag_uid || '')}</p>
-                          </div>
-                          
-                          <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100/60">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">MATCHED PRODUCT</p>
-                            <p className="text-xs font-black text-slate-800">{asset.product_name || '매칭된 제품 없음'}</p>
-                            <p className="text-[10px] font-bold text-slate-500">{asset.weight}g · {asset.purity}</p>
-                          </div>
-
-                          <div className="pt-4 border-t border-slate-100 space-y-3" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-black text-slate-500 uppercase tracking-widest">1g당 시세</span>
-                              <div className="flex items-center gap-2">
-                                <input 
-                                  type="number" 
-                                  key={asset.market_price_per_gram}
-                                  defaultValue={asset.market_price_per_gram || 0} 
-                                  onBlur={(e) => handleUpdateAssetMarket(asset, { market_price_per_gram: Number(e.target.value) })}
-                                  className="w-24 h-9 bg-white border border-slate-200 rounded-lg text-center font-black text-xs outline-none focus:border-amber-500 transition-all" 
-                                />
-                                <span className="text-[10px] font-black text-slate-400">원</span>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-black text-slate-500 uppercase tracking-widest">시세 노출</span>
-                              <button
-                                onClick={() => handleUpdateAssetMarket(asset, { show_market_price: !asset.show_market_price })}
-                                className={`px-3 py-1.5 rounded-lg font-black text-[10px] transition-all ${
-                                  asset.show_market_price
-                                    ? 'bg-amber-500 text-white shadow-sm'
-                                    : 'bg-slate-100 text-slate-400'
-                                }`}
-                              >
-                                {asset.show_market_price ? 'ON' : 'OFF'}
-                              </button>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2 pt-1">
-                              <div className="space-y-1">
-                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">시작일</label>
-                                <input 
-                                  type="date" 
-                                  value={asset.show_start_at ? asset.show_start_at.split('T')[0] : ''} 
-                                  onChange={(e) => handleUpdateAssetMarket(asset, { show_start_at: e.target.value })}
-                                  className="w-full h-8 bg-slate-50 border border-slate-100 rounded-lg px-2 font-bold text-[10px] outline-none"
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">종료일</label>
-                                <input 
-                                  type="date" 
-                                  value={asset.show_end_at ? asset.show_end_at.split('T')[0] : ''} 
-                                  onChange={(e) => handleUpdateAssetMarket(asset, { show_end_at: e.target.value })}
-                                  className="w-full h-8 bg-slate-50 border border-slate-100 rounded-lg px-2 font-bold text-[10px] outline-none"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="col-span-full py-20 bg-white rounded-3xl border border-dashed border-slate-200 flex flex-col items-center justify-center text-center">
-                    <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300 mb-4">
-                      <Package className="w-8 h-8" />
-                    </div>
-                    <p className="font-black text-slate-400 text-sm">매칭된 자산이 없거나 데이터를 불러오는 중입니다.</p>
-                  </div>
-                )}
-              </div>
+                      {i + 1}
+                    </button>
+                  ))}
+                  <button
+                    disabled={currentPageAssets === Math.ceil(assets.length / ITEMS_PER_PAGE)}
+                    onClick={() => setCurrentPageAssets(p => p + 1)}
+                    className="h-11 px-4 text-xs font-black bg-white rounded-2xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm shrink-0"
+                  >
+                    다음
+                  </button>
+                </div>
+              )}
             </>
           )}
 
