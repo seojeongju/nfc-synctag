@@ -1861,18 +1861,6 @@ export default function AdminDashboard() {
                                   {p.cert_serial_number || '?'}
                                 </span>
                               )}
-                              {p.cert_tag_uid ? (
-                                <span
-                                  className={
-                                    isPendingCertTagUid(String(p.cert_tag_uid))
-                                      ? 'text-amber-800/90 font-sans'
-                                      : 'font-mono text-amber-800/85'
-                                  }
-                                >
-                                  {' '}
-                                  · {formatCertTagForUi(String(p.cert_tag_uid))}
-                                </span>
-                              ) : null}
                             </span>
                           </p>
                         )}
