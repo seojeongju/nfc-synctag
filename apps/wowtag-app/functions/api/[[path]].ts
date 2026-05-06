@@ -1661,12 +1661,12 @@ app.get('/admin/assets', async (c) => {
       SELECT 
         g.id, g.serial_number, g.weight, g.purity, g.status, g.display_name,
         g.market_price_per_gram, g.show_market_price, g.show_start_at, g.show_end_at,
-        COALESCE(c.tag_uid, t.tag_uid) as tag_uid,
+        c.tag_uid,
         COALESCE(t.created_at, g.created_at) as matching_date,
         COALESCE(p.name, g.display_name, g.serial_number) as product_name
       FROM goldbars g
       LEFT JOIN certificates c ON g.id = c.goldbar_id
-      LEFT JOIN tags t ON (c.tag_uid = t.tag_uid OR (c.tag_uid IS NULL AND t.tag_uid IS NULL))
+      LEFT JOIN tags t ON c.tag_uid = t.tag_uid
       LEFT JOIN products p ON t.product_id = p.id
       
       UNION ALL
