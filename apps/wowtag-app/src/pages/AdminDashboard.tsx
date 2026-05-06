@@ -246,8 +246,7 @@ export default function AdminDashboard() {
   /** 보증서 피커 검색 (일련번호·표시명·UID) — API q 파라미터 */
   const [certificateSearchQuery, setCertificateSearchQuery] = useState('');
   const [goldbars, setGoldbars] = useState<any[]>([]);
-  const [bulkMarketPrice, setBulkMarketPrice] = useState('');
-  const [bulkGoldbarId, setBulkGoldbarId] = useState<number | ''>('');
+
 
   const [stats, setStats] = useState<any>({
     scanCount: 0,
@@ -371,8 +370,7 @@ export default function AdminDashboard() {
   const [currentPageGoldbars, setCurrentPageGoldbars] = useState(1);
   const ITEMS_PER_PAGE = 3;
   /** 골드바 카드 펼침: 인증서 기준 UID 목록 페이지 크기 */
-  const [expandedGoldbarId, setExpandedGoldbarId] = useState<number | null>(null);
-  const [goldbarTagUidsMap, setGoldbarTagUidsMap] = useState<Record<number, string[]>>({});
+
   const [activeReleaseRequests, setActiveReleaseRequests] = useState<any[]>([]);
   const [loadingRelease, setLoadingRelease] = useState(false);
   const [assets, setAssets] = useState<any[]>([]);
@@ -549,9 +547,6 @@ export default function AdminDashboard() {
       const data = await res.json();
       if (Array.isArray(data)) {
         setGoldbars(data);
-        setGoldbarTagUidsMap({});
-        setExpandedGoldbarId(null);
-        setGoldbarTagUidPage({});
       }
     } catch (err) {
       console.error('Failed to fetch goldbars', err);
