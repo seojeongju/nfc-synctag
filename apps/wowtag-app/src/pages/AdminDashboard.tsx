@@ -252,6 +252,9 @@ export default function AdminDashboard() {
   const [bulkShowMarket, setBulkShowMarket] = useState(true);
   const [bulkUserId, setBulkUserId] = useState('');
   const [bulkGoldbarId, setBulkGoldbarId] = useState<number | ''>('');
+  const [bulkShowStart, setBulkShowStart] = useState('');
+  const [bulkShowEnd, setBulkShowEnd] = useState('');
+
   const [stats, setStats] = useState<any>({
     scanCount: 0,
     scanCountToday: 0,
@@ -263,6 +266,10 @@ export default function AdminDashboard() {
     topGoldbars: []
   });
   const [statsLoading, setStatsLoading] = useState(true);
+  
+  const [currentPageLogs, setCurrentPageLogs] = useState(1);
+  const LOGS_PER_PAGE = 3;
+  const [logsLoading, setLogsLoading] = useState(false);
   
   // 검색 및 필터 상태
   const [searchTerm, setSearchTerm] = useState('');
@@ -573,7 +580,8 @@ export default function AdminDashboard() {
   const fetchStats = async () => {
     setStatsLoading(true);
     try {
-      const res = await fetch('/api/admin/stats');
+      // stats는 기본 데이터만 가져오고 로그는 fetchLogs에서 별도 처리
+      const res = await fetch('/api/admin/stats?logsLimit=0');
       if (res.ok) {
         const data = await res.json();
         setStats(data);
@@ -584,6 +592,25 @@ export default function AdminDashboard() {
       setStatsLoading(false);
     }
   };
+
+  const fetchLogs = useCallback(async (page: number) => {
+    setLogsLoading(true);
+    try {
+      const offset = (page - 1) * LOGS_PER_PAGE;
+      const res = await fetch(`/api/admin/stats?logsLimit=${LOGS_PER_PAGE}&logsOffset=${offset}`);
+      if (res.ok) {
+        const data = await res.json();
+        setStats((prev: any) => ({
+          ...prev,
+          recentLogs: data.recentLogs || []
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to fetch logs', err);
+    } finally {
+      setLogsLoading(false);
+    }
+  }, [LOGS_PER_PAGE]);
 
   const fetchUserGoldbars = async () => {
     try {
@@ -652,8 +679,11 @@ export default function AdminDashboard() {
           userId: bulkUserId,
           goldbarId: bulkGoldbarId,
           showMarketPrice: bulkShowMarket,
-          marketPricePerGram: price
+          marketPricePerGram: price,
+          showStart: bulkShowStart,
+          showEnd: bulkShowEnd
         })
+
       });
       if (res.ok) {
         alert('시세가 선택한 사용자에게 적용되었습니다.');
@@ -677,8 +707,11 @@ export default function AdminDashboard() {
           userId,
           goldbarId,
           showMarketPrice: !currentShow,
-          marketPricePerGram: price
+          marketPricePerGram: price,
+          showStart: userGoldbars.find(u => u.user_id === userId && u.goldbar_id === goldbarId)?.show_start_at || null,
+          showEnd: userGoldbars.find(u => u.user_id === userId && u.goldbar_id === goldbarId)?.show_end_at || null
         })
+
       });
       if (res.ok) {
         alert('시세 노출 상태가 성공적으로 변경되었습니다.');
@@ -698,8 +731,11 @@ export default function AdminDashboard() {
           userId,
           goldbarId,
           showMarketPrice: currentShow,
-          marketPricePerGram: newPrice
+          marketPricePerGram: newPrice,
+          showStart: userGoldbars.find(u => u.user_id === userId && u.goldbar_id === goldbarId)?.show_start_at || null,
+          showEnd: userGoldbars.find(u => u.user_id === userId && u.goldbar_id === goldbarId)?.show_end_at || null
         })
+
       });
       if (res.ok) {
         alert('1g당 시세가 변경되었습니다.');
@@ -709,6 +745,31 @@ export default function AdminDashboard() {
       alert(`수정 실패: ${err.message}`);
     }
   };
+
+  const handleUpdateDateValue = async (userId: string, goldbarId: number, currentShow: boolean, price: number, field: 'showStart' | 'showEnd', newValue: string) => {
+    try {
+      const ug = userGoldbars.find(u => u.user_id === userId && u.goldbar_id === goldbarId);
+      const res = await fetch('/api/admin/user-goldbars', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          goldbarId,
+          showMarketPrice: currentShow,
+          marketPricePerGram: price,
+          showStart: field === 'showStart' ? newValue : (ug?.show_start_at || null),
+          showEnd: field === 'showEnd' ? newValue : (ug?.show_end_at || null)
+        })
+      });
+      if (res.ok) {
+        alert('노출 기간이 변경되었습니다.');
+        fetchUserGoldbars();
+      }
+    } catch (err: any) {
+      alert(`수정 실패: ${err.message}`);
+    }
+  };
+
 
   useEffect(() => {
     fetchProducts();
@@ -722,8 +783,9 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (currentTab !== 'dashboard') return;
     fetchStats();
+    fetchLogs(currentPageLogs);
     fetchTags();
-  }, [currentTab]);
+  }, [currentTab, currentPageLogs, fetchLogs]);
 
   useEffect(() => {
     if (!isProductModalOpen && !isEditProductModalOpen) {
@@ -1630,14 +1692,17 @@ export default function AdminDashboard() {
 
                 {/* 2) 최근 스캔 로그 리스트 (Timeline) */}
                 <div className="lg:col-span-2 bg-white rounded-[2.5rem] p-6 lg:p-8 border border-slate-50 shadow-sm flex flex-col h-full">
-                  <div className="flex items-center gap-2 mb-6">
-                    <div className="w-1.5 h-6 bg-emerald-500 rounded-full"></div>
-                    <h3 className="text-lg font-black text-slate-800">최근 스캔 기록</h3>
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-6 bg-emerald-500 rounded-full"></div>
+                      <h3 className="text-lg font-black text-slate-800">최근 스캔 기록</h3>
+                    </div>
+                    {logsLoading && <Loader2 className="w-5 h-5 animate-spin text-emerald-500" />}
                   </div>
 
                   <div className="space-y-3 flex-1">
                     {stats.recentLogs && stats.recentLogs.map((log: any, idx: number) => (
-                      <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100/60 hover:border-amber-400/30 transition-all">
+                      <div key={idx} className={`flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100/60 hover:border-amber-400/30 transition-all ${logsLoading ? 'opacity-50' : ''}`}>
                         <div className="flex items-center gap-4">
                           <div className="w-10 h-10 bg-white border border-slate-100 rounded-xl flex items-center justify-center text-amber-500">
                             <Award className="w-5 h-5" />
@@ -1661,11 +1726,32 @@ export default function AdminDashboard() {
                       </div>
                     ))}
 
-                    {(!stats.recentLogs || stats.recentLogs.length === 0) && (
+                    {(!stats.recentLogs || stats.recentLogs.length === 0) && !logsLoading && (
                       <div className="p-8 text-center text-slate-400 font-bold">
                         아직 접수된 스캔 기록이 없습니다.
                       </div>
                     )}
+
+                    {/* 최근 스캔 페이지네이션 */}
+                    <div className="flex justify-center items-center gap-3 mt-6">
+                      <button
+                        disabled={currentPageLogs === 1 || logsLoading}
+                        onClick={() => setCurrentPageLogs(p => Math.max(1, p - 1))}
+                        className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm"
+                      >
+                        이전
+                      </button>
+                      <span className="text-xs font-black text-slate-400 px-2">
+                        {currentPageLogs} 페이지
+                      </span>
+                      <button
+                        disabled={(stats.recentLogs?.length ?? 0) < LOGS_PER_PAGE || logsLoading}
+                        onClick={() => setCurrentPageLogs(p => p + 1)}
+                        className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm"
+                      >
+                        다음
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2477,6 +2563,27 @@ export default function AdminDashboard() {
                     </select>
                   </div>
                 </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">노출 시작일 (선택)</label>
+                    <input
+                      type="date"
+                      value={bulkShowStart}
+                      onChange={(e) => setBulkShowStart(e.target.value)}
+                      className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 font-bold text-sm outline-none focus:border-amber-400"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">노출 종료일 (선택)</label>
+                    <input
+                      type="date"
+                      value={bulkShowEnd}
+                      onChange={(e) => setBulkShowEnd(e.target.value)}
+                      className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 font-bold text-sm outline-none focus:border-amber-400"
+                    />
+                  </div>
+                </div>
                 <button
                   type="button"
                   onClick={handleBulkApplyMarket}
@@ -2484,6 +2591,7 @@ export default function AdminDashboard() {
                 >
                   시세 적용하기
                 </button>
+
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mt-6 w-full min-w-0">
@@ -2546,7 +2654,29 @@ export default function AdminDashboard() {
                           {ug.show_market_price === 1 ? '노출 중' : '숨김 중'}
                         </button>
                       </div>
+
+                      <div className="grid grid-cols-2 gap-2 mt-1">
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-tighter pl-1">시작일</label>
+                          <input 
+                            type="date" 
+                            value={ug.show_start_at ? ug.show_start_at.split('T')[0] : ''} 
+                            onChange={(e) => handleUpdateDateValue(ug.user_id, ug.goldbar_id, ug.show_market_price === 1, ug.market_price_per_gram || 110000, 'showStart', e.target.value)}
+                            className="w-full h-9 bg-slate-50 border border-slate-100 rounded-lg px-2 font-bold text-[11px] outline-none focus:border-amber-400 transition-all"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-tighter pl-1">종료일</label>
+                          <input 
+                            type="date" 
+                            value={ug.show_end_at ? ug.show_end_at.split('T')[0] : ''} 
+                            onChange={(e) => handleUpdateDateValue(ug.user_id, ug.goldbar_id, ug.show_market_price === 1, ug.market_price_per_gram || 110000, 'showEnd', e.target.value)}
+                            className="w-full h-9 bg-slate-50 border border-slate-100 rounded-lg px-2 font-bold text-[11px] outline-none focus:border-amber-400 transition-all"
+                          />
+                        </div>
+                      </div>
                     </div>
+
                   </div>
                 ))}
 

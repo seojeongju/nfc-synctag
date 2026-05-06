@@ -298,17 +298,28 @@ app.get('/goldbars/t/:tagId', async (c) => {
     }
 
     const certQuery = `
-      SELECT g.*, c.tag_uid, c.cert_file_path
+      SELECT 
+        g.*, c.tag_uid, c.cert_file_path,
+        CASE 
+          WHEN ug.show_market_price = 1 
+               AND (ug.show_start_at IS NULL OR ug.show_start_at <= ?)
+               AND (ug.show_end_at IS NULL OR ug.show_end_at >= ?)
+          THEN 1 
+          ELSE 0 
+        END as show_market_price,
+        ug.market_price_per_gram
       FROM goldbars g
       JOIN certificates c ON g.id = c.goldbar_id
+      LEFT JOIN user_goldbars ug ON g.id = ug.goldbar_id
       WHERE c.tag_uid = ?
     `;
 
     let matchedUid: string | null = null;
     let goldbar: Record<string, unknown> | null = null;
+    const now = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
     for (const v of variants) {
-      const row = await c.env.DB.prepare(certQuery).bind(v).first();
+      const row = await c.env.DB.prepare(certQuery).bind(now, now, v).first();
       if (row) {
         goldbar = row as Record<string, unknown>;
         matchedUid = v;
@@ -1397,6 +1408,9 @@ app.get('/admin/stats', async (c) => {
       /* users 테이블 없음 */
     }
 
+    const logsLimit = Number(c.req.query('logsLimit')) || 12;
+    const logsOffset = Number(c.req.query('logsOffset')) || 0;
+
     const recentLogsRaw = await c.env.DB.prepare(`
       SELECT
         l.id,
@@ -1414,8 +1428,8 @@ app.get('/admin/stats', async (c) => {
         ) AS display_label
       FROM verification_logs l
       ORDER BY l.scanned_at DESC
-      LIMIT 12
-    `).all();
+      LIMIT ? OFFSET ?
+    `).bind(logsLimit, logsOffset).all();
 
     const topScanned = await c.env.DB.prepare(`
       WITH tag_cnt AS (
@@ -1755,7 +1769,7 @@ app.get('/admin/users', async (c) => {
 // 관리자가 특정 유저의 골드바 시세 노출 여부 및 1g당 시세를 수정하는 API
 app.put('/admin/user-goldbars', async (c) => {
   try {
-    const { userId, goldbarId, showMarketPrice, marketPricePerGram } = await c.req.json();
+    const { userId, goldbarId, showMarketPrice, marketPricePerGram, showStart, showEnd } = await c.req.json();
     if (!userId || !goldbarId) return c.json({ error: '유저 및 골드바 정보가 필요합니다.' }, 400);
 
     // 자동 마이그레이션
@@ -1765,12 +1779,25 @@ app.put('/admin/user-goldbars', async (c) => {
     try {
       await c.env.DB.prepare("ALTER TABLE user_goldbars ADD COLUMN market_price_per_gram REAL DEFAULT 110000").run();
     } catch (_) {}
+    try {
+      await c.env.DB.prepare("ALTER TABLE user_goldbars ADD COLUMN show_start_at TEXT").run();
+    } catch (_) {}
+    try {
+      await c.env.DB.prepare("ALTER TABLE user_goldbars ADD COLUMN show_end_at TEXT").run();
+    } catch (_) {}
 
     const result = await c.env.DB.prepare(`
       UPDATE user_goldbars 
-      SET show_market_price = ?, market_price_per_gram = ?
+      SET show_market_price = ?, market_price_per_gram = ?, show_start_at = ?, show_end_at = ?
       WHERE user_id = ? AND goldbar_id = ?
-    `).bind(showMarketPrice ? 1 : 0, marketPricePerGram || 110000, userId, goldbarId).run();
+    `).bind(
+      showMarketPrice ? 1 : 0, 
+      marketPricePerGram || 110000, 
+      showStart || null, 
+      showEnd || null, 
+      userId, 
+      goldbarId
+    ).run();
 
     if ((result.meta?.changes ?? 0) === 0) {
       return c.json(
@@ -1808,6 +1835,8 @@ app.get('/admin/user-goldbars', async (c) => {
           goldbar_id INTEGER NOT NULL,
           show_market_price INTEGER DEFAULT 0,
           market_price_per_gram REAL DEFAULT 110000,
+          show_start_at TEXT,
+          show_end_at TEXT,
           added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           UNIQUE(user_id, goldbar_id)
         )
@@ -1821,11 +1850,20 @@ app.get('/admin/user-goldbars', async (c) => {
       await c.env.DB.prepare("ALTER TABLE user_goldbars ADD COLUMN market_price_per_gram REAL DEFAULT 110000").run();
     } catch (_) {}
     try {
+      await c.env.DB.prepare("ALTER TABLE user_goldbars ADD COLUMN show_start_at TEXT").run();
+    } catch (_) {}
+    try {
+      await c.env.DB.prepare("ALTER TABLE user_goldbars ADD COLUMN show_end_at TEXT").run();
+    } catch (_) {}
+    try {
       await c.env.DB.prepare("ALTER TABLE user_goldbars ADD COLUMN added_at DATETIME DEFAULT CURRENT_TIMESTAMP").run();
     } catch (_) {}
 
     const { results } = await c.env.DB.prepare(`
-      SELECT ug.id, ug.user_id, ug.goldbar_id, ug.show_market_price, ug.market_price_per_gram, u.email as user_email, u.name as user_name, g.serial_number, g.weight, g.purity
+      SELECT 
+        ug.id, ug.user_id, ug.goldbar_id, ug.show_market_price, ug.market_price_per_gram, 
+        ug.show_start_at, ug.show_end_at,
+        u.email as user_email, u.name as user_name, g.serial_number, g.weight, g.purity
       FROM user_goldbars ug
       LEFT JOIN users u ON ug.user_id = u.id
       LEFT JOIN goldbars g ON ug.goldbar_id = g.id
@@ -1836,6 +1874,7 @@ app.get('/admin/user-goldbars', async (c) => {
     return c.json({ error: err.message }, 500);
   }
 });
+
 
 // 2. 사용자의 소유 골드바 목록 조회 및 동기화
 app.post('/user/sync', async (c) => {
@@ -1862,15 +1901,27 @@ app.post('/user/sync', async (c) => {
       }
     }
 
-    // 최종 동기화된 모든 골드바 목록 반환
+    // 최종 동기화된 모든 골드바 목록 반환 (시세 노출 날짜 조건 추가)
+    const now = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     const { results } = await c.env.DB.prepare(`
-      SELECT g.*, c.tag_uid, c.cert_file_path, ug.show_market_price, ug.market_price_per_gram
+      SELECT 
+        g.*, c.tag_uid, c.cert_file_path, 
+        CASE 
+          WHEN ug.show_market_price = 1 
+               AND (ug.show_start_at IS NULL OR ug.show_start_at <= ?)
+               AND (ug.show_end_at IS NULL OR ug.show_end_at >= ?)
+          THEN 1 
+          ELSE 0 
+        END as show_market_price,
+        ug.market_price_per_gram
       FROM user_goldbars ug
       JOIN goldbars g ON ug.goldbar_id = g.id
       LEFT JOIN certificates c ON g.id = c.goldbar_id
       WHERE ug.user_id = ?
       ORDER BY ug.id DESC
-    `).bind(userId).all();
+    `).bind(now, now, userId).all();
+
+
 
     return c.json({ success: true, syncGoldbars: results });
   } catch (err: any) {
