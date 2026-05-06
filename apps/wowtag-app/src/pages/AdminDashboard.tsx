@@ -402,8 +402,11 @@ export default function AdminDashboard() {
     productName: string | null;
     createdAt?: string;
   } | null>(null);
-  /** 판매 완료 제품: NFC 스캔 후 매칭 해제 */
   const [unmapSoldModalTag, setUnmapSoldModalTag] = useState<any | null>(null);
+  /** NFC 태그 관리: 매칭된 리스트 필터링 */
+  const [nfcFilterProductId, setNfcFilterProductId] = useState('');
+  const [nfcFilterCertSerial, setNfcFilterCertSerial] = useState('');
+  const [nfcSearchUid, setNfcSearchUid] = useState('');
   /** 제품 보증서 PDF 생성 (화면 밖 렌더 → html2canvas) */
   const [guaranteePdfPayload, setGuaranteePdfPayload] = useState<GuaranteeCertificateData | null>(null);
   /** 제품 보증서 미리보기 모달 */
@@ -414,10 +417,21 @@ export default function AdminDashboard() {
     () => nfcProductTags.filter((t: any) => t.target_id == null || t.target_id === ''),
     [nfcProductTags]
   );
-  const nfcLinkedList = useMemo(
-    () => nfcProductTags.filter((t: any) => t.target_id != null && t.target_id !== ''),
-    [nfcProductTags]
-  );
+  const nfcLinkedList = useMemo(() => {
+    let list = nfcProductTags.filter((t: any) => t.target_id != null && t.target_id !== '');
+    
+    if (nfcFilterProductId) {
+      list = list.filter((t: any) => String(t.target_id) === nfcFilterProductId);
+    }
+    if (nfcFilterCertSerial) {
+      list = list.filter((t: any) => t.goldbar_serial_number?.toLowerCase().includes(nfcFilterCertSerial.toLowerCase()));
+    }
+    if (nfcSearchUid) {
+      list = list.filter((t: any) => t.tag_uid?.toLowerCase().includes(nfcSearchUid.toLowerCase()));
+    }
+    
+    return list;
+  }, [nfcProductTags, nfcFilterProductId, nfcFilterCertSerial, nfcSearchUid]);
 
   const closeAllAdminModals = useCallback(() => {
     setIsProductModalOpen(false);
@@ -2136,6 +2150,49 @@ export default function AdminDashboard() {
                   <span className="text-xs font-black text-emerald-800 bg-emerald-50 px-3.5 py-1.5 rounded-2xl border border-emerald-200/80 shadow-sm shrink-0">
                     총 {nfcLinkedList.length}건
                   </span>
+                </div>
+
+                {/* 섹션 ② 필터바 */}
+                <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="relative flex items-center">
+                    <Search className="absolute left-3.5 w-4 h-4 text-slate-300" />
+                    <input 
+                      type="text"
+                      placeholder="태그 UID 검색"
+                      value={nfcSearchUid}
+                      onChange={(e) => {
+                        setNfcSearchUid(e.target.value);
+                        setCurrentPageNfcLinked(1);
+                      }}
+                      className="w-full h-11 bg-slate-50 border border-slate-100 rounded-xl pl-10 pr-4 text-xs font-bold outline-none focus:border-emerald-200 focus:bg-white transition-all"
+                    />
+                  </div>
+                  <div className="relative flex items-center">
+                    <Award className="absolute left-3.5 w-4 h-4 text-slate-300" />
+                    <input 
+                      type="text"
+                      placeholder="보증서 일련번호 검색"
+                      value={nfcFilterCertSerial}
+                      onChange={(e) => {
+                        setNfcFilterCertSerial(e.target.value);
+                        setCurrentPageNfcLinked(1);
+                      }}
+                      className="w-full h-11 bg-slate-50 border border-slate-100 rounded-xl pl-10 pr-4 text-xs font-bold outline-none focus:border-emerald-200 focus:bg-white transition-all"
+                    />
+                  </div>
+                  <select
+                    value={nfcFilterProductId}
+                    onChange={(e) => {
+                      setNfcFilterProductId(e.target.value);
+                      setCurrentPageNfcLinked(1);
+                    }}
+                    className="h-11 bg-slate-50 border border-slate-100 rounded-xl px-4 text-xs font-bold outline-none focus:border-emerald-200 focus:bg-white transition-all cursor-pointer"
+                  >
+                    <option value="">모든 제품 보기</option>
+                    {products.map(p => (
+                      <option key={p.id} value={String(p.id)}>{p.name}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="space-y-4">
