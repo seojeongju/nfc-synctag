@@ -801,7 +801,12 @@ app.put('/products/:id', async (c) => {
   try {
     await migrateProductsExtraColumns(c.env.DB);
 
-    const id = c.req.param('id');
+    const rawId = c.req.param('id');
+    const idMatch = String(rawId).match(/^(?:product_)?(\d+)$/);
+    if (!idMatch) {
+      return c.json({ error: '유효하지 않은 제품 ID입니다.' }, 400);
+    }
+    const id = idMatch[1];
     const body = await c.req.json();
     const {
       name,
@@ -859,9 +864,11 @@ app.put('/products/:id', async (c) => {
       savedImageUrl = `/api/products/image/${r2Path}`;
     }
 
+    let updateResult: D1Result<unknown> | null = null;
+
     if (soldInBody && sold === true) {
       const mark = new Date().toISOString();
-      await c.env.DB.prepare(`
+      updateResult = await c.env.DB.prepare(`
       UPDATE products 
       SET name = ?, description = ?, video_url = ?, manual_url = ?, image_url = ?, options = ?,
           material = ?, purity = ?, weight = ?, width_mm = ?, height_mm = ?, price = ?, memo = ?,
@@ -889,7 +896,7 @@ app.put('/products/:id', async (c) => {
         )
         .run();
     } else if (soldInBody && sold === false) {
-      await c.env.DB.prepare(`
+      updateResult = await c.env.DB.prepare(`
       UPDATE products 
       SET name = ?, description = ?, video_url = ?, manual_url = ?, image_url = ?, options = ?,
           material = ?, purity = ?, weight = ?, width_mm = ?, height_mm = ?, price = ?, memo = ?,
@@ -916,7 +923,7 @@ app.put('/products/:id', async (c) => {
         )
         .run();
     } else {
-      await c.env.DB.prepare(`
+      updateResult = await c.env.DB.prepare(`
       UPDATE products 
       SET name = ?, description = ?, video_url = ?, manual_url = ?, image_url = ?, options = ?,
           material = ?, purity = ?, weight = ?, width_mm = ?, height_mm = ?, price = ?, memo = ?,
@@ -941,6 +948,10 @@ app.put('/products/:id', async (c) => {
           id
         )
         .run();
+    }
+
+    if ((updateResult?.meta?.changes ?? 0) === 0) {
+      return c.json({ error: '수정할 제품을 찾지 못했습니다.' }, 404);
     }
 
     return c.json({ success: true }, 200);

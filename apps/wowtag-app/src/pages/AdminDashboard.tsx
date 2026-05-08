@@ -408,6 +408,20 @@ export default function AdminDashboard() {
   const [guaranteePdfPayload, setGuaranteePdfPayload] = useState<GuaranteeCertificateData | null>(null);
   /** 제품 보증서 미리보기 모달 */
   const [guaranteePreviewData, setGuaranteePreviewData] = useState<GuaranteeCertificateData | null>(null);
+  const [toast, setToast] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
+
+  const showToast = useCallback((type: 'success' | 'error', message: string) => {
+    setToast({ type, message });
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 2600);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   const nfcProductTags = useMemo(() => allTags.filter((t: any) => t.target_type === 'product'), [allTags]);
   const nfcUnlinkedList = useMemo(
@@ -460,13 +474,13 @@ export default function AdminDashboard() {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       if (data?.code === 'NEEDS_NFC_SCAN') {
-        alert(data?.error || '실제 NFC 태그를 스캔한 뒤 다시 시도해 주세요.');
+        showToast('error', data?.error || '실제 NFC 태그를 스캔한 뒤 다시 시도해 주세요.');
       } else {
-        alert(data?.error || '매칭 해제에 실패했습니다.');
+        showToast('error', data?.error || '매칭 해제에 실패했습니다.');
       }
       return false;
     }
-    alert('매칭이 해제되었습니다. 태그는 출고 전 자산 목록으로 이동합니다.');
+    showToast('success', '매칭이 해제되었습니다. 태그는 출고 전 자산 목록으로 이동합니다.');
     fetchTags();
     return true;
   };
@@ -491,7 +505,7 @@ export default function AdminDashboard() {
     const url = `${window.location.origin}/t/${encodeURIComponent(tagUid)}?unmap=1`;
     try {
       await navigator.clipboard.writeText(url);
-      alert('링크가 복사되었습니다. 태그 스캔으로 이 주소를 여세요.');
+      showToast('success', '링크가 복사되었습니다. 태그 스캔으로 이 주소를 여세요.');
     } catch {
       prompt('아래 URL을 복사해 태그에 연결된 기기에서 여세요:', url);
     }
@@ -598,12 +612,12 @@ export default function AdminDashboard() {
 
   const handleBulkApplyAssetMarket = async () => {
     if (selectedAssetIds.length === 0) {
-      alert('적용할 자산을 최소 하나 이상 선택해 주세요.');
+      showToast('error', '적용할 자산을 최소 하나 이상 선택해 주세요.');
       return;
     }
     const price = Number(String(bulkMarketPrice).replace(/,/g, '').trim());
     if (!Number.isFinite(price) || price <= 0) {
-      alert('유효한 1g당 매입 시세를 입력해 주세요.');
+      showToast('error', '유효한 1g당 매입 시세를 입력해 주세요.');
       return;
     }
 
@@ -642,12 +656,12 @@ export default function AdminDashboard() {
         if (res.ok) successCount++;
       }
 
-      alert(`${successCount}개의 자산 시세 정보가 업데이트되었습니다.`);
+      showToast('success', `${successCount}개의 자산 시세 정보가 업데이트되었습니다.`);
       setSelectedAssetIds([]);
       setBulkMarketPrice('');
       fetchAssets();
     } catch (err: any) {
-      alert(`오류 발생: ${err.message}`);
+      showToast('error', `오류 발생: ${err.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -694,14 +708,14 @@ export default function AdminDashboard() {
       });
 
       if (res.ok) {
-        alert('시세 정보가 업데이트되었습니다.');
+        showToast('success', '시세 정보가 업데이트되었습니다.');
         fetchAssets();
       } else {
         const d = await res.json();
-        alert(d.error || '업데이트 실패');
+        showToast('error', d.error || '업데이트 실패');
       }
     } catch (err: any) {
-      alert(`오류 발생: ${err.message}`);
+      showToast('error', `오류 발생: ${err.message}`);
     }
   };
 
@@ -732,15 +746,15 @@ export default function AdminDashboard() {
         body: JSON.stringify({ action }),
       });
       if (res.ok) {
-        alert('처리되었습니다.');
+        showToast('success', '처리되었습니다.');
         fetchReleaseRequests();
         fetchAssets(); // 목록 갱신
       } else {
         const d = await res.json();
-        alert(d.error || '처리에 실패했습니다.');
+        showToast('error', d.error || '처리에 실패했습니다.');
       }
     } catch (err) {
-      alert('오류 발생');
+      showToast('error', '오류 발생');
     }
   };
 
@@ -792,7 +806,7 @@ export default function AdminDashboard() {
   // --- NFC 로직 ---
   const handleNFCScan = async (target: 'nfc' | 'goldbar' | 'edit') => {
     if (!('NDEFReader' in window)) {
-      alert('⚠️ 현재 환경에서 Web NFC를 지원하지 않습니다.\n\n해결 방법:\n1. 삼성 안드로이드 기기의 Chrome 브라우저로 접속해 주세요.\n2. 반드시 HTTPS(보안 연결) 환경이어야 합니다.\n3. 홈 화면에 설치된 앱(PWA) 형태로 실행해 주세요.');
+      showToast('error', '현재 환경에서 Web NFC를 지원하지 않습니다. 안드로이드 Chrome + HTTPS(PWA) 환경에서 다시 시도해 주세요.');
       return;
     }
 
@@ -809,13 +823,13 @@ export default function AdminDashboard() {
           const existingData = await res.json();
 
           if (existingData?.message === 'goldbar_pool') {
-            alert('이 UID는 골드바 자산 풀(인증서 연결 전)에 등록되어 있습니다. 골드바 탭에서 관리하세요.');
+            showToast('error', '이 UID는 골드바 자산 풀(인증서 연결 전)에 등록되어 있습니다. 골드바 탭에서 관리하세요.');
             setNfcScanning(false);
             return;
           }
 
           if (existingData?.reserved || existingData?.message === 'goldbar_tag') {
-            alert('이 UID는 골드바 정품 태그로 이미 사용 중입니다.');
+            showToast('error', '이 UID는 골드바 정품 태그로 이미 사용 중입니다.');
             setNfcScanning(false);
             return;
           }
@@ -849,7 +863,10 @@ export default function AdminDashboard() {
   };
 
   const handleNFCWrite = async () => {
-    if (!nfcFormData.tag_uid) return alert('먼저 UID를 스캔하세요.');
+    if (!nfcFormData.tag_uid) {
+      showToast('error', '먼저 UID를 스캔하세요.');
+      return;
+    }
     try {
       setNfcWriting(true);
       const ndef = new (window as any).NDEFReader();
@@ -863,9 +880,9 @@ export default function AdminDashboard() {
 
       await ndef.write({ records: [{ recordType: "url", data: url }] });
       if ('vibrate' in navigator) navigator.vibrate([100, 50, 100]);
-      alert('태그 쓰기 성공!');
+      showToast('success', '태그 쓰기 성공!');
     } catch (err) {
-      alert('쓰기 실패: 태그를 단말기 뒷면에 정확하게 대어 주시거나, NFC가 "기본 모드"인지 다시 한 번 확인해 주세요.');
+      showToast('error', '쓰기 실패: 태그를 단말기 뒷면에 정확하게 대어 주시거나, NFC가 "기본 모드"인지 다시 확인해 주세요.');
     } finally {
       setNfcWriting(false);
     }
@@ -917,7 +934,10 @@ export default function AdminDashboard() {
 
   const handleProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!productFormData.name) return alert('제품 이름을 입력해 주세요.');
+    if (!productFormData.name) {
+      showToast('error', '제품 이름을 입력해 주세요.');
+      return;
+    }
     setSubmitting(true);
     try {
       const { certificate_id, ...productPayload } = productFormData;
@@ -986,11 +1006,19 @@ export default function AdminDashboard() {
 
   const handleEditProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editProductFormData.name) return alert('이름을 입력하세요.');
+    if (!editProductFormData.name) {
+      showToast('error', '이름을 입력하세요.');
+      return;
+    }
     setSubmitting(true);
     try {
+      const normalizedProductId = String(editProductFormData.id).match(/^(?:product_)?(\d+)$/)?.[1];
+      if (!normalizedProductId) {
+        showToast('error', '유효하지 않은 제품 ID입니다. 목록을 새로고침한 뒤 다시 시도해 주세요.');
+        return;
+      }
       const { certificate_id, ...editPayload } = editProductFormData;
-      const res = await fetch(`/api/products/${editProductFormData.id}`, {
+      const res = await fetch(`/api/products/${normalizedProductId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1000,14 +1028,14 @@ export default function AdminDashboard() {
       });
       if (res.ok) {
         setIsEditProductModalOpen(false);
-        alert('수정되었습니다.');
+        showToast('success', '수정되었습니다.');
         fetchProducts();
       } else {
         const d = await res.json();
-        alert(`수정 실패: ${d.error}`);
+        showToast('error', `수정 실패: ${d.error}`);
       }
     } catch (err: any) {
-      alert(`수정 요청 실패: ${err.message}`);
+      showToast('error', `수정 요청 실패: ${err.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -1019,19 +1047,25 @@ export default function AdminDashboard() {
     try {
       const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        alert('삭제 성공!');
+        showToast('success', '삭제 성공!');
         fetchProducts();
         fetchTags();
       }
     } catch (err: any) {
-      alert('삭제 요청 실패');
+      showToast('error', '삭제 요청 실패');
     }
   };
 
   const handleNfcMappingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nfcFormData.tag_uid) return alert('태그 UID를 스캔하세요.');
-    if (nfcRegisterMode === 'product' && !nfcFormData.product_id) return alert('제품을 선택하세요.');
+    if (!nfcFormData.tag_uid) {
+      showToast('error', '태그 UID를 스캔하세요.');
+      return;
+    }
+    if (nfcRegisterMode === 'product' && !nfcFormData.product_id) {
+      showToast('error', '제품을 선택하세요.');
+      return;
+    }
     setSubmitting(true);
     try {
       const body =
@@ -1049,13 +1083,13 @@ export default function AdminDashboard() {
         setNfcRegisterMode('asset');
         setNfcFormData({ tag_uid: '', product_id: '' });
         setNfcExistingSnapshot(null);
-        alert(data.mode === 'asset' ? '자산 태그로 등록되었습니다.' : '태그 매핑이 완료되었습니다.');
+        showToast('success', data.mode === 'asset' ? '자산 태그로 등록되었습니다.' : '태그 매핑이 완료되었습니다.');
         fetchProducts();
         fetchTags();
         fetchAssets();
         fetchGoldbars();
       } else {
-        alert(typeof data.error === 'string' ? data.error : '등록에 실패했습니다.');
+        showToast('error', typeof data.error === 'string' ? data.error : '등록에 실패했습니다.');
       }
     } finally {
       setSubmitting(false);
@@ -1064,7 +1098,10 @@ export default function AdminDashboard() {
 
   const handleLinkTagProduct = async (uid: string) => {
     const pid = linkPick[uid];
-    if (!pid) return alert('연결할 제품을 선택하세요.');
+    if (!pid) {
+      showToast('error', '연결할 제품을 선택하세요.');
+      return;
+    }
     try {
       const res = await fetch('/api/tags/link-product', {
         method: 'PUT',
@@ -1073,17 +1110,17 @@ export default function AdminDashboard() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        alert('출고 시 제품 연동이 완료되었습니다.\n보증서가 자동으로 발행되었습니다.');
+        showToast('success', '출고 시 제품 연동이 완료되었습니다. 보증서가 자동으로 발행되었습니다.');
         setExpandedUnlinkedTagUid(null);
         fetchTags();
         fetchProducts();
         fetchAssets();
         fetchGoldbars();
       } else {
-        alert(typeof data.error === 'string' ? data.error : '연동에 실패했습니다.');
+        showToast('error', typeof data.error === 'string' ? data.error : '연동에 실패했습니다.');
       }
     } catch (err: any) {
-      alert(err?.message || '연동 요청 실패');
+      showToast('error', err?.message || '연동 요청 실패');
     }
   };
 
@@ -1134,7 +1171,8 @@ export default function AdminDashboard() {
   const handleGoldbarSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!goldbarFormData.serial_number || !goldbarFormData.weight) {
-      return alert('필수 입력 항목을 모두 채워주세요.');
+      showToast('error', '필수 입력 항목을 모두 채워주세요.');
+      return;
     }
     setSubmitting(true);
     try {
@@ -1162,15 +1200,15 @@ export default function AdminDashboard() {
           status: 'CATALOG',
           cert_url: ''
         });
-        alert('골드바 및 정품인증서 등록 성공!');
+        showToast('success', '골드바 및 정품인증서 등록 성공!');
         fetchGoldbars();
         fetchStats();
       } else {
         const errData = await res.json();
-        alert(`오류 발생: ${errData.error || '알 수 없는 오류'}`);
+        showToast('error', `오류 발생: ${errData.error || '알 수 없는 오류'}`);
       }
     } catch (err: any) {
-      alert(`요청 실패: ${err.message}`);
+      showToast('error', `요청 실패: ${err.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -1201,7 +1239,10 @@ export default function AdminDashboard() {
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editGoldbarData.serial_number || !editGoldbarData.weight) return alert('정보를 입력하세요.');
+    if (!editGoldbarData.serial_number || !editGoldbarData.weight) {
+      showToast('error', '정보를 입력하세요.');
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch(`/api/goldbars/${editGoldbarData.id}`, {
@@ -1211,14 +1252,14 @@ export default function AdminDashboard() {
       });
       if (res.ok) {
         setIsEditModalOpen(false);
-        alert('수정되었습니다.');
+        showToast('success', '수정되었습니다.');
         fetchGoldbars();
       } else {
         const d = await res.json();
-        alert(`수정 실패: ${d.error}`);
+        showToast('error', `수정 실패: ${d.error}`);
       }
     } catch (err: any) {
-      alert(`수정 요청 실패: ${err.message}`);
+      showToast('error', `수정 요청 실패: ${err.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -1230,12 +1271,12 @@ export default function AdminDashboard() {
     try {
       const res = await fetch(`/api/goldbars/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        alert('삭제 성공!');
+        showToast('success', '삭제 성공!');
         fetchGoldbars();
         fetchStats();
       }
     } catch (err: any) {
-      alert('삭제 요청 실패');
+      showToast('error', '삭제 요청 실패');
     }
   };
 
@@ -2850,11 +2891,11 @@ export default function AdminDashboard() {
                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                    <div className="space-y-2">
                      <label className="text-xs font-black text-slate-400 tracking-widest pl-1">영상 URL</label>
-                     <input type="url" value={productFormData.video_url} onChange={(e) => setProductFormData({ ...productFormData, video_url: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 outline-none text-sm font-bold border border-transparent focus:border-primary/50 focus:bg-white" />
+                    <input type="text" inputMode="url" placeholder="https://..." value={productFormData.video_url} onChange={(e) => setProductFormData({ ...productFormData, video_url: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 outline-none text-sm font-bold border border-transparent focus:border-primary/50 focus:bg-white" />
                    </div>
                    <div className="space-y-2">
                      <label className="text-xs font-black text-slate-400 tracking-widest pl-1">매뉴얼 URL</label>
-                     <input type="url" value={productFormData.manual_url} onChange={(e) => setProductFormData({ ...productFormData, manual_url: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 outline-none text-sm font-bold border border-transparent focus:border-primary/50 focus:bg-white" />
+                    <input type="text" inputMode="url" placeholder="https://..." value={productFormData.manual_url} onChange={(e) => setProductFormData({ ...productFormData, manual_url: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 outline-none text-sm font-bold border border-transparent focus:border-primary/50 focus:bg-white" />
                    </div>
                  </div>
                </div>
@@ -2994,11 +3035,11 @@ export default function AdminDashboard() {
                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                    <div className="space-y-2">
                      <label className="text-xs font-black text-slate-400 tracking-widest pl-1">영상 URL</label>
-                     <input type="url" value={editProductFormData.video_url} onChange={(e) => setEditProductFormData({ ...editProductFormData, video_url: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 outline-none text-sm font-bold border border-transparent focus:border-primary/50 focus:bg-white" />
+                    <input type="text" inputMode="url" placeholder="https://..." value={editProductFormData.video_url} onChange={(e) => setEditProductFormData({ ...editProductFormData, video_url: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 outline-none text-sm font-bold border border-transparent focus:border-primary/50 focus:bg-white" />
                    </div>
                    <div className="space-y-2">
                      <label className="text-xs font-black text-slate-400 tracking-widest pl-1">매뉴얼 URL</label>
-                     <input type="url" value={editProductFormData.manual_url} onChange={(e) => setEditProductFormData({ ...editProductFormData, manual_url: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 outline-none text-sm font-bold border border-transparent focus:border-primary/50 focus:bg-white" />
+                    <input type="text" inputMode="url" placeholder="https://..." value={editProductFormData.manual_url} onChange={(e) => setEditProductFormData({ ...editProductFormData, manual_url: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 outline-none text-sm font-bold border border-transparent focus:border-primary/50 focus:bg-white" />
                    </div>
                  </div>
                </div>
@@ -3601,6 +3642,22 @@ export default function AdminDashboard() {
                  {submitting && <Loader2 className="w-5 h-5 animate-spin" />} 수정 완료
                </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className="fixed left-1/2 -translate-x-1/2 bottom-24 lg:bottom-8 z-[260] pointer-events-none">
+          <div
+            className={`px-4 py-3 rounded-xl shadow-xl border text-sm font-bold ${
+              toast.type === 'success'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : 'bg-rose-50 text-rose-700 border-rose-200'
+            }`}
+            role="status"
+            aria-live="polite"
+          >
+            {toast.message}
           </div>
         </div>
       )}
