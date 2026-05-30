@@ -239,6 +239,151 @@ function ProductCertificatePicker({
   );
 }
 
+type NfcUidScanAccent = 'emerald' | 'amber';
+
+/** NFC 워크벤치 1단계: 스캔 CTA를 강조하고 직접 입력은 보조로 배치 */
+function NfcUidScanStep({
+  stepNumber,
+  stepTitle,
+  tagUid,
+  onTagUidChange,
+  onScan,
+  scanning,
+  accent,
+  placeholder = '04:51:4b:fa:c1:1c:91',
+  onClear,
+  scanLabel = 'NFC 태그 스캔 시작',
+  scanSubLabel = '태그를 스마트폰 뒷면에 대면 UID가 자동으로 입력됩니다',
+}: {
+  stepNumber: number;
+  stepTitle: string;
+  tagUid: string;
+  onTagUidChange: (value: string) => void;
+  onScan: () => void;
+  scanning: boolean;
+  accent: NfcUidScanAccent;
+  placeholder?: string;
+  onClear?: () => void;
+  scanLabel?: string;
+  scanSubLabel?: string;
+}) {
+  const scanGradient =
+    accent === 'emerald'
+      ? 'from-emerald-600 via-emerald-500 to-teal-600 shadow-emerald-500/35 ring-emerald-400/40'
+      : 'from-amber-500 via-amber-500 to-orange-500 shadow-amber-500/35 ring-amber-400/40';
+  const stepChip = accent === 'emerald' ? 'bg-emerald-600' : 'bg-amber-500';
+  const inputFocus = accent === 'emerald' ? 'focus:border-emerald-500' : 'focus:border-amber-400';
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            className={`shrink-0 w-7 h-7 rounded-lg ${stepChip} text-white text-xs font-black flex items-center justify-center shadow-sm`}
+          >
+            {stepNumber}
+          </span>
+          <label className="text-xs sm:text-sm font-black text-slate-800 leading-snug">{stepTitle}</label>
+        </div>
+        {onClear && tagUid.trim() ? (
+          <button
+            type="button"
+            onClick={onClear}
+            className="text-[11px] font-black text-slate-500 hover:text-rose-600 flex items-center gap-1 shrink-0"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            초기화
+          </button>
+        ) : null}
+      </div>
+
+      <button
+        type="button"
+        onClick={onScan}
+        disabled={scanning}
+        className={`w-full rounded-2xl bg-gradient-to-r ${scanGradient} text-white p-4 sm:p-5 shadow-lg ring-2 ring-offset-2 ring-offset-white transition-all active:scale-[0.99] disabled:opacity-95`}
+      >
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center shrink-0 border border-white/35">
+            {scanning ? (
+              <Loader2 className="w-7 h-7 sm:w-8 sm:h-8 animate-spin" aria-hidden />
+            ) : (
+              <ScanLine className="w-7 h-7 sm:w-8 sm:h-8" strokeWidth={2.25} aria-hidden />
+            )}
+          </div>
+          <div className="flex-1 text-left min-w-0">
+            <p className="text-sm sm:text-base font-black leading-tight">
+              {scanning ? '태그를 기기에 대 주세요…' : scanLabel}
+            </p>
+            <p className="text-[10px] sm:text-[11px] font-bold text-white/90 mt-1 leading-snug">
+              {scanning ? '스캔이 끝나면 아래 UID 칸에 자동 입력됩니다' : scanSubLabel}
+            </p>
+          </div>
+          {!scanning ? <Smartphone className="w-6 h-6 sm:w-7 sm:h-7 shrink-0 opacity-90" /> : null}
+        </div>
+      </button>
+
+      {scanning ? (
+        <p className="text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 flex items-center gap-2">
+          <span className="relative flex h-2 w-2 shrink-0">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+          </span>
+          NFC 스캔 대기 중 — 태그를 떼지 마세요.
+        </p>
+      ) : null}
+
+      <div className="flex items-center gap-3 py-0.5">
+        <div className="flex-1 h-px bg-slate-200" />
+        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider shrink-0">또는 UID 직접 입력</span>
+        <div className="flex-1 h-px bg-slate-200" />
+      </div>
+
+      <input
+        type="text"
+        value={tagUid}
+        onChange={(e) => onTagUidChange(e.target.value)}
+        placeholder={placeholder}
+        className={`w-full h-12 rounded-xl border border-slate-200 bg-slate-50 px-4 font-mono text-sm font-bold outline-none focus:bg-white ${inputFocus}`}
+      />
+    </div>
+  );
+}
+
+function NfcWorkflowSteps({
+  accent,
+  labels,
+}: {
+  accent: NfcUidScanAccent;
+  labels: string[];
+}) {
+  const active = accent === 'emerald' ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-white';
+  const line = accent === 'emerald' ? 'bg-emerald-200' : 'bg-amber-200';
+  const wrap = accent === 'emerald' ? 'bg-emerald-50/90 border-emerald-100' : 'bg-amber-50/90 border-amber-100';
+
+  return (
+    <div className={`flex items-center gap-1 sm:gap-2 mb-5 p-3 sm:p-3.5 rounded-2xl border ${wrap}`}>
+      {labels.map((label, i) => (
+        <Fragment key={label}>
+          <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
+            <span
+              className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full text-[10px] sm:text-[11px] font-black flex items-center justify-center shrink-0 ${
+                i === 0 ? active : 'bg-white text-slate-400 border border-slate-200'
+              }`}
+            >
+              {i + 1}
+            </span>
+            <span className="text-[9px] sm:text-[10px] font-black text-slate-600 text-center leading-tight px-0.5">
+              {label}
+            </span>
+          </div>
+          {i < labels.length - 1 ? <div className={`w-3 sm:w-6 h-0.5 ${line} shrink-0`} /> : null}
+        </Fragment>
+      ))}
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const { tab: tabParam } = useParams<{ tab: string }>();
   const navigate = useNavigate();
@@ -2235,47 +2380,28 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
+                  <NfcWorkflowSteps accent="emerald" labels={['NFC 스캔', '제품 선택', '매칭 완료']} />
+
                   <form onSubmit={handleQuickProductMatch} className="space-y-5">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-2 pl-1">
-                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">1. 태그 UID (스캔 또는 직접 입력)</label>
-                        <button
-                          type="button"
-                          onClick={clearNfcMatchWorkbench}
-                          className="text-[11px] font-black text-slate-500 hover:text-rose-600 flex items-center gap-1 shrink-0"
-                        >
-                          <RefreshCw className="w-3.5 h-3.5" />
-                          입력 초기화
-                        </button>
-                      </div>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={nfcMatchForm.tag_uid}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            if (!v.trim()) {
-                              clearNfcMatchWorkbench();
-                              return;
-                            }
-                            setNfcMatchForm((prev) => ({ ...prev, tag_uid: v }));
-                            void refreshNfcMatchSnapshot(v);
-                          }}
-                          placeholder="04:51:4b:fa:c1:1c:91"
-                          className="flex-1 h-12 rounded-xl border border-slate-200 bg-slate-50 px-4 font-mono text-sm font-bold outline-none focus:border-emerald-500 focus:bg-white"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => void handleNFCScanMatch()}
-                          className={`w-12 h-12 shrink-0 rounded-xl border flex items-center justify-center transition-all ${
-                            nfcScanning ? 'bg-amber-50 border-amber-200 text-amber-600' : 'bg-white border-slate-200 hover:border-emerald-400 text-slate-500'
-                          }`}
-                          aria-label="NFC 스캔"
-                        >
-                          {nfcScanning ? <Loader2 className="w-5 h-5 animate-spin" /> : <Smartphone className="w-5 h-5" />}
-                        </button>
-                      </div>
-                    </div>
+                    <NfcUidScanStep
+                      stepNumber={1}
+                      stepTitle="태그 UID — 아래 초록 버튼부터 누르세요"
+                      accent="emerald"
+                      tagUid={nfcMatchForm.tag_uid}
+                      scanning={nfcScanning}
+                      onScan={() => void handleNFCScanMatch()}
+                      onClear={clearNfcMatchWorkbench}
+                      scanLabel="제품 매칭 · NFC 스캔 시작"
+                      scanSubLabel="① 이 버튼 → ② 제품 선택 → ③ 맨 아래 「제품 매칭 완료」"
+                      onTagUidChange={(v) => {
+                        if (!v.trim()) {
+                          clearNfcMatchWorkbench();
+                          return;
+                        }
+                        setNfcMatchForm((prev) => ({ ...prev, tag_uid: v }));
+                        void refreshNfcMatchSnapshot(v);
+                      }}
+                    />
 
                     {nfcMatchSnapshot && (
                       <div
@@ -2301,7 +2427,12 @@ export default function AdminDashboard() {
                     )}
 
                     <div className="space-y-2">
-                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">2. 출고할 제품 선택</label>
+                      <div className="flex items-center gap-2 pl-0.5">
+                        <span className="shrink-0 w-7 h-7 rounded-lg bg-emerald-600 text-white text-xs font-black flex items-center justify-center shadow-sm">
+                          2
+                        </span>
+                        <label className="text-xs sm:text-sm font-black text-slate-800">출고할 제품 선택</label>
+                      </div>
                       <div className="relative">
                         <select
                           required
@@ -2321,7 +2452,12 @@ export default function AdminDashboard() {
                     </div>
 
                     <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 space-y-3">
-                      <p className="text-xs font-black text-slate-500 uppercase tracking-widest">3. 태그 URL 기록 (선택)</p>
+                      <div className="flex items-center gap-2">
+                        <span className="shrink-0 w-6 h-6 rounded-md bg-slate-200 text-slate-600 text-[10px] font-black flex items-center justify-center">
+                          3
+                        </span>
+                        <p className="text-xs font-black text-slate-600">태그 URL 기록 (선택)</p>
+                      </div>
                       <button
                         type="button"
                         onClick={() => handleNFCWriteFor(nfcMatchForm.tag_uid)}
@@ -2389,29 +2525,20 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
+                  <NfcWorkflowSteps accent="amber" labels={['NFC 스캔', 'UID 확인', '자산 등록']} />
+
                   <form onSubmit={handleUidOnlyRegister} className="space-y-5">
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">태그 UID</label>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={nfcRegisterOnlyForm.tag_uid}
-                          onChange={(e) => setNfcRegisterOnlyForm({ tag_uid: e.target.value })}
-                          placeholder="NFC 스캔 또는 UID 입력"
-                          className="flex-1 h-12 rounded-xl border border-slate-200 bg-slate-50 px-4 font-mono text-sm font-bold outline-none focus:border-amber-400 focus:bg-white"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => void handleNFCScanRegisterOnly()}
-                          className={`w-12 h-12 shrink-0 rounded-xl border flex items-center justify-center ${
-                            nfcScanning ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-200 hover:border-amber-300'
-                          }`}
-                          aria-label="NFC 스캔"
-                        >
-                          {nfcScanning ? <Loader2 className="w-5 h-5 animate-spin" /> : <Smartphone className="w-5 h-5" />}
-                        </button>
-                      </div>
-                    </div>
+                    <NfcUidScanStep
+                      stepNumber={1}
+                      stepTitle="태그 UID — 아래 주황 버튼부터 누르세요"
+                      accent="amber"
+                      tagUid={nfcRegisterOnlyForm.tag_uid}
+                      scanning={nfcScanning}
+                      onScan={() => void handleNFCScanRegisterOnly()}
+                      scanLabel="UID 자산 등록 · NFC 스캔 시작"
+                      scanSubLabel="① 이 버튼 → ② UID 확인 → ③ 맨 아래 「UID 자산 등록」"
+                      onTagUidChange={(v) => setNfcRegisterOnlyForm({ tag_uid: v })}
+                    />
 
                     <button
                       type="button"
