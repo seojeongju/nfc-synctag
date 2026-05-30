@@ -20,7 +20,22 @@ type NfcWriteContext = 'match' | 'register' | 'modal';
 const NFC_WRITE_TIMEOUT_MS = 45_000;
 
 function buildTagLandingUrl(tagUid: string): string {
-  return `${window.location.origin}/t/${encodeURIComponent(tagUid.trim())}`;
+  const base = typeof window !== 'undefined' ? window.location.origin.replace(/\/$/, '') : '';
+  return `${base}/t/${encodeURIComponent(tagUid.trim())}`;
+}
+
+/** 삼성 등 기본 NFC 앱에서 「비어있는 태그」가 되지 않도록 URL + 텍스트 레코드 기록 */
+async function writeNdefLandingUrl(ndef: { write: (message: unknown, options?: unknown) => Promise<void> }, tagUid: string) {
+  const url = buildTagLandingUrl(tagUid);
+  const records = [
+    { recordType: 'url', data: url },
+    { recordType: 'text', data: `Gold SyncTag\n${url}`, lang: 'en' },
+  ];
+  try {
+    await ndef.write({ records }, { overwrite: true });
+  } catch {
+    await ndef.write({ records });
+  }
 }
 
 type NfcMatchSnapshot =
@@ -418,8 +433,8 @@ function NfcUrlWritePanel({
 
       {optionalLabel ? (
         <p className="text-[11px] font-bold text-slate-500 leading-relaxed -mt-1">
-          출고·매칭과는 별개입니다. 태그에 앱 주소를 넣을 때만 사용하세요.{' '}
-          <strong className="text-slate-700">제품 매칭 완료만으로 출고 처리됩니다.</strong>
+          폰에서 「<strong className="text-slate-700">비어있는 태그</strong>」로 보이면 여기서 기록하세요. 매칭 직후 안내창에서
+          기록하는 것을 권장합니다.
         </p>
       ) : null}
 
@@ -706,6 +721,13 @@ export default function AdminDashboard() {
   const [nfcPendingWriteContext, setNfcPendingWriteContext] = useState<NfcWriteContext>('modal');
   const [nfcMatchUrlWrite, setNfcMatchUrlWrite] = useState<NfcUrlWriteStatus>('idle');
   const [nfcRegisterUrlWrite, setNfcRegisterUrlWrite] = useState<NfcUrlWriteStatus>('idle');
+  /** 매칭·등록 직후 실물 태그 URL 기록 안내 (DB 저장과 NFC 칩 기록은 별도) */
+  const [nfcTagWritePrompt, setNfcTagWritePrompt] = useState<{
+    open: boolean;
+    uid: string;
+    kind: 'match' | 'register';
+  }>({ open: false, uid: '', kind: 'match' });
+  const nfcPendingWriteOnSuccessRef = useRef<(() => void) | null>(null);
   /** 제품 보증서 PDF 생성 (화면 밖 렌더 → html2canvas) */
   const [guaranteePdfPayload, setGuaranteePdfPayload] = useState<GuaranteeCertificateData | null>(null);
   /** 제품 보증서 미리보기 모달 */
@@ -1177,6 +1199,29 @@ export default function AdminDashboard() {
   };
 
   /** NFC 쓰기 실제 실행 — 안내 모달 확인 후 또는 이미 확인된 경우 바로 호출 */
+  const closeTagWritePrompt = useCallback(() => {
+    setNfcTagWritePrompt({ open: false, uid: '', kind: 'match' });
+  }, []);
+
+  const beginTagUrlWrite = (tagUid: string, context: NfcWriteContext, onSuccess?: () => void) => {
+    const uid = tagUid.trim();
+    if (!uid) return;
+    nfcPendingWriteOnSuccessRef.current = onSuccess ?? null;
+    const run = () => {
+      void executeNFCWriteForUid(uid, context).then((ok) => {
+        if (ok) nfcPendingWriteOnSuccessRef.current?.();
+        nfcPendingWriteOnSuccessRef.current = null;
+      });
+    };
+    if (nfcModeConfirmed) {
+      run();
+      return;
+    }
+    setNfcPendingWriteUid(uid);
+    setNfcPendingWriteContext(context);
+    setNfcWriteGuideOpen(true);
+  };
+
   const executeNFCWriteForUid = async (
     tagUid: string,
     context: NfcWriteContext = 'modal'
@@ -1195,8 +1240,7 @@ export default function AdminDashboard() {
 
     try {
       const ndef = new (window as any).NDEFReader();
-      const url = buildTagLandingUrl(uid);
-      const writeOp = ndef.write({ records: [{ recordType: 'url', data: url }] });
+      const writeOp = writeNdefLandingUrl(ndef, uid);
       await Promise.race([
         writeOp,
         new Promise<never>((_, reject) => {
@@ -1227,14 +1271,7 @@ export default function AdminDashboard() {
       showToast('error', '먼저 UID를 스캔하세요.');
       return;
     }
-    const run = () => void executeNFCWriteForUid(tagUid.trim(), context);
-    if (nfcModeConfirmed) {
-      run();
-      return;
-    }
-    setNfcPendingWriteUid(tagUid.trim());
-    setNfcPendingWriteContext(context);
-    setNfcWriteGuideOpen(true);
+    beginTagUrlWrite(tagUid, context);
   };
 
   const handleNFCWrite = () => handleNFCWriteFor(nfcFormData.tag_uid);
@@ -1432,10 +1469,11 @@ export default function AdminDashboard() {
 
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        showToast('success', '제품 매칭이 완료되었습니다.');
-        setNfcMatchForm({ tag_uid: '', product_id: '' });
+        showToast('success', '제품 매칭이 완료되었습니다. 이제 같은 태그에 앱 주소를 기록해 주세요.');
+        setNfcMatchForm({ tag_uid: uid, product_id: '' });
         setNfcMatchSnapshot(null);
         setNfcMatchUrlWrite('idle');
+        setNfcTagWritePrompt({ open: true, uid, kind: 'match' });
         fetchTags();
         fetchProducts();
         fetchAssets();
@@ -1467,9 +1505,10 @@ export default function AdminDashboard() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        showToast('success', 'UID 자산으로 등록되었습니다. 제품 매칭 탭에서 출고 연결할 수 있습니다.');
-        setNfcRegisterOnlyForm({ tag_uid: '' });
+        showToast('success', 'UID 자산으로 등록되었습니다. 태그에 앱 주소를 기록해 주세요.');
+        setNfcRegisterOnlyForm({ tag_uid: uid });
         setNfcRegisterUrlWrite('idle');
+        setNfcTagWritePrompt({ open: true, uid, kind: 'register' });
         fetchTags();
       } else {
         showToast('error', typeof data.error === 'string' ? data.error : '등록에 실패했습니다.');
@@ -2541,8 +2580,8 @@ export default function AdminDashboard() {
                     <div>
                       <h3 className="text-base sm:text-lg font-black text-slate-900">제품 매칭 (출고)</h3>
                       <p className="text-xs font-bold text-slate-500 mt-1 leading-relaxed">
-                        <strong className="text-slate-700">① 태그 스캔 → ② 제품 선택 → ③ 제품 매칭 완료</strong> 순서입니다. URL 굽기는
-                        필수가 아닙니다.
+                        <strong className="text-slate-700">① 태그 스캔 → ② 제품 선택 → ③ 제품 매칭 완료</strong> 후 안내에 따라
+                        <strong className="text-slate-700"> 같은 태그에 URL 기록</strong>까지 하면 고객 스캔 시 앱이 열립니다.
                       </p>
                     </div>
                   </div>
@@ -4013,6 +4052,72 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* 매칭·등록 직후: 실물 태그에 URL 기록 (「비어있는 태그」 방지) */}
+      {nfcTagWritePrompt.open && (
+        <div className="fixed inset-0 z-[310] flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="absolute inset-0 bg-slate-900/55 backdrop-blur-md" aria-hidden />
+          <div className="relative w-full max-w-sm bg-white rounded-t-[2rem] sm:rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300">
+            <div
+              className={`p-6 pb-5 ${
+                nfcTagWritePrompt.kind === 'match'
+                  ? 'bg-gradient-to-br from-emerald-500 to-teal-600'
+                  : 'bg-gradient-to-br from-amber-500 to-orange-500'
+              }`}
+            >
+              <h3 className="text-lg font-black text-white tracking-tight">
+                {nfcTagWritePrompt.kind === 'match' ? '제품 매칭 완료' : 'UID 등록 완료'}
+              </h3>
+              <p className="text-xs font-bold text-white/90 mt-2 leading-relaxed">
+                서버에는 저장되었습니다. <strong className="text-white">실물 태그 칩</strong>에도 주소를 넣어야 고객이 스캔할
+                때 「비어있는 태그」가 아닌 앱이 열립니다.
+              </p>
+              <p className="text-[10px] font-mono font-bold text-white/80 mt-3 break-all">{nfcTagWritePrompt.uid}</p>
+            </div>
+            <div className="p-5 space-y-3">
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-[11px] font-bold text-amber-900 leading-relaxed">
+                아래 버튼을 누른 뒤, <strong>같은 NFC 태그</strong>를 스마트폰 뒷면에 1~2초 대 주세요. (Galaxy는 NFC
+                「기본 모드」)
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const { uid: promptUid, kind: promptKind } = nfcTagWritePrompt;
+                  beginTagUrlWrite(promptUid, promptKind === 'match' ? 'match' : 'register', () => {
+                    closeTagWritePrompt();
+                    if (promptKind === 'match') {
+                      setNfcMatchForm({ tag_uid: '', product_id: '' });
+                      setNfcMatchUrlWrite('done');
+                    } else {
+                      setNfcRegisterOnlyForm({ tag_uid: '' });
+                      setNfcRegisterUrlWrite('done');
+                    }
+                  });
+                }}
+                disabled={nfcWriting}
+                className="w-full h-13 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black text-sm rounded-2xl shadow-lg flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                {nfcWriting ? <Loader2 className="w-4 h-4 animate-spin" /> : <PenTool className="w-4 h-4" />}
+                {nfcWriting ? '태그를 기기에 대 주세요…' : '태그에 URL 기록하기'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  closeTagWritePrompt();
+                  if (nfcTagWritePrompt.kind === 'match') {
+                    setNfcMatchForm({ tag_uid: '', product_id: '' });
+                  } else {
+                    setNfcRegisterOnlyForm({ tag_uid: '' });
+                  }
+                }}
+                className="w-full h-11 text-slate-500 font-bold text-sm hover:text-slate-800"
+              >
+                나중에 (태그 관리 화면에서 기록)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ─── NFC 쓰기 모드 안내 모달 (미확인 시에만 표시) ─── */}
       {nfcWriteGuideOpen && (
         <div className="fixed inset-0 z-[300] flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -4100,7 +4205,10 @@ export default function AdminDashboard() {
                     await executeNFCWriteForUid(
                       nfcPendingWriteUid || nfcFormData.tag_uid,
                       nfcPendingWriteContext
-                    );
+                    ).then((ok) => {
+                      if (ok) nfcPendingWriteOnSuccessRef.current?.();
+                      nfcPendingWriteOnSuccessRef.current = null;
+                    });
                     setNfcPendingWriteUid('');
                     setNfcPendingWriteContext('modal');
                   }}
@@ -4111,7 +4219,10 @@ export default function AdminDashboard() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setNfcWriteGuideOpen(false)}
+                  onClick={() => {
+                    setNfcWriteGuideOpen(false);
+                    nfcPendingWriteOnSuccessRef.current = null;
+                  }}
                   className="w-full h-11 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 font-black text-sm rounded-2xl transition-all duration-200 active:scale-[0.98]"
                 >
                   취소
