@@ -722,12 +722,15 @@ export default function AdminDashboard() {
   const [nfcMatchUrlWrite, setNfcMatchUrlWrite] = useState<NfcUrlWriteStatus>('idle');
   const [nfcRegisterUrlWrite, setNfcRegisterUrlWrite] = useState<NfcUrlWriteStatus>('idle');
   /** 매칭·등록 직후 실물 태그 URL 기록 안내 (DB 저장과 NFC 칩 기록은 별도) */
+  /** URL 기록 실패 시에만 표시 (성공 시 별도 클릭 불필요) */
   const [nfcTagWritePrompt, setNfcTagWritePrompt] = useState<{
     open: boolean;
     uid: string;
     kind: 'match' | 'register';
   }>({ open: false, uid: '', kind: 'match' });
   const nfcPendingWriteOnSuccessRef = useRef<(() => void) | null>(null);
+  const nfcPendingQuickMatchRef = useRef<{ uid: string; product_id: string } | null>(null);
+  const nfcPendingUidRegisterRef = useRef<string | null>(null);
   /** 제품 보증서 PDF 생성 (화면 밖 렌더 → html2canvas) */
   const [guaranteePdfPayload, setGuaranteePdfPayload] = useState<GuaranteeCertificateData | null>(null);
   /** 제품 보증서 미리보기 모달 */
@@ -1224,7 +1227,8 @@ export default function AdminDashboard() {
 
   const executeNFCWriteForUid = async (
     tagUid: string,
-    context: NfcWriteContext = 'modal'
+    context: NfcWriteContext = 'modal',
+    options?: { silent?: boolean }
   ): Promise<boolean> => {
     const uid = tagUid.trim();
     if (!uid) return false;
@@ -1249,17 +1253,19 @@ export default function AdminDashboard() {
       ]);
       if ('vibrate' in navigator) navigator.vibrate([100, 50, 100]);
       if (context !== 'modal') setWorkbenchUrlWriteStatus(context, 'done');
-      showToast('success', '태그 URL 기록이 완료되었습니다.');
+      if (!options?.silent) showToast('success', '태그 URL 기록이 완료되었습니다.');
       return true;
     } catch (err) {
       const timedOut = err instanceof Error && err.message === 'NFC_WRITE_TIMEOUT';
       if (context !== 'modal') setWorkbenchUrlWriteStatus(context, 'error');
-      showToast(
-        'error',
-        timedOut
-          ? `제한 시간(${Math.round(NFC_WRITE_TIMEOUT_MS / 1000)}초) 안에 태그를 인식하지 못했습니다. 태그를 기기에 대고 다시 시도해 주세요.`
-          : '쓰기 실패: 태그를 단말기 뒷면에 정확하게 대어 주시거나, NFC가 "기본 모드"인지 다시 확인해 주세요.'
-      );
+      if (!options?.silent) {
+        showToast(
+          'error',
+          timedOut
+            ? `제한 시간(${Math.round(NFC_WRITE_TIMEOUT_MS / 1000)}초) 안에 태그를 인식하지 못했습니다. 태그를 기기에 대고 다시 시도해 주세요.`
+            : '쓰기 실패: 태그를 단말기 뒷면에 정확하게 대어 주시거나, NFC가 "기본 모드"인지 다시 확인해 주세요.'
+        );
+      }
       return false;
     } finally {
       setNfcWriting(false);
@@ -1425,24 +1431,12 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleQuickProductMatch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const uid = nfcMatchForm.tag_uid.trim();
-    const pid = nfcMatchForm.product_id;
-    if (!uid) {
-      showToast('error', '태그 UID를 스캔하거나 입력하세요.');
-      return;
-    }
-    if (!pid) {
-      showToast('error', '연결할 제품을 선택하세요.');
-      return;
-    }
-    if (nfcMatchSnapshot?.kind === 'blocked') {
-      showToast('error', nfcMatchSnapshot.message);
-      return;
-    }
-
+  /** 제품 매칭 API — submit 버튼 제스처 직후 NFC URL 기록과 병행 */
+  const submitProductMatchWithTagWrite = async (uid: string, pid: string) => {
     setSubmitting(true);
+    const canNfcWrite = typeof window !== 'undefined' && 'NDEFReader' in window;
+    const writePromise = canNfcWrite ? executeNFCWriteForUid(uid, 'match', { silent: true }) : null;
+
     try {
       const tagRes = await fetch(`/api/tags/${encodeURIComponent(uid)}`);
       const tagData = (await tagRes.json()) as Record<string, unknown>;
@@ -1468,22 +1462,100 @@ export default function AdminDashboard() {
       }
 
       const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        showToast('success', '제품 매칭이 완료되었습니다. 이제 같은 태그에 앱 주소를 기록해 주세요.');
+      if (!res.ok) {
+        showToast('error', typeof data.error === 'string' ? data.error : '제품 매칭에 실패했습니다.');
+        return;
+      }
+
+      const writeOk = writePromise ? await writePromise : false;
+      if (!canNfcWrite) {
+        showToast('success', '제품 매칭이 완료되었습니다. (Chrome Android에서 URL 굽기를 해 주세요.)');
+        setNfcMatchForm({ tag_uid: '', product_id: '' });
+        setNfcMatchSnapshot(null);
+      } else if (writeOk) {
+        showToast('success', '제품 매칭 및 태그 URL 기록이 완료되었습니다.');
+        setNfcMatchForm({ tag_uid: '', product_id: '' });
+        setNfcMatchSnapshot(null);
+        setNfcMatchUrlWrite('done');
+      } else {
+        showToast(
+          'error',
+          '제품 매칭은 완료됐습니다. 같은 태그를 대고 아래 「태그 URL 굽기」 또는 안내창에서 다시 기록해 주세요.'
+        );
         setNfcMatchForm({ tag_uid: uid, product_id: '' });
         setNfcMatchSnapshot(null);
-        setNfcMatchUrlWrite('idle');
         setNfcTagWritePrompt({ open: true, uid, kind: 'match' });
-        fetchTags();
-        fetchProducts();
-        fetchAssets();
-        fetchGoldbars();
-      } else {
-        showToast('error', typeof data.error === 'string' ? data.error : '제품 매칭에 실패했습니다.');
       }
+
+      fetchTags();
+      fetchProducts();
+      fetchAssets();
+      fetchGoldbars();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '요청 실패';
       showToast('error', msg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleQuickProductMatch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const uid = nfcMatchForm.tag_uid.trim();
+    const pid = nfcMatchForm.product_id;
+    if (!uid) {
+      showToast('error', '태그 UID를 스캔하거나 입력하세요.');
+      return;
+    }
+    if (!pid) {
+      showToast('error', '연결할 제품을 선택하세요.');
+      return;
+    }
+    if (nfcMatchSnapshot?.kind === 'blocked') {
+      showToast('error', nfcMatchSnapshot.message);
+      return;
+    }
+
+    if (!nfcModeConfirmed && typeof window !== 'undefined' && 'NDEFReader' in window) {
+      nfcPendingQuickMatchRef.current = { uid, product_id: pid };
+      setNfcWriteGuideOpen(true);
+      return;
+    }
+
+    await submitProductMatchWithTagWrite(uid, pid);
+  };
+
+  const submitUidRegisterWithTagWrite = async (uid: string) => {
+    setSubmitting(true);
+    const canNfcWrite = typeof window !== 'undefined' && 'NDEFReader' in window;
+    const writePromise = canNfcWrite ? executeNFCWriteForUid(uid, 'register', { silent: true }) : null;
+
+    try {
+      const res = await fetch('/api/tags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag_uid: uid, product_id: null }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast('error', typeof data.error === 'string' ? data.error : '등록에 실패했습니다.');
+        return;
+      }
+
+      const writeOk = writePromise ? await writePromise : false;
+      if (!canNfcWrite) {
+        showToast('success', 'UID 자산 등록이 완료되었습니다.');
+        setNfcRegisterOnlyForm({ tag_uid: '' });
+      } else if (writeOk) {
+        showToast('success', 'UID 등록 및 태그 URL 기록이 완료되었습니다.');
+        setNfcRegisterOnlyForm({ tag_uid: '' });
+        setNfcRegisterUrlWrite('done');
+      } else {
+        showToast('error', 'UID 등록은 완료됐습니다. 같은 태그를 대고 URL을 다시 기록해 주세요.');
+        setNfcRegisterOnlyForm({ tag_uid: uid });
+        setNfcTagWritePrompt({ open: true, uid, kind: 'register' });
+      }
+      fetchTags();
     } finally {
       setSubmitting(false);
     }
@@ -1496,26 +1568,14 @@ export default function AdminDashboard() {
       showToast('error', '태그 UID를 스캔하거나 입력하세요.');
       return;
     }
-    setSubmitting(true);
-    try {
-      const res = await fetch('/api/tags', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tag_uid: uid, product_id: null }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        showToast('success', 'UID 자산으로 등록되었습니다. 태그에 앱 주소를 기록해 주세요.');
-        setNfcRegisterOnlyForm({ tag_uid: uid });
-        setNfcRegisterUrlWrite('idle');
-        setNfcTagWritePrompt({ open: true, uid, kind: 'register' });
-        fetchTags();
-      } else {
-        showToast('error', typeof data.error === 'string' ? data.error : '등록에 실패했습니다.');
-      }
-    } finally {
-      setSubmitting(false);
+
+    if (!nfcModeConfirmed && typeof window !== 'undefined' && 'NDEFReader' in window) {
+      nfcPendingUidRegisterRef.current = uid;
+      setNfcWriteGuideOpen(true);
+      return;
     }
+
+    await submitUidRegisterWithTagWrite(uid);
   };
 
   // --- 이미지 압축 및 자동 리사이징 (Canvas 사용) ---
@@ -2580,8 +2640,9 @@ export default function AdminDashboard() {
                     <div>
                       <h3 className="text-base sm:text-lg font-black text-slate-900">제품 매칭 (출고)</h3>
                       <p className="text-xs font-bold text-slate-500 mt-1 leading-relaxed">
-                        <strong className="text-slate-700">① 태그 스캔 → ② 제품 선택 → ③ 제품 매칭 완료</strong> 후 안내에 따라
-                        <strong className="text-slate-700"> 같은 태그에 URL 기록</strong>까지 하면 고객 스캔 시 앱이 열립니다.
+                        <strong className="text-slate-700">① 태그 스캔 → ② 제품 선택 → ③ 제품 매칭 완료</strong> 한 번이면 서버 저장과
+                        태그 URL 기록이 함께 진행됩니다. 버튼을 누른 뒤 <strong className="text-slate-700">같은 태그</strong>를
+                        폰에 대 주세요.
                       </p>
                     </div>
                   </div>
@@ -2664,13 +2725,16 @@ export default function AdminDashboard() {
                         submitting ||
                         !nfcMatchForm.tag_uid.trim() ||
                         !nfcMatchForm.product_id ||
-                        nfcMatchUrlWrite === 'writing' ||
                         nfcMatchSnapshot?.kind === 'blocked'
                       }
                       className="w-full h-14 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black text-base rounded-2xl shadow-lg shadow-emerald-500/20 disabled:opacity-40 flex items-center justify-center gap-2"
                     >
-                      {submitting && <Loader2 className="w-5 h-5 animate-spin" />}
-                      제품 매칭 완료
+                      {(submitting || nfcWriting) && <Loader2 className="w-5 h-5 animate-spin" />}
+                      {nfcWriting
+                        ? '태그를 기기에 대 주세요…'
+                        : submitting
+                          ? '매칭 저장 중…'
+                          : '제품 매칭 완료 (URL 자동 기록)'}
                     </button>
 
                     <NfcUrlWritePanel
@@ -2743,15 +2807,15 @@ export default function AdminDashboard() {
 
                     <button
                       type="submit"
-                      disabled={
-                        submitting ||
-                        !nfcRegisterOnlyForm.tag_uid.trim() ||
-                        nfcRegisterUrlWrite === 'writing'
-                      }
+                      disabled={submitting || !nfcRegisterOnlyForm.tag_uid.trim()}
                       className="w-full h-14 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-base rounded-2xl shadow-lg shadow-amber-500/20 disabled:opacity-40 flex items-center justify-center gap-2"
                     >
-                      {submitting && <Loader2 className="w-5 h-5 animate-spin" />}
-                      UID 자산 등록
+                      {(submitting || nfcWriting) && <Loader2 className="w-5 h-5 animate-spin" />}
+                      {nfcWriting
+                        ? '태그를 기기에 대 주세요…'
+                        : submitting
+                          ? '등록 중…'
+                          : 'UID 자산 등록 (URL 자동 기록)'}
                     </button>
 
                     <NfcUrlWritePanel
@@ -4064,12 +4128,10 @@ export default function AdminDashboard() {
                   : 'bg-gradient-to-br from-amber-500 to-orange-500'
               }`}
             >
-              <h3 className="text-lg font-black text-white tracking-tight">
-                {nfcTagWritePrompt.kind === 'match' ? '제품 매칭 완료' : 'UID 등록 완료'}
-              </h3>
+              <h3 className="text-lg font-black text-white tracking-tight">URL 기록 다시 시도</h3>
               <p className="text-xs font-bold text-white/90 mt-2 leading-relaxed">
-                서버에는 저장되었습니다. <strong className="text-white">실물 태그 칩</strong>에도 주소를 넣어야 고객이 스캔할
-                때 「비어있는 태그」가 아닌 앱이 열립니다.
+                {nfcTagWritePrompt.kind === 'match' ? '제품 매칭' : 'UID 등록'}은 이미 완료되었습니다. 태그 칩에 주소만 다시
+                넣어 주세요.
               </p>
               <p className="text-[10px] font-mono font-bold text-white/80 mt-3 break-all">{nfcTagWritePrompt.uid}</p>
             </div>
@@ -4198,10 +4260,28 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={async () => {
-                    // 확인 처리: localStorage 저장 + 상태 업데이트
-                    try { localStorage.setItem('nfc_mode_confirmed', '1'); } catch {}
+                    try {
+                      localStorage.setItem('nfc_mode_confirmed', '1');
+                    } catch {
+                      /* ignore */
+                    }
                     setNfcModeConfirmed(true);
                     setNfcWriteGuideOpen(false);
+
+                    const pendingMatch = nfcPendingQuickMatchRef.current;
+                    const pendingRegister = nfcPendingUidRegisterRef.current;
+                    nfcPendingQuickMatchRef.current = null;
+                    nfcPendingUidRegisterRef.current = null;
+
+                    if (pendingMatch) {
+                      await submitProductMatchWithTagWrite(pendingMatch.uid, pendingMatch.product_id);
+                      return;
+                    }
+                    if (pendingRegister) {
+                      await submitUidRegisterWithTagWrite(pendingRegister);
+                      return;
+                    }
+
                     await executeNFCWriteForUid(
                       nfcPendingWriteUid || nfcFormData.tag_uid,
                       nfcPendingWriteContext
@@ -4215,12 +4295,16 @@ export default function AdminDashboard() {
                   className="w-full h-13 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-sm rounded-2xl shadow-lg shadow-emerald-500/30 transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2"
                 >
                   <PenTool className="w-4 h-4 shrink-0" />
-                  기본 모드 확인 — 쓰기 시작
+                  {nfcPendingQuickMatchRef.current || nfcPendingUidRegisterRef.current
+                    ? '확인 — 매칭·등록 및 URL 기록'
+                    : '기본 모드 확인 — 쓰기 시작'}
                 </button>
                 <button
                   type="button"
                   onClick={() => {
                     setNfcWriteGuideOpen(false);
+                    nfcPendingQuickMatchRef.current = null;
+                    nfcPendingUidRegisterRef.current = null;
                     nfcPendingWriteOnSuccessRef.current = null;
                   }}
                   className="w-full h-11 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 font-black text-sm rounded-2xl transition-all duration-200 active:scale-[0.98]"
