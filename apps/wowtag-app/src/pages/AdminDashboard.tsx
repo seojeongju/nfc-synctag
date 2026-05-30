@@ -17,24 +17,44 @@ type NfcWorkbenchTab = 'match' | 'register' | 'browse';
 type NfcUrlWriteStatus = 'idle' | 'writing' | 'done' | 'error';
 type NfcWriteContext = 'match' | 'register' | 'modal';
 
-const NFC_WRITE_TIMEOUT_MS = 45_000;
+const NFC_WRITE_TIMEOUT_MS = 30_000;
+
+/** 진행 중인 NFC 스캔/쓰기 세션 — 스캔과 쓰기가 겹치면 Galaxy에서 무한 대기되는 경우가 있음 */
+let activeNfcAbort: AbortController | null = null;
+
+function abortActiveNfcSession() {
+  try {
+    activeNfcAbort?.abort();
+  } catch {
+    /* ignore */
+  }
+  activeNfcAbort = null;
+}
+
+function beginNfcSession(): AbortController {
+  abortActiveNfcSession();
+  const ac = new AbortController();
+  activeNfcAbort = ac;
+  return ac;
+}
 
 function buildTagLandingUrl(tagUid: string): string {
   const base = typeof window !== 'undefined' ? window.location.origin.replace(/\/$/, '') : '';
   return `${base}/t/${encodeURIComponent(tagUid.trim())}`;
 }
 
-/** 삼성 등 기본 NFC 앱에서 「비어있는 태그」가 되지 않도록 URL + 텍스트 레코드 기록 */
-async function writeNdefLandingUrl(ndef: { write: (message: unknown, options?: unknown) => Promise<void> }, tagUid: string) {
+/** 태그 NDEF에 앱 URL 기록 (URL 레코드만 — 호환성 우선) */
+async function writeNdefLandingUrl(tagUid: string, signal?: AbortSignal): Promise<void> {
+  const ndef = new (window as any).NDEFReader();
   const url = buildTagLandingUrl(tagUid);
-  const records = [
-    { recordType: 'url', data: url },
-    { recordType: 'text', data: `Gold SyncTag\n${url}`, lang: 'en' },
-  ];
+  const records = [{ recordType: 'url', data: url }];
+  const opts: { overwrite: boolean; signal?: AbortSignal } = { overwrite: true };
+  if (signal) opts.signal = signal;
   try {
-    await ndef.write({ records }, { overwrite: true });
-  } catch {
-    await ndef.write({ records });
+    await ndef.write({ records }, opts);
+  } catch (err) {
+    if (signal?.aborted) throw err;
+    await ndef.write({ records }, signal ? { signal } : undefined);
   }
 }
 
@@ -764,6 +784,16 @@ export default function AdminDashboard() {
     setToast({ type, message });
   }, []);
 
+  const cancelNfcWrite = useCallback(() => {
+    abortActiveNfcSession();
+    setNfcWriting(false);
+    setNfcScanning(false);
+    setSubmitting(false);
+    setNfcMatchUrlWrite('idle');
+    setNfcRegisterUrlWrite('idle');
+    showToast('error', 'NFC 기록을 취소했습니다.');
+  }, [showToast]);
+
   useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(null), 2600);
@@ -1165,11 +1195,14 @@ export default function AdminDashboard() {
     }
 
     try {
+      abortActiveNfcSession();
       setNfcScanning(true);
+      const ac = beginNfcSession();
       const ndef = new (window as any).NDEFReader();
-      await ndef.scan();
-      
+      await ndef.scan({ signal: ac.signal });
+
       ndef.onreading = async ({ serialNumber }: { serialNumber: string }) => {
+        abortActiveNfcSession();
         if ('vibrate' in navigator) navigator.vibrate(200);
 
         if (target === 'nfc') {
@@ -1259,35 +1292,36 @@ export default function AdminDashboard() {
       return false;
     }
 
+    abortActiveNfcSession();
+    setNfcScanning(false);
+
     if (context !== 'modal') setWorkbenchUrlWriteStatus(context, 'writing');
     setNfcWriting(true);
 
+    const ac = beginNfcSession();
+    const timeoutId = window.setTimeout(() => ac.abort(), NFC_WRITE_TIMEOUT_MS);
+
     try {
-      const ndef = new (window as any).NDEFReader();
-      const writeOp = writeNdefLandingUrl(ndef, uid);
-      await Promise.race([
-        writeOp,
-        new Promise<never>((_, reject) => {
-          window.setTimeout(() => reject(new Error('NFC_WRITE_TIMEOUT')), NFC_WRITE_TIMEOUT_MS);
-        }),
-      ]);
+      await writeNdefLandingUrl(uid, ac.signal);
       if ('vibrate' in navigator) navigator.vibrate([100, 50, 100]);
       if (context !== 'modal') setWorkbenchUrlWriteStatus(context, 'done');
       if (!options?.silent) showToast('success', '태그 URL 기록이 완료되었습니다.');
       return true;
     } catch (err) {
-      const timedOut = err instanceof Error && err.message === 'NFC_WRITE_TIMEOUT';
+      const timedOut = ac.signal.aborted;
       if (context !== 'modal') setWorkbenchUrlWriteStatus(context, 'error');
       if (!options?.silent) {
         showToast(
           'error',
           timedOut
-            ? `제한 시간(${Math.round(NFC_WRITE_TIMEOUT_MS / 1000)}초) 안에 태그를 인식하지 못했습니다. 태그를 기기에 대고 다시 시도해 주세요.`
+            ? `${Math.round(NFC_WRITE_TIMEOUT_MS / 1000)}초 안에 태그를 인식하지 못했습니다. NFC 「기본 모드」인지 확인 후 다시 시도해 주세요.`
             : '쓰기 실패: 태그를 단말기 뒷면에 정확하게 대어 주시거나, NFC가 "기본 모드"인지 다시 확인해 주세요.'
         );
       }
       return false;
     } finally {
+      window.clearTimeout(timeoutId);
+      abortActiveNfcSession();
       setNfcWriting(false);
     }
   };
@@ -1420,10 +1454,13 @@ export default function AdminDashboard() {
       return;
     }
     try {
+      abortActiveNfcSession();
       setNfcScanning(true);
+      const ac = beginNfcSession();
       const ndef = new (window as any).NDEFReader();
-      await ndef.scan();
+      await ndef.scan({ signal: ac.signal });
       ndef.onreading = async ({ serialNumber }: { serialNumber: string }) => {
+        abortActiveNfcSession();
         if ('vibrate' in navigator) navigator.vibrate(200);
         const ok = await applyTagScanLookup(serialNumber, (_data, uid) => {
           setNfcMatchUrlWrite('idle');
@@ -1433,6 +1470,7 @@ export default function AdminDashboard() {
         setNfcScanning(false);
       };
     } catch {
+      abortActiveNfcSession();
       setNfcScanning(false);
     }
   };
@@ -1443,10 +1481,13 @@ export default function AdminDashboard() {
       return;
     }
     try {
+      abortActiveNfcSession();
       setNfcScanning(true);
+      const ac = beginNfcSession();
       const ndef = new (window as any).NDEFReader();
-      await ndef.scan();
+      await ndef.scan({ signal: ac.signal });
       ndef.onreading = async ({ serialNumber }: { serialNumber: string }) => {
+        abortActiveNfcSession();
         if ('vibrate' in navigator) navigator.vibrate(200);
         await applyTagScanLookup(serialNumber, (_data, uid) => {
           setNfcRegisterUrlWrite('idle');
@@ -1455,15 +1496,18 @@ export default function AdminDashboard() {
         setNfcScanning(false);
       };
     } catch {
+      abortActiveNfcSession();
       setNfcScanning(false);
     }
   };
 
-  /** 제품 매칭 API — submit 버튼 제스처 직후 NFC URL 기록과 병행 */
+  /** 제품 매칭: 서버 저장 후 NFC URL 기록 (스캔 세션 종료 뒤 쓰기) */
   const submitProductMatchWithTagWrite = async (uid: string, pid: string) => {
+    abortActiveNfcSession();
+    setNfcScanning(false);
     setSubmitting(true);
+    setNfcWriting(false);
     const canNfcWrite = typeof window !== 'undefined' && 'NDEFReader' in window;
-    const writePromise = canNfcWrite ? executeNFCWriteForUid(uid, 'match', { silent: true }) : null;
 
     try {
       const tagRes = await fetch(`/api/tags/${encodeURIComponent(uid)}`);
@@ -1498,14 +1542,20 @@ export default function AdminDashboard() {
       const productName =
         products.find((p: { id: number | string }) => String(p.id) === String(pid))?.name || '선택한 제품';
 
-      const writeOk = writePromise ? await writePromise : false;
+      if (!canNfcWrite) {
+        setNfcMatchForm({ tag_uid: '', product_id: '' });
+        setNfcMatchSnapshot(null);
+        setNfcMatchResult({ productName, urlWritten: false });
+        showToast('success', '매칭 완료');
+        return;
+      }
+
+      setSubmitting(false);
+      const writeOk = await executeNFCWriteForUid(uid, 'match', { silent: true });
       setNfcMatchForm({ tag_uid: '', product_id: '' });
       setNfcMatchSnapshot(null);
 
-      if (!canNfcWrite) {
-        setNfcMatchResult({ productName, urlWritten: false });
-        showToast('success', '매칭 완료');
-      } else if (writeOk) {
+      if (writeOk) {
         setNfcMatchUrlWrite('done');
         setNfcMatchResult({ productName, urlWritten: true });
         showToast('success', '매칭 완료');
@@ -1555,9 +1605,11 @@ export default function AdminDashboard() {
   };
 
   const submitUidRegisterWithTagWrite = async (uid: string) => {
+    abortActiveNfcSession();
+    setNfcScanning(false);
     setSubmitting(true);
+    setNfcWriting(false);
     const canNfcWrite = typeof window !== 'undefined' && 'NDEFReader' in window;
-    const writePromise = canNfcWrite ? executeNFCWriteForUid(uid, 'register', { silent: true }) : null;
 
     try {
       const res = await fetch('/api/tags', {
@@ -1571,11 +1623,15 @@ export default function AdminDashboard() {
         return;
       }
 
-      const writeOk = writePromise ? await writePromise : false;
       if (!canNfcWrite) {
         showToast('success', 'UID 자산 등록이 완료되었습니다.');
         setNfcRegisterOnlyForm({ tag_uid: '' });
-      } else if (writeOk) {
+        return;
+      }
+
+      setSubmitting(false);
+      const writeOk = await executeNFCWriteForUid(uid, 'register', { silent: true });
+      if (writeOk) {
         showToast('success', 'UID 등록 및 태그 URL 기록이 완료되었습니다.');
         setNfcRegisterOnlyForm({ tag_uid: '' });
         setNfcRegisterUrlWrite('done');
@@ -1587,6 +1643,7 @@ export default function AdminDashboard() {
       fetchTags();
     } finally {
       setSubmitting(false);
+      setNfcWriting(false);
     }
   };
 
@@ -2814,6 +2871,21 @@ export default function AdminDashboard() {
                             ? '매칭 중…'
                             : '제품 매칭'}
                       </button>
+                      {nfcWriting && (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
+                          <p className="text-[11px] font-bold text-amber-900 leading-relaxed">
+                            같은 태그를 <strong>NFC 안테나</strong>에 붙인 채 유지하세요. (Galaxy: NFC 「기본
+                            모드」) 최대 {Math.round(NFC_WRITE_TIMEOUT_MS / 1000)}초
+                          </p>
+                          <button
+                            type="button"
+                            onClick={cancelNfcWrite}
+                            className="w-full h-10 rounded-xl border border-amber-300 bg-white text-amber-900 text-xs font-black"
+                          >
+                            기록 취소
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {(nfcMatchUrlWrite === 'error' || nfcMatchUrlWrite === 'writing') && (
