@@ -500,6 +500,18 @@ app.get('/products', async (c) => {
 app.get('/tags/:uid', async (c) => {
   const uid = c.req.param('uid');
 
+  // 제품 태그 자산(tags)이 있으면 certificates와 무관하게 제품 워크플로로 처리
+  const tagInfo = await c.env.DB.prepare(`
+    SELECT t.*, p.name as product_name 
+    FROM tags t 
+    LEFT JOIN products p ON t.product_id = p.id 
+    WHERE t.tag_uid = ?
+  `).bind(uid).first();
+
+  if (tagInfo) {
+    return c.json(tagInfo);
+  }
+
   await ensureGoldbarTagPoolTable(c.env.DB);
   const pool = await c.env.DB.prepare('SELECT tag_uid FROM goldbar_tag_pool WHERE tag_uid = ?').bind(uid).first();
   if (pool) {
@@ -511,14 +523,7 @@ app.get('/tags/:uid', async (c) => {
     return c.json({ message: 'goldbar_tag', reserved: true, tag_uid: uid });
   }
 
-  const tagInfo = await c.env.DB.prepare(`
-    SELECT t.*, p.name as product_name 
-    FROM tags t 
-    LEFT JOIN products p ON t.product_id = p.id 
-    WHERE t.tag_uid = ?
-  `).bind(uid).first();
-
-  return c.json(tagInfo || { message: 'not_found' });
+  return c.json({ message: 'not_found' });
 });
 
 async function migrateProductsExtraColumns(db: D1Database) {
@@ -605,9 +610,6 @@ async function ensureAssetForTag(db: D1Database, tagUid: string, productId?: num
     LIMIT 1
   `).bind(tagUid).first();
 
-  // 이미 보증서가 발행된(CERTIFIED) 상태라면 기존 ID 반환
-  if (existing) return (existing as any).id;
-
   let name = "";
   let weight = "0";
   let purity = "24K";
@@ -634,6 +636,21 @@ async function ensureAssetForTag(db: D1Database, tagUid: string, productId?: num
       purity = p.purity || p.template_purity || "24K";
       templateCertPath = p.template_cert_path || "";
     }
+  }
+
+  // 해제 후 재매칭: 기존 자산/보증서가 있으면 새 제품 정보로 갱신
+  if (existing) {
+    const existingId = (existing as { id: number }).id;
+    if (productId) {
+      await db.prepare(`
+        UPDATE goldbars
+        SET weight = ?, purity = ?, display_name = ?, status = 'SHIPPED'
+        WHERE id = ?
+      `)
+        .bind(weight, purity, name || '신규 매칭 자산', existingId)
+        .run();
+    }
+    return existingId;
   }
 
   // 2. 새로운 goldbar 생성 (자산화)
@@ -1007,6 +1024,8 @@ app.post('/tags', async (c) => {
       return c.json({ error: 'tag_uid가 필요합니다.' }, 400);
     }
 
+    const tagRow = await c.env.DB.prepare('SELECT tag_uid, product_id FROM tags WHERE tag_uid = ?').bind(rawUid).first();
+
     const inPool = await c.env.DB.prepare('SELECT tag_uid FROM goldbar_tag_pool WHERE tag_uid = ?').bind(rawUid).first();
     if (inPool) {
       return c.json(
@@ -1016,7 +1035,8 @@ app.post('/tags', async (c) => {
     }
 
     const cert = await c.env.DB.prepare('SELECT tag_uid FROM certificates WHERE tag_uid = ?').bind(rawUid).first();
-    if (cert) {
+    // 제품 태그 자산(tags)이 없고 certificates만 있는 경우 = 골드바 전용 태그
+    if (cert && !tagRow) {
       return c.json({ error: '이 UID는 골드바 정품 태그로 이미 사용 중입니다.' }, 400);
     }
 
