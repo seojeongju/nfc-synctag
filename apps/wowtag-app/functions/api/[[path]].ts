@@ -297,6 +297,17 @@ app.get('/goldbars/t/:tagId', async (c) => {
       return c.json({ error: 'not_found' }, 404);
     }
 
+    /** tags에 자산만 등록(product_id NULL)된 카탈로그 태그 — 이전 매칭의 ASSET 인증서를 지갑에 노출하지 않음 */
+    for (const v of variants) {
+      const tagOnly = await c.env.DB.prepare('SELECT product_id FROM tags WHERE tag_uid = ?').bind(v).first();
+      if (tagOnly && tagOnly.product_id == null) {
+        return c.json(
+          { error: 'asset_only', message: '출고 전 등록된 자산 태그입니다. 제품 매칭 후 정품 정보가 표시됩니다.' },
+          404
+        );
+      }
+    }
+
     const certQuery = `
       SELECT 
         g.*, c.tag_uid, c.cert_file_path,
@@ -687,6 +698,26 @@ async function ensureAssetForTag(db: D1Database, tagUid: string, productId?: num
   await removeTagFromGoldbarPool(db, tagUid);
 
   return newGoldbarId;
+}
+
+/** 카탈로그 제품 매칭 시 자동 생성된 ASSET-* 골드바·인증서 연결 해제 (매칭 해제 후 소비자 지갑에 남지 않도록) */
+async function detachCatalogAssetForTag(db: D1Database, tagUid: string) {
+  const row = await db
+    .prepare(
+      `SELECT g.id, g.serial_number
+       FROM goldbars g
+       INNER JOIN certificates c ON g.id = c.goldbar_id
+       WHERE c.tag_uid = ?
+       LIMIT 1`
+    )
+    .bind(tagUid)
+    .first();
+  if (!row) return;
+  const serial = String((row as { serial_number?: string }).serial_number || '');
+  if (!serial.startsWith('ASSET-')) return;
+  const goldbarId = (row as { id: number }).id;
+  await db.prepare('DELETE FROM certificates WHERE tag_uid = ?').bind(tagUid).run();
+  await db.prepare('DELETE FROM goldbars WHERE id = ?').bind(goldbarId).run();
 }
 
 function verifyAdminToken(c: { req: { header: (name: string) => string | undefined }; env: Bindings }): boolean {
@@ -1197,6 +1228,7 @@ app.post('/tags/:uid/unmap', async (c) => {
     }
 
     await c.env.DB.prepare('UPDATE tags SET product_id = NULL WHERE tag_uid = ?').bind(uid).run();
+    await detachCatalogAssetForTag(c.env.DB, uid);
 
     return c.json({ success: true });
   } catch (err: any) {

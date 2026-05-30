@@ -60,6 +60,18 @@ function formatCertTagForUi(uid: string) {
   return isPendingCertTagUid(uid) ? 'NFC 태그 미등록' : uid;
 }
 
+/** NFC UID 표기(콜론·대소문자) 차이 무시 비교 */
+function normalizeNfcUidKey(uid: string) {
+  return uid.trim().toLowerCase().replace(/[^0-9a-f]/g, '');
+}
+
+function nfcUidsMatch(a: string, b: string) {
+  if (a.trim() === b.trim()) return true;
+  const ka = normalizeNfcUidKey(a);
+  const kb = normalizeNfcUidKey(b);
+  return ka.length >= 8 && ka === kb;
+}
+
 /** 모달·overflow 안에서 네이티브 select 옵션이 잘리는 문제 → viewport 고정 + 스크롤 목록 */
 function ProductCertificatePicker({
   value,
@@ -419,6 +431,7 @@ export default function AdminDashboard() {
   const [nfcWorkbenchTab, setNfcWorkbenchTab] = useState<NfcWorkbenchTab>('match');
   /** 제품 매칭 워크벤치: 스캔·수동 입력 후 즉시 출고 연결 */
   const [nfcMatchForm, setNfcMatchForm] = useState({ tag_uid: '', product_id: '' });
+  const nfcMatchUidRef = useRef('');
   const [nfcMatchSnapshot, setNfcMatchSnapshot] = useState<NfcMatchSnapshot | null>(null);
   /** UID만 자산 등록 워크벤치 */
   const [nfcRegisterOnlyForm, setNfcRegisterOnlyForm] = useState({ tag_uid: '' });
@@ -463,6 +476,14 @@ export default function AdminDashboard() {
     return list;
   }, [nfcProductTags, nfcFilterProductId, nfcFilterCertSerial, nfcSearchUid]);
 
+  /** 전체 product 태그 중 제품 연결 완료 비율(%) — 태그가 없으면 null */
+  const nfcProductMatchRate = useMemo<number | null>(() => {
+    const total = nfcProductTags.length;
+    if (total === 0) return null;
+    const linked = nfcProductTags.filter((t: any) => t.target_id != null && t.target_id !== '').length;
+    return Math.round((linked / total) * 100);
+  }, [nfcProductTags]);
+
   const closeAllAdminModals = useCallback(() => {
     setIsProductModalOpen(false);
     setIsEditProductModalOpen(false);
@@ -499,6 +520,10 @@ export default function AdminDashboard() {
       return false;
     }
     showToast('success', '매칭이 해제되었습니다. 태그는 출고 전 자산 목록으로 이동합니다.');
+    setNfcMatchForm((prev) => {
+      if (!nfcUidsMatch(prev.tag_uid, tagUid)) return prev;
+      return { tag_uid: prev.tag_uid.trim(), product_id: '' };
+    });
     fetchTags();
     return true;
   };
@@ -929,10 +954,16 @@ export default function AdminDashboard() {
     return true;
   };
 
-  const refreshNfcMatchSnapshot = async (uid: string) => {
+  const clearNfcMatchWorkbench = useCallback(() => {
+    setNfcMatchForm({ tag_uid: '', product_id: '' });
+    setNfcMatchSnapshot(null);
+  }, []);
+
+  const refreshNfcMatchSnapshot = useCallback(async (uid: string) => {
     const trimmed = uid.trim();
     if (!trimmed) {
       setNfcMatchSnapshot(null);
+      setNfcMatchForm((prev) => ({ ...prev, product_id: '' }));
       return;
     }
     try {
@@ -944,6 +975,7 @@ export default function AdminDashboard() {
           kind: 'blocked',
           message: '골드바 자산 풀에 등록된 UID입니다. 골드바 탭에서 관리하세요.',
         });
+        setNfcMatchForm((prev) => ({ ...prev, tag_uid: trimmed, product_id: '' }));
         return;
       }
       if (data.reserved || data.message === 'goldbar_tag') {
@@ -951,39 +983,55 @@ export default function AdminDashboard() {
           kind: 'blocked',
           message: '골드바 전용 정품 태그입니다. 제품 매칭 워크벤치에서 사용할 수 없습니다.',
         });
+        setNfcMatchForm((prev) => ({ ...prev, tag_uid: trimmed, product_id: '' }));
         return;
       }
       if (data.message === 'not_found') {
         setNfcMatchSnapshot({ kind: 'new' });
+        setNfcMatchForm((prev) => ({ ...prev, tag_uid: trimmed, product_id: '' }));
         return;
       }
       if (data.tag_uid) {
+        const canonicalUid = String(data.tag_uid);
         const hasProduct = data.product_id != null && data.product_id !== '';
         setNfcMatchSnapshot({
           kind: hasProduct ? 'linked' : 'asset',
           productName: (data.product_name as string) || null,
           productId: hasProduct ? String(data.product_id) : '',
         });
-        if (hasProduct) {
-          setNfcMatchForm((prev) => ({
-            ...prev,
-            tag_uid: trimmed,
-            product_id: String(data.product_id),
-          }));
-        }
+        setNfcMatchForm((prev) => ({
+          ...prev,
+          tag_uid: canonicalUid,
+          product_id: hasProduct ? String(data.product_id) : '',
+        }));
         return;
       }
       setNfcMatchSnapshot({ kind: 'new' });
+      setNfcMatchForm((prev) => ({ ...prev, tag_uid: trimmed, product_id: '' }));
     } catch {
       setNfcMatchSnapshot(null);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    nfcMatchUidRef.current = nfcMatchForm.tag_uid;
+  }, [nfcMatchForm.tag_uid]);
+
+  /** 목록에서 매칭 해제·삭제 후 제품 매칭 폼이 이전 연결 정보를 보여주지 않도록 동기화 */
+  useEffect(() => {
+    if (nfcWorkbenchTab !== 'match') return;
+    const uid = nfcMatchUidRef.current.trim();
+    if (!uid) return;
+    void refreshNfcMatchSnapshot(uid);
+  }, [allTags, nfcWorkbenchTab, refreshNfcMatchSnapshot]);
 
   const openMatchWorkbench = (uid?: string) => {
     setNfcWorkbenchTab('match');
     if (uid) {
-      setNfcMatchForm((prev) => ({ ...prev, tag_uid: uid }));
+      setNfcMatchForm({ tag_uid: uid, product_id: '' });
       void refreshNfcMatchSnapshot(uid);
+    } else {
+      clearNfcMatchWorkbench();
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -1000,7 +1048,7 @@ export default function AdminDashboard() {
       ndef.onreading = async ({ serialNumber }: { serialNumber: string }) => {
         if ('vibrate' in navigator) navigator.vibrate(200);
         const ok = await applyTagScanLookup(serialNumber, (_data, uid) => {
-          setNfcMatchForm((prev) => ({ ...prev, tag_uid: uid }));
+          setNfcMatchForm({ tag_uid: uid, product_id: '' });
         });
         if (ok) await refreshNfcMatchSnapshot(serialNumber);
         setNfcScanning(false);
@@ -1473,13 +1521,6 @@ export default function AdminDashboard() {
     localStorage.removeItem('admin_token');
     window.location.href = '/login';
   };
-
-  /** NFC 탭 기준 제품(카탈로그)용 태그 중 출고(제품) 매칭 완료 비율 */
-  const nfcProductMatchRate = useMemo(() => {
-    const total = nfcProductTags.length;
-    if (total === 0) return null;
-    return Math.min(100, Math.round((nfcLinkedList.length / total) * 100));
-  }, [nfcProductTags, nfcLinkedList]);
 
   // 검색 및 필터링된 골드바 리스트
   const filteredGoldbars = goldbars.filter(g => {
@@ -2196,13 +2237,27 @@ export default function AdminDashboard() {
 
                   <form onSubmit={handleQuickProductMatch} className="space-y-5">
                     <div className="space-y-2">
-                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">1. 태그 UID (스캔 또는 직접 입력)</label>
+                      <div className="flex items-center justify-between gap-2 pl-1">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">1. 태그 UID (스캔 또는 직접 입력)</label>
+                        <button
+                          type="button"
+                          onClick={clearNfcMatchWorkbench}
+                          className="text-[11px] font-black text-slate-500 hover:text-rose-600 flex items-center gap-1 shrink-0"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          입력 초기화
+                        </button>
+                      </div>
                       <div className="flex gap-2">
                         <input
                           type="text"
                           value={nfcMatchForm.tag_uid}
                           onChange={(e) => {
                             const v = e.target.value;
+                            if (!v.trim()) {
+                              clearNfcMatchWorkbench();
+                              return;
+                            }
                             setNfcMatchForm((prev) => ({ ...prev, tag_uid: v }));
                             void refreshNfcMatchSnapshot(v);
                           }}

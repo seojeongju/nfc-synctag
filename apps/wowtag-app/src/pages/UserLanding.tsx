@@ -15,7 +15,8 @@ import {
   rememberWalletTagUid,
   setTagSessionActive,
   hydrateWalletGoldbarsFromStorage,
-  persistWalletGoldbars
+  persistWalletGoldbars,
+  clearWalletGoldbarsStorage
 } from '../lib/tagSession';
 
 /** Chrome BeforeInstallPromptEvent (lib.dom에 없을 수 있음) */
@@ -444,6 +445,9 @@ export default function UserLanding() {
         if (productRes.ok) {
           const data = await productRes.json();
           if (data.nfc_mode === 'home' || data.nfc_mode === 'asset') {
+            if (data.nfc_mode === 'asset') {
+              clearWalletGoldbarsStorage();
+            }
             navigate('/', { replace: true, state: { nfcScan: data } });
             setLoading(false);
             return;
@@ -477,13 +481,26 @@ export default function UserLanding() {
   useEffect(() => {
     if (tagId) return;
     if (!readTagSession()) return;
-    const st = location.state as { nfcScan?: { tag_uid?: string } } | null;
-    const tagUid = st?.nfcScan?.tag_uid || readWalletTagUid();
+    const st = location.state as { nfcScan?: { tag_uid?: string; nfc_mode?: string } } | null;
+    const scan = st?.nfcScan;
+    if (scan?.nfc_mode === 'asset') {
+      setMyGoldbars([]);
+      clearWalletGoldbarsStorage();
+      return;
+    }
+    const tagUid = scan?.tag_uid || readWalletTagUid();
     if (!tagUid) return;
     let cancelled = false;
     (async () => {
       const res = await fetch(`/api/goldbars/t/${encodeURIComponent(tagUid)}`);
-      if (cancelled || !res.ok) return;
+      if (cancelled) return;
+      if (!res.ok) {
+        if (res.status === 404) {
+          setMyGoldbars([]);
+          clearWalletGoldbarsStorage();
+        }
+        return;
+      }
       const goldbarData = await res.json();
       const wid = goldbarData?.id;
       if (wid === undefined || wid === null || wid === '') return;
