@@ -8,7 +8,8 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { AlertCircle, CheckCircle2, Info, X, XCircle } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { AlertCircle, CheckCircle2, Info, LogIn, X, XCircle } from 'lucide-react';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -20,6 +21,14 @@ export type ToastItem = {
   exiting?: boolean;
 };
 
+export type ConfirmOptions = {
+  title?: string;
+  message: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  tone?: 'default' | 'danger';
+};
+
 const DEFAULT_DURATION: Record<ToastType, number> = {
   success: 3200,
   error: 4500,
@@ -29,6 +38,7 @@ const DEFAULT_DURATION: Record<ToastType, number> = {
 
 type ToastContextValue = {
   showToast: (type: ToastType, message: string, duration?: number) => void;
+  showConfirm: (options: ConfirmOptions) => Promise<boolean>;
 };
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -109,9 +119,90 @@ function ToastCard({ item, onDismiss }: { item: ToastItem; onDismiss: (id: strin
   );
 }
 
+function ConfirmDialog({
+  options,
+  onResult,
+}: {
+  options: ConfirmOptions;
+  onResult: (ok: boolean) => void;
+}) {
+  const isDanger = options.tone === 'danger';
+  const title = options.title ?? '확인';
+  const confirmLabel = options.confirmLabel ?? '확인';
+  const cancelLabel = options.cancelLabel ?? '취소';
+  const showLoginIcon = !isDanger && /로그인/.test(confirmLabel);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[410] flex items-center justify-center p-4 sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="app-confirm-title"
+      aria-describedby="app-confirm-desc"
+    >
+      <button
+        type="button"
+        className="absolute inset-0 bg-slate-900/45 backdrop-blur-[2px]"
+        aria-label="닫기"
+        onClick={() => onResult(false)}
+      />
+      <div className="relative w-full max-w-sm overflow-hidden rounded-[1.75rem] border border-white/70 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.18)] toast-enter">
+        <div className="bg-gradient-to-br from-violet-50/90 via-white to-amber-50/50 px-5 pt-5 pb-4">
+          <div className="flex items-start gap-3">
+            <div
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
+                isDanger ? 'bg-rose-500/10 text-rose-600' : 'bg-violet-500/10 text-violet-600'
+              }`}
+            >
+              {showLoginIcon ? (
+                <LogIn className="h-5 w-5" strokeWidth={2.25} aria-hidden />
+              ) : isDanger ? (
+                <AlertCircle className="h-5 w-5" strokeWidth={2.25} aria-hidden />
+              ) : (
+                <Info className="h-5 w-5" strokeWidth={2.25} aria-hidden />
+              )}
+            </div>
+            <div className="min-w-0 flex-1 pt-0.5">
+              <h2 id="app-confirm-title" className="text-base font-black text-slate-900 tracking-tight">
+                {title}
+              </h2>
+              <p id="app-confirm-desc" className="mt-2 text-[13px] font-bold leading-relaxed text-slate-600 whitespace-pre-line">
+                {options.message}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-2 border-t border-slate-100 bg-slate-50/80 p-3">
+          <button
+            type="button"
+            onClick={() => onResult(false)}
+            className="flex-1 h-11 rounded-xl border border-slate-200/80 bg-white text-sm font-black text-slate-600 transition-colors hover:bg-slate-50 active:scale-[0.98]"
+          >
+            {cancelLabel}
+          </button>
+          <button
+            type="button"
+            onClick={() => onResult(true)}
+            className={`flex-1 h-11 rounded-xl text-sm font-black text-white shadow-md transition-all active:scale-[0.98] ${
+              isDanger
+                ? 'bg-rose-500 hover:bg-rose-600 shadow-rose-500/25'
+                : 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 shadow-violet-500/30'
+            }`}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmOptions | null>(null);
   const timersRef = useRef<Map<string, number>>(new Map());
+  const confirmResolveRef = useRef<((value: boolean) => void) | null>(null);
 
   const dismiss = useCallback((id: string) => {
     const t = timersRef.current.get(id);
@@ -123,6 +214,26 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     window.setTimeout(() => {
       setToasts((prev) => prev.filter((x) => x.id !== id));
     }, 220);
+  }, []);
+
+  const finishConfirm = useCallback((ok: boolean) => {
+    setConfirmDialog(null);
+    const resolve = confirmResolveRef.current;
+    confirmResolveRef.current = null;
+    resolve?.(ok);
+  }, []);
+
+  const showConfirm = useCallback((options: ConfirmOptions): Promise<boolean> => {
+    return new Promise((resolve) => {
+      confirmResolveRef.current = resolve;
+      setConfirmDialog({
+        title: options.title,
+        message: options.message.trim(),
+        confirmLabel: options.confirmLabel,
+        cancelLabel: options.cancelLabel,
+        tone: options.tone,
+      });
+    });
   }, []);
 
   const showToast = useCallback(
@@ -144,10 +255,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     return () => {
       timers.forEach((t) => clearTimeout(t));
       timers.clear();
+      confirmResolveRef.current?.(false);
+      confirmResolveRef.current = null;
     };
   }, []);
 
-  const value = useMemo(() => ({ showToast }), [showToast]);
+  const value = useMemo(() => ({ showToast, showConfirm }), [showToast, showConfirm]);
 
   return (
     <ToastContext.Provider value={value}>
@@ -160,6 +273,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <ToastCard key={item.id} item={item} onDismiss={dismiss} />
         ))}
       </div>
+      {confirmDialog ? <ConfirmDialog options={confirmDialog} onResult={finishConfirm} /> : null}
     </ToastContext.Provider>
   );
 }

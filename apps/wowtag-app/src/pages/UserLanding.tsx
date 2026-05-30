@@ -85,7 +85,7 @@ export default function UserLanding() {
   const { tagId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { showToast } = useToast();
+  const { showToast, showConfirm } = useToast();
   const [product, setProduct] = useState<any>(null);
   const [goldbar, setGoldbar] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -154,11 +154,16 @@ export default function UserLanding() {
     }
   }, []);
 
-  const promptLoginForWallet = useCallback(() => {
-    if (window.confirm('내 지갑·전자앨범은 로그인 후 NFC 태그를 연결해야 이용할 수 있습니다. 로그인 화면으로 이동할까요?')) {
-      navigate(loginPathWithNext('wallet'));
-    }
-  }, [navigate]);
+  const promptLoginForWallet = useCallback(async () => {
+    const ok = await showConfirm({
+      title: '로그인 안내',
+      message:
+        '내 지갑·전자앨범은 로그인 후 NFC 태그를 연결해야 이용할 수 있습니다.\n로그인 화면으로 이동할까요?',
+      confirmLabel: '로그인하기',
+      cancelLabel: '닫기',
+    });
+    if (ok) navigate(loginPathWithNext('wallet'));
+  }, [navigate, showConfirm]);
 
   useEffect(() => {
     if (!tagId) return;
@@ -229,7 +234,7 @@ export default function UserLanding() {
   // 앨범 — 로그인 + 지갑에 등록된 항목만
   const handleOpenAlbum = (g: any) => {
     if (!canUseWalletFeatures(currentUser)) {
-      promptLoginForWallet();
+      void promptLoginForWallet();
       return;
     }
     const inWallet = myGoldbars.some(
@@ -250,7 +255,13 @@ export default function UserLanding() {
       showToast('info', '로그인이 필요한 서비스입니다.');
       return;
     }
-    if (!confirm('소유권을 해지 요청하시겠습니까? 관리자 승인 후 재판매 가능한 상태가 됩니다.')) return;
+    const okRelease = await showConfirm({
+      title: '소유권 해지',
+      message: '소유권을 해지 요청하시겠습니까? 관리자 승인 후 재판매 가능한 상태가 됩니다.',
+      confirmLabel: '요청하기',
+      cancelLabel: '취소',
+    });
+    if (!okRelease) return;
 
     try {
       const res = await fetch('/api/user/goldbars/release-request', {
@@ -321,7 +332,14 @@ export default function UserLanding() {
 
   // 앨범 사진 삭제
   const handleDeleteAlbumImage = async (imageId: any) => {
-    if (!confirm('정말 이 사진을 삭제하시겠습니까?')) return;
+    const okDelete = await showConfirm({
+      title: '사진 삭제',
+      message: '정말 이 사진을 삭제하시겠습니까?',
+      confirmLabel: '삭제',
+      cancelLabel: '취소',
+      tone: 'danger',
+    });
+    if (!okDelete) return;
     try {
       const res = await fetch(`/api/albums/images/${imageId}`, { method: 'DELETE' });
       if (res.ok) {
@@ -746,7 +764,7 @@ export default function UserLanding() {
               <div 
                 onClick={() => {
                   if (!canUseWalletFeatures(currentUser)) {
-                    promptLoginForWallet();
+                    void promptLoginForWallet();
                     return;
                   }
                   goToUserTab('myWallet');
@@ -766,7 +784,7 @@ export default function UserLanding() {
               <div 
                 onClick={() => {
                   if (!canUseWalletFeatures(currentUser)) {
-                    promptLoginForWallet();
+                    void promptLoginForWallet();
                     return;
                   }
                   if (myGoldbars.length > 0) {
@@ -913,13 +931,21 @@ export default function UserLanding() {
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (confirm('정말 내 지갑에서 이 골드바를 제거하시겠습니까?')) {
+                        void (async () => {
+                          const okRemove = await showConfirm({
+                            title: '지갑에서 제거',
+                            message: '정말 내 지갑에서 이 항목을 제거하시겠습니까?',
+                            confirmLabel: '제거',
+                            cancelLabel: '취소',
+                            tone: 'danger',
+                          });
+                          if (!okRemove) return;
                           const updated = myGoldbars.filter((_, i) => i !== index);
                           setMyGoldbars(updated);
                           if (!canUseWalletFeatures(currentUser)) {
                             persistGuestTagPreview(updated);
                           }
-                        }
+                        })();
                       }}
                       className="p-2 bg-slate-50 text-slate-400 hover:text-rose-500 hover:bg-rose-50 border border-slate-100 rounded-xl transition-all shadow-sm"
                     >
