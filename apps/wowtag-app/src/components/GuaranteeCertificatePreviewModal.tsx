@@ -5,6 +5,7 @@ import { X, Download, Loader2 } from 'lucide-react';
 import { ProductGuaranteeCertificate } from './ProductGuaranteeCertificate';
 import { downloadProductGuaranteePdf } from '../lib/exportGuaranteePdf';
 import type { GuaranteeCertificateData } from '../lib/guaranteeCertificateData';
+import { useToast } from './ToastProvider';
 
 const CERT_W = 794;
 const CERT_H = 1123;
@@ -20,6 +21,7 @@ export function GuaranteeCertificatePreviewModal({
   data: GuaranteeCertificateData | null;
   onClose: () => void;
 }) {
+  const { showToast } = useToast();
   const wrapRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [pdfBusy, setPdfBusy] = useState(false);
@@ -45,7 +47,7 @@ export function GuaranteeCertificatePreviewModal({
   const handleDownloadPdf = async () => {
     const root = wrapRef.current?.querySelector('[data-guarantee-pdf-root="1"]') as HTMLElement | null;
     if (!root) {
-      alert('보증서 영역을 찾을 수 없습니다.');
+      showToast('error', '보증서 영역을 찾을 수 없습니다.');
       return;
     }
     setPdfBusy(true);
@@ -57,7 +59,7 @@ export function GuaranteeCertificatePreviewModal({
         e instanceof Error && e.message
           ? e.message
           : 'PDF 저장 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.';
-      alert(msg);
+      showToast('error', msg);
     } finally {
       setPdfBusy(false);
     }

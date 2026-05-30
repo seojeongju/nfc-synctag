@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import UserLanding from './pages/UserLanding';
 import AdminDashboard from './pages/AdminDashboard';
 import ConsumerLogin from './pages/ConsumerLogin';
+import { ToastProvider } from './components/ToastProvider';
 import { isAdminSessionValid } from './lib/adminSession';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -10,6 +11,7 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 
 function App() {
   return (
+    <ToastProvider>
     <Routes>
       {/* 사용자용 경로 */}
       <Route path="/" element={<UserLanding />} />
@@ -40,6 +42,7 @@ function App() {
       {/* 404 처리 */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </ToastProvider>
   );
 }
 

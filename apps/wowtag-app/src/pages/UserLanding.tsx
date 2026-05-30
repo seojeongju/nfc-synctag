@@ -22,6 +22,7 @@ import {
 } from '../lib/tagSession';
 import { fetchUserWallet, linkTagToUserWallet } from '../lib/walletApi';
 import { canUseWalletFeatures, isConsumerLoggedIn, loginPathWithNext } from '../lib/sessionPolicy';
+import { useToast } from '../components/ToastProvider';
 
 /** Chrome BeforeInstallPromptEvent (lib.dom에 없을 수 있음) */
 type AnyBeforeInstallPrompt = {
@@ -84,6 +85,7 @@ export default function UserLanding() {
   const { tagId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { showToast } = useToast();
   const [product, setProduct] = useState<any>(null);
   const [goldbar, setGoldbar] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -234,7 +236,7 @@ export default function UserLanding() {
       (w) => w.id === g.id || (w.serial_number && w.serial_number === g.serial_number)
     );
     if (!inWallet) {
-      alert('NFC 태그를 스캔해 내 지갑에 연결한 뒤 전자앨범을 이용해 주세요.');
+      showToast('info', 'NFC 태그를 스캔해 내 지갑에 연결한 뒤 전자앨범을 이용해 주세요.');
       return;
     }
     setCurrentGoldbarForAlbum(g);
@@ -245,7 +247,7 @@ export default function UserLanding() {
   /** [신규] 소유권 해지 요청 */
   const handleReleaseRequest = async (goldbarId: number) => {
     if (!currentUser) {
-      alert('로그인이 필요한 서비스입니다.');
+      showToast('info', '로그인이 필요한 서비스입니다.');
       return;
     }
     if (!confirm('소유권을 해지 요청하시겠습니까? 관리자 승인 후 재판매 가능한 상태가 됩니다.')) return;
@@ -262,14 +264,14 @@ export default function UserLanding() {
       });
 
       if (res.ok) {
-        alert('소유권 해지 요청이 완료되었습니다. 관리자 승인 후 목록에서 삭제됩니다.');
+        showToast('success', '소유권 해지 요청이 완료되었습니다. 관리자 승인 후 목록에서 삭제됩니다.');
         await syncWalletForUser(currentUser.id);
       } else {
         const d = await res.json();
-        alert(d.error || '요청 처리에 실패했습니다.');
+        showToast('error', d.error || '요청 처리에 실패했습니다.');
       }
     } catch (err) {
-      alert('오류가 발생했습니다.');
+      showToast('error', '오류가 발생했습니다.');
     }
   };
 
@@ -278,12 +280,12 @@ export default function UserLanding() {
     const file = e.target.files?.[0];
     if (!file || !currentGoldbarForAlbum) return;
     if (!canUseWalletFeatures(currentUser)) {
-      alert('전자앨범 업로드는 로그인 후 이용할 수 있습니다.');
+      showToast('info', '전자앨범 업로드는 로그인 후 이용할 수 있습니다.');
       return;
     }
 
     if (albumData.images.length >= 5) {
-      alert('최대 5장까지만 등록 가능합니다.');
+      showToast('warning', '최대 5장까지만 등록 가능합니다.');
       return;
     }
 
@@ -306,10 +308,10 @@ export default function UserLanding() {
           fetchAlbum(currentGoldbarForAlbum.id || currentGoldbarForAlbum.serial_number);
         } else {
           const d = await res.json();
-          alert(d.error || '업로드에 실패했습니다.');
+          showToast('error', d.error || '업로드에 실패했습니다.');
         }
       } catch (err: any) {
-        alert('업로드 요청 실패');
+        showToast('error', '업로드 요청 실패');
       } finally {
         setUploadingImage(false);
       }
@@ -356,28 +358,32 @@ export default function UserLanding() {
 
   const handleInstallApp = useCallback(async () => {
     if (isStandalonePwa) {
-      alert('이미 앱(홈 화면 설치) 모드에서 실행 중입니다.');
+      showToast('info', '이미 앱(홈 화면 설치) 모드에서 실행 중입니다.');
       return;
     }
 
     if (isIosDevice) {
-      alert(
+      showToast(
+        'info',
         'iPhone/iPad Safari에서는 다음 순서로 추가할 수 있습니다.\n\n' +
           '1) 하단 공유 버튼(□↑) 을 누른 뒤\n' +
           '2) 「홈 화면에 추가」를 선택해 주세요.\n\n' +
-          'Chrome 앱이 아닌 Safari로 열어 주시면 설치가 더 안정적입니다.'
+          'Chrome 앱이 아닌 Safari로 열어 주시면 설치가 더 안정적입니다.',
+        8000
       );
       return;
     }
 
     const p = installPromptRef.current;
     if (!p) {
-      alert(
+      showToast(
+        'info',
         '이 환경에서는 자동 설치 창을 띄울 수 없습니다.\n\n' +
           '【안드로이드 Chrome】\n' +
           '1) 주소창 오른쪽의 ⊕ 설치 아이콘을 누르거나\n' +
           '2) 우측 상단 ⋮ 메뉴 → 「앱 설치」 또는 「홈 화면에 추가」\n\n' +
-          '인스타/카카오 등 앱 안 웹뷰가 아닌, Chrome으로 사이트를 열어 주세요.'
+          '인스타/카카오 등 앱 안 웹뷰가 아닌, Chrome으로 사이트를 열어 주세요.',
+        8000
       );
       return;
     }
@@ -387,14 +393,15 @@ export default function UserLanding() {
       await p.userChoice;
     } catch (err) {
       console.error('[PWA] install prompt failed', err);
-      alert(
+      showToast(
+        'warning',
         '설치 창을 열지 못했습니다. Chrome을 최신으로 유지한 뒤, 주소창의 설치(⊕) 아이콘 또는 ⋮ 메뉴의 「앱 설치」를 이용해 주세요.'
       );
     } finally {
       installPromptRef.current = null;
       setInstallPromptReady(false);
     }
-  }, [isIosDevice, isStandalonePwa]);
+  }, [isIosDevice, isStandalonePwa, showToast]);
 
   // 해시 기반 탭 네비게이션 구현 (모바일 뒤로가기 대응)
   useEffect(() => {
@@ -598,7 +605,7 @@ export default function UserLanding() {
   const handlePurchaseSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!purchaseFormData.name || !purchaseFormData.phone) {
-      alert('필수 정보를 입력해 주세요.');
+      showToast('warning', '필수 정보를 입력해 주세요.');
       return;
     }
     // 모의 구매 완료 처리

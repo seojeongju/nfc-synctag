@@ -8,6 +8,7 @@ import { GuaranteeCertificatePreviewModal } from '../components/GuaranteeCertifi
 import { mapProductToGuaranteeData } from '../lib/guaranteeCertificateData';
 import type { GuaranteeCertificateData } from '../lib/guaranteeCertificateData';
 import { clearAdminSession } from '../lib/adminSession';
+import { useToast } from '../components/ToastProvider';
 
 const ADMIN_TAB_IDS = ['dashboard', 'products', 'nfc', 'goldbars', 'assetMarket', 'releaseRequests'] as const;
 type AdminTabId = (typeof ADMIN_TAB_IDS)[number];
@@ -775,14 +776,7 @@ export default function AdminDashboard() {
   const [guaranteePdfPayload, setGuaranteePdfPayload] = useState<GuaranteeCertificateData | null>(null);
   /** 제품 보증서 미리보기 모달 */
   const [guaranteePreviewData, setGuaranteePreviewData] = useState<GuaranteeCertificateData | null>(null);
-  const [toast, setToast] = useState<{
-    type: 'success' | 'error';
-    message: string;
-  } | null>(null);
-
-  const showToast = useCallback((type: 'success' | 'error', message: string) => {
-    setToast({ type, message });
-  }, []);
+  const { showToast } = useToast();
 
   const cancelNfcWrite = useCallback(() => {
     abortActiveNfcSession();
@@ -792,12 +786,6 @@ export default function AdminDashboard() {
     setNfcMatchUrlWrite('idle');
     showToast('error', 'NFC 기록을 취소했습니다.');
   }, [showToast]);
-
-  useEffect(() => {
-    if (!toast) return;
-    const timer = window.setTimeout(() => setToast(null), 2600);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
 
   const nfcProductTags = useMemo(() => allTags.filter((t: any) => t.target_type === 'product'), [allTags]);
   const nfcUnlinkedList = useMemo(
@@ -4810,22 +4798,6 @@ export default function AdminDashboard() {
                  {submitting && <Loader2 className="w-5 h-5 animate-spin" />} 수정 완료
                </button>
             </form>
-          </div>
-        </div>
-      )}
-
-      {toast && (
-        <div className="fixed left-1/2 -translate-x-1/2 bottom-24 lg:bottom-8 z-[260] pointer-events-none">
-          <div
-            className={`px-4 py-3 rounded-xl shadow-xl border text-sm font-bold ${
-              toast.type === 'success'
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                : 'bg-rose-50 text-rose-700 border-rose-200'
-            }`}
-            role="status"
-            aria-live="polite"
-          >
-            {toast.message}
           </div>
         </div>
       )}

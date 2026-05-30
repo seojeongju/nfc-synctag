@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef } from 'react';
+import { useToast } from './ToastProvider';
 import { createPortal } from 'react-dom';
 
 import { downloadProductGuaranteePdf } from '../lib/exportGuaranteePdf';
@@ -238,6 +239,7 @@ export function GuaranteePdfHost({
   data: GuaranteeCertificateData;
   onDone: () => void;
 }) {
+  const { showToast } = useToast();
   const ref = useRef<HTMLDivElement>(null);
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
@@ -265,7 +267,7 @@ export function GuaranteePdfHost({
           e instanceof Error && e.message
             ? e.message
             : '보증서 PDF를 만드는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.';
-        alert(msg);
+        showToast('error', msg);
       } finally {
         if (!cancelled) onDoneRef.current();
       }
@@ -275,7 +277,7 @@ export function GuaranteePdfHost({
     return () => {
       cancelled = true;
     };
-  }, [data]);
+  }, [data, showToast]);
 
   /**
    * 모바일 Chrome/WebView는 z-index 음수·화면 멀리 떨어진 노드를 레이어에서 생략해

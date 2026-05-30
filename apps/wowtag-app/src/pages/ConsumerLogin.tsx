@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { setAdminSession } from '../lib/adminSession';
+import { useToast } from '../components/ToastProvider';
 
 const ADMIN_EMAIL = 'admin@wowtag.com';
 
@@ -42,6 +43,7 @@ function KakaoMark() {
 export default function ConsumerLogin() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { showToast } = useToast();
   const [tab, setTab] = useState<Tab>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -172,12 +174,14 @@ export default function ConsumerLogin() {
   const handleSocial = (kind: 'google' | 'kakao') => {
     const enabled = kind === 'google' ? providers.google : providers.kakao;
     if (!enabled) {
-      alert(
-        `${kind === 'google' ? 'Google' : 'Kakao'} 로그인은 OAuth 클라이언트 ID를 워커 환경 변수에 설정하면 활성화됩니다.\n\n지금은 이메일 로그인을 이용해 주세요.`
+      showToast(
+        'info',
+        `${kind === 'google' ? 'Google' : 'Kakao'} 로그인은 OAuth 클라이언트 ID를 워커 환경 변수에 설정하면 활성화됩니다.\n\n지금은 이메일 로그인을 이용해 주세요.`,
+        7000
       );
       return;
     }
-    alert('OAuth 리다이렉트 연동은 클라이언트 등록 후 콜백 URL과 함께 설정합니다.');
+    showToast('info', 'OAuth 리다이렉트 연동은 클라이언트 등록 후 콜백 URL과 함께 설정합니다.');
   };
 
   return (

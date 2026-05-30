@@ -30,3 +30,46 @@
     @apply bg-purple-gradient text-white font-semibold py-3 px-6 rounded-3xl shadow-lg transition-all active:scale-95 cursor-pointer;
   }
 }
+
+@keyframes toast-enter-keyframes {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toast-exit-keyframes {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+}
+
+@keyframes toast-progress-keyframes {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.toast-enter {
+  animation: toast-enter-keyframes 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.toast-exit {
+  animation: toast-exit-keyframes 0.2s ease-in both;
+}
+
+.toast-progress {
+  animation: toast-progress-keyframes linear forwards;
+}
