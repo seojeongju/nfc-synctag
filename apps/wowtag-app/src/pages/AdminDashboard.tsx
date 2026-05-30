@@ -490,33 +490,48 @@ function NfcUrlWritePanel({
 function NfcWorkflowSteps({
   accent,
   labels,
+  activeStep = 1,
+  allDone = false,
 }: {
   accent: NfcUidScanAccent;
   labels: string[];
+  /** 1~labels.length — 현재 진행 단계 */
+  activeStep?: number;
+  allDone?: boolean;
 }) {
-  const active = accent === 'emerald' ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-white';
+  const activeRing = accent === 'emerald' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-amber-500 text-white shadow-sm';
+  const doneRing = accent === 'emerald' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-900 border border-amber-300';
   const line = accent === 'emerald' ? 'bg-emerald-200' : 'bg-amber-200';
   const wrap = accent === 'emerald' ? 'bg-emerald-50/90 border-emerald-100' : 'bg-amber-50/90 border-amber-100';
 
   return (
     <div className={`flex items-center gap-1 sm:gap-2 mb-5 p-3 sm:p-3.5 rounded-2xl border ${wrap}`}>
-      {labels.map((label, i) => (
-        <Fragment key={label}>
-          <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
-            <span
-              className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full text-[10px] sm:text-[11px] font-black flex items-center justify-center shrink-0 ${
-                i === 0 ? active : 'bg-white text-slate-400 border border-slate-200'
-              }`}
-            >
-              {i + 1}
-            </span>
-            <span className="text-[9px] sm:text-[10px] font-black text-slate-600 text-center leading-tight px-0.5">
-              {label}
-            </span>
-          </div>
-          {i < labels.length - 1 ? <div className={`w-3 sm:w-6 h-0.5 ${line} shrink-0`} /> : null}
-        </Fragment>
-      ))}
+      {labels.map((label, i) => {
+        const stepNum = i + 1;
+        const isDone = allDone || stepNum < activeStep;
+        const isActive = !allDone && stepNum === activeStep;
+        return (
+          <Fragment key={label}>
+            <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
+              <span
+                className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full text-[10px] sm:text-[11px] font-black flex items-center justify-center shrink-0 ${
+                  isDone ? doneRing : isActive ? activeRing : 'bg-white text-slate-400 border border-slate-200'
+                }`}
+              >
+                {isDone ? '✓' : stepNum}
+              </span>
+              <span
+                className={`text-[9px] sm:text-[10px] font-black text-center leading-tight px-0.5 ${
+                  isActive || isDone ? 'text-slate-800' : 'text-slate-500'
+                }`}
+              >
+                {label}
+              </span>
+            </div>
+            {i < labels.length - 1 ? <div className={`w-3 sm:w-6 h-0.5 ${line} shrink-0`} /> : null}
+          </Fragment>
+        );
+      })}
     </div>
   );
 }
@@ -721,6 +736,11 @@ export default function AdminDashboard() {
   const [nfcPendingWriteContext, setNfcPendingWriteContext] = useState<NfcWriteContext>('modal');
   const [nfcMatchUrlWrite, setNfcMatchUrlWrite] = useState<NfcUrlWriteStatus>('idle');
   const [nfcRegisterUrlWrite, setNfcRegisterUrlWrite] = useState<NfcUrlWriteStatus>('idle');
+  /** 제품 매칭 3단계 완료 시 화면 내 결과 메시지 */
+  const [nfcMatchResult, setNfcMatchResult] = useState<{
+    productName: string;
+    urlWritten: boolean;
+  } | null>(null);
   /** 매칭·등록 직후 실물 태그 URL 기록 안내 (DB 저장과 NFC 칩 기록은 별도) */
   /** URL 기록 실패 시에만 표시 (성공 시 별도 클릭 불필요) */
   const [nfcTagWritePrompt, setNfcTagWritePrompt] = useState<{
@@ -1306,7 +1326,15 @@ export default function AdminDashboard() {
     setNfcMatchForm({ tag_uid: '', product_id: '' });
     setNfcMatchSnapshot(null);
     setNfcMatchUrlWrite('idle');
+    setNfcMatchResult(null);
   }, []);
+
+  const nfcMatchActiveStep = useMemo(() => {
+    if (nfcMatchResult) return 3;
+    if (!nfcMatchForm.tag_uid.trim()) return 1;
+    if (!nfcMatchForm.product_id) return 2;
+    return 3;
+  }, [nfcMatchForm.tag_uid, nfcMatchForm.product_id, nfcMatchResult]);
 
   const refreshNfcMatchSnapshot = useCallback(async (uid: string) => {
     const trimmed = uid.trim();
@@ -1467,24 +1495,25 @@ export default function AdminDashboard() {
         return;
       }
 
+      const productName =
+        products.find((p: { id: number | string }) => String(p.id) === String(pid))?.name || '선택한 제품';
+
       const writeOk = writePromise ? await writePromise : false;
+      setNfcMatchForm({ tag_uid: '', product_id: '' });
+      setNfcMatchSnapshot(null);
+
       if (!canNfcWrite) {
-        showToast('success', '제품 매칭이 완료되었습니다. (Chrome Android에서 URL 굽기를 해 주세요.)');
-        setNfcMatchForm({ tag_uid: '', product_id: '' });
-        setNfcMatchSnapshot(null);
+        setNfcMatchResult({ productName, urlWritten: false });
+        showToast('success', '매칭 완료');
       } else if (writeOk) {
-        showToast('success', '제품 매칭 및 태그 URL 기록이 완료되었습니다.');
-        setNfcMatchForm({ tag_uid: '', product_id: '' });
-        setNfcMatchSnapshot(null);
         setNfcMatchUrlWrite('done');
+        setNfcMatchResult({ productName, urlWritten: true });
+        showToast('success', '매칭 완료');
       } else {
-        showToast(
-          'error',
-          '제품 매칭은 완료됐습니다. 같은 태그를 대고 아래 「태그 URL 굽기」 또는 안내창에서 다시 기록해 주세요.'
-        );
-        setNfcMatchForm({ tag_uid: uid, product_id: '' });
-        setNfcMatchSnapshot(null);
+        setNfcMatchUrlWrite('error');
+        setNfcMatchResult({ productName, urlWritten: false });
         setNfcTagWritePrompt({ open: true, uid, kind: 'match' });
+        showToast('error', '매칭은 완료됐으나 URL 기록에 실패했습니다.');
       }
 
       fetchTags();
@@ -2640,31 +2669,69 @@ export default function AdminDashboard() {
                     <div>
                       <h3 className="text-base sm:text-lg font-black text-slate-900">제품 매칭 (출고)</h3>
                       <p className="text-xs font-bold text-slate-500 mt-1 leading-relaxed">
-                        <strong className="text-slate-700">① 태그 스캔 → ② 제품 선택 → ③ 제품 매칭 완료</strong> 한 번이면 서버 저장과
-                        태그 URL 기록이 함께 진행됩니다. 버튼을 누른 뒤 <strong className="text-slate-700">같은 태그</strong>를
-                        폰에 대 주세요.
+                        ① NFC 스캔 → ② 출고 제품 선택 → ③ 제품 매칭(URL 자동 기록)
                       </p>
                     </div>
                   </div>
 
-                  <NfcWorkflowSteps accent="emerald" labels={['NFC 스캔', '제품 선택', '매칭 완료']} />
+                  <NfcWorkflowSteps
+                    accent="emerald"
+                    labels={['NFC 스캔', '출고 제품 선택', '제품 매칭']}
+                    activeStep={nfcMatchActiveStep}
+                    allDone={!!nfcMatchResult}
+                  />
 
+                  {nfcMatchResult && (
+                    <div
+                      className={`rounded-2xl border px-4 py-4 flex gap-3 ${
+                        nfcMatchResult.urlWritten
+                          ? 'bg-emerald-50 border-emerald-200'
+                          : 'bg-amber-50 border-amber-200'
+                      }`}
+                    >
+                      <CheckCircle2
+                        className={`w-8 h-8 shrink-0 ${nfcMatchResult.urlWritten ? 'text-emerald-600' : 'text-amber-600'}`}
+                      />
+                      <div className="min-w-0">
+                        <p className="text-sm font-black text-slate-900">매칭 완료</p>
+                        <p className="text-xs font-bold text-slate-700 mt-1 leading-relaxed">
+                          「{nfcMatchResult.productName}」 제품과 연결되었습니다.
+                          {nfcMatchResult.urlWritten
+                            ? ' 태그 URL도 기록되었습니다. 다음 태그를 스캔해 주세요.'
+                            : ' 태그 URL 기록에 실패했습니다. 아래에서 다시 시도해 주세요.'}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={clearNfcMatchWorkbench}
+                          className="mt-2 text-[11px] font-black text-emerald-700 underline underline-offset-2"
+                        >
+                          새 태그 매칭하기
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {!nfcMatchResult && (
                   <form onSubmit={handleQuickProductMatch} className="space-y-5">
                     <NfcUidScanStep
                       stepNumber={1}
-                      stepTitle="태그 UID — 아래 초록 버튼부터 누르세요"
+                      stepTitle="제품 매칭 NFC 스캔"
                       accent="emerald"
                       tagUid={nfcMatchForm.tag_uid}
                       scanning={nfcScanning}
-                      onScan={() => void handleNFCScanMatch()}
+                      onScan={() => {
+                        setNfcMatchResult(null);
+                        void handleNFCScanMatch();
+                      }}
                       onClear={clearNfcMatchWorkbench}
-                      scanLabel="제품 매칭 · NFC 스캔 시작"
-                      scanSubLabel="① 이 버튼 → ② 제품 선택 → ③ 맨 아래 「제품 매칭 완료」"
+                      scanLabel="NFC 스캔"
+                      scanSubLabel="태그를 스마트폰 뒷면에 대면 UID가 입력됩니다"
                       onTagUidChange={(v) => {
                         if (!v.trim()) {
                           clearNfcMatchWorkbench();
                           return;
                         }
+                        setNfcMatchResult(null);
                         setNfcMatchUrlWrite('idle');
                         setNfcMatchForm((prev) => ({ ...prev, tag_uid: v }));
                         void refreshNfcMatchSnapshot(v);
@@ -2701,6 +2768,7 @@ export default function AdminDashboard() {
                         </span>
                         <label className="text-xs sm:text-sm font-black text-slate-800">출고할 제품 선택</label>
                       </div>
+                      <p className="text-[11px] font-bold text-slate-500 pl-9 -mt-1">카탈로그에서 출고할 제품을 고릅니다.</p>
                       <div className="relative">
                         <select
                           required
@@ -2719,31 +2787,44 @@ export default function AdminDashboard() {
                       </div>
                     </div>
 
-                    <button
-                      type="submit"
-                      disabled={
-                        submitting ||
-                        !nfcMatchForm.tag_uid.trim() ||
-                        !nfcMatchForm.product_id ||
-                        nfcMatchSnapshot?.kind === 'blocked'
-                      }
-                      className="w-full h-14 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black text-base rounded-2xl shadow-lg shadow-emerald-500/20 disabled:opacity-40 flex items-center justify-center gap-2"
-                    >
-                      {(submitting || nfcWriting) && <Loader2 className="w-5 h-5 animate-spin" />}
-                      {nfcWriting
-                        ? '태그를 기기에 대 주세요…'
-                        : submitting
-                          ? '매칭 저장 중…'
-                          : '제품 매칭 완료 (URL 자동 기록)'}
-                    </button>
+                    <div className="space-y-2 pt-1">
+                      <div className="flex items-center gap-2 pl-0.5">
+                        <span className="shrink-0 w-7 h-7 rounded-lg bg-emerald-600 text-white text-xs font-black flex items-center justify-center shadow-sm">
+                          3
+                        </span>
+                        <label className="text-xs sm:text-sm font-black text-slate-800">제품 매칭 (URL 자동 기록)</label>
+                      </div>
+                      <p className="text-[11px] font-bold text-slate-500 pl-9">
+                        버튼을 누른 뒤 <strong className="text-slate-700">같은 태그</strong>를 폰에 1~2초 대 주세요.
+                      </p>
+                      <button
+                        type="submit"
+                        disabled={
+                          submitting ||
+                          !nfcMatchForm.tag_uid.trim() ||
+                          !nfcMatchForm.product_id ||
+                          nfcMatchSnapshot?.kind === 'blocked'
+                        }
+                        className="w-full h-14 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black text-base rounded-2xl shadow-lg shadow-emerald-500/20 disabled:opacity-40 flex items-center justify-center gap-2"
+                      >
+                        {(submitting || nfcWriting) && <Loader2 className="w-5 h-5 animate-spin" />}
+                        {nfcWriting
+                          ? '태그를 기기에 대 주세요…'
+                          : submitting
+                            ? '매칭 중…'
+                            : '제품 매칭'}
+                      </button>
+                    </div>
 
-                    <NfcUrlWritePanel
-                      accent="emerald"
-                      status={nfcMatchUrlWrite}
-                      uidReady={!!nfcMatchForm.tag_uid.trim()}
-                      optionalLabel
-                      onWrite={() => handleNFCWriteFor(nfcMatchForm.tag_uid, 'match')}
-                    />
+                    {(nfcMatchUrlWrite === 'error' || nfcMatchUrlWrite === 'writing') && (
+                      <NfcUrlWritePanel
+                        accent="emerald"
+                        status={nfcMatchUrlWrite}
+                        uidReady={!!nfcMatchForm.tag_uid.trim()}
+                        optionalLabel
+                        onWrite={() => handleNFCWriteFor(nfcMatchForm.tag_uid, 'match')}
+                      />
+                    )}
                     <button
                       type="button"
                       onClick={() => {
@@ -2769,6 +2850,7 @@ export default function AdminDashboard() {
                       통합 발행 모달 (고급 · URL 덮어쓰기)
                     </button>
                   </form>
+                  )}
                 </div>
               )}
 
