@@ -366,16 +366,19 @@ function NfcUrlWritePanel({
   uidReady,
   onWrite,
   onSkip,
-  optionalLabel = false,
+  optionalLabel = true,
+  showSkip = false,
 }: {
   accent: NfcUidScanAccent;
   status: NfcUrlWriteStatus;
   uidReady: boolean;
   onWrite: () => void;
   onSkip?: () => void;
+  /** true면 매칭/등록과 별도 선택 작업임을 표시 */
   optionalLabel?: boolean;
+  showSkip?: boolean;
 }) {
-  const title = optionalLabel ? '태그 URL 기록 (선택)' : '태그 URL 기록';
+  const title = optionalLabel ? '태그 URL 굽기 (선택 · 나중에 해도 됨)' : '태그 URL 기록';
   const doneRing = accent === 'emerald' ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-amber-300 bg-amber-50 text-amber-900';
   const activeRing =
     accent === 'emerald'
@@ -398,18 +401,27 @@ function NfcUrlWritePanel({
     <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 space-y-3">
       <div className="flex items-center gap-2">
         <span
-          className={`shrink-0 w-6 h-6 rounded-md text-[10px] font-black flex items-center justify-center ${
+          className={`shrink-0 min-w-6 h-6 px-1 rounded-md text-[10px] font-black flex items-center justify-center ${
             status === 'done'
               ? accent === 'emerald'
                 ? 'bg-emerald-600 text-white'
                 : 'bg-amber-500 text-white'
-              : 'bg-slate-200 text-slate-600'
+              : optionalLabel
+                ? 'bg-slate-100 text-slate-500 border border-slate-200'
+                : 'bg-slate-200 text-slate-600'
           }`}
         >
-          {status === 'done' ? '✓' : '3'}
+          {status === 'done' ? '✓' : optionalLabel ? '선택' : '3'}
         </span>
         <p className="text-xs font-black text-slate-600">{title}</p>
       </div>
+
+      {optionalLabel ? (
+        <p className="text-[11px] font-bold text-slate-500 leading-relaxed -mt-1">
+          출고·매칭과는 별개입니다. 태그에 앱 주소를 넣을 때만 사용하세요.{' '}
+          <strong className="text-slate-700">제품 매칭 완료만으로 출고 처리됩니다.</strong>
+        </p>
+      ) : null}
 
       <button
         type="button"
@@ -442,11 +454,11 @@ function NfcUrlWritePanel({
               : 'text-amber-900 bg-amber-50 border-amber-200'
           }`}
         >
-          URL 기록이 완료되었습니다. 이제 마지막 단계 버튼을 눌러 주세요.
+          {optionalLabel ? '태그에 URL을 기록했습니다.' : 'URL 기록이 완료되었습니다. 이제 마지막 단계 버튼을 눌러 주세요.'}
         </p>
       ) : null}
 
-      {onSkip && status !== 'done' && status !== 'writing' ? (
+      {showSkip && onSkip && status !== 'done' && status !== 'writing' ? (
         <button
           type="button"
           onClick={onSkip}
@@ -2529,12 +2541,13 @@ export default function AdminDashboard() {
                     <div>
                       <h3 className="text-base sm:text-lg font-black text-slate-900">제품 매칭 (출고)</h3>
                       <p className="text-xs font-bold text-slate-500 mt-1 leading-relaxed">
-                        UID가 등록된 태그라면 목록에서 찾을 필요 없이, 여기서 스캔 후 제품만 선택하면 됩니다.
+                        <strong className="text-slate-700">① 태그 스캔 → ② 제품 선택 → ③ 제품 매칭 완료</strong> 순서입니다. URL 굽기는
+                        필수가 아닙니다.
                       </p>
                     </div>
                   </div>
 
-                  <NfcWorkflowSteps accent="emerald" labels={['NFC 스캔', 'URL 기록', '매칭 완료']} />
+                  <NfcWorkflowSteps accent="emerald" labels={['NFC 스캔', '제품 선택', '매칭 완료']} />
 
                   <form onSubmit={handleQuickProductMatch} className="space-y-5">
                     <NfcUidScanStep
@@ -2606,30 +2619,13 @@ export default function AdminDashboard() {
                       </div>
                     </div>
 
-                    <NfcUrlWritePanel
-                      accent="emerald"
-                      status={nfcMatchUrlWrite}
-                      uidReady={!!nfcMatchForm.tag_uid.trim()}
-                      onWrite={() => handleNFCWriteFor(nfcMatchForm.tag_uid, 'match')}
-                      onSkip={() => setNfcMatchUrlWrite('done')}
-                    />
-
-                    {nfcMatchForm.tag_uid.trim() &&
-                      nfcMatchForm.product_id &&
-                      nfcMatchUrlWrite !== 'done' &&
-                      nfcMatchSnapshot?.kind !== 'blocked' && (
-                        <p className="text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-center leading-relaxed">
-                          ③ URL 기록(또는 「이미 기록됨 — 건너뛰기」) 후 <strong>제품 매칭 완료</strong> 버튼이 활성화됩니다.
-                        </p>
-                      )}
-
                     <button
                       type="submit"
                       disabled={
                         submitting ||
                         !nfcMatchForm.tag_uid.trim() ||
                         !nfcMatchForm.product_id ||
-                        nfcMatchUrlWrite !== 'done' ||
+                        nfcMatchUrlWrite === 'writing' ||
                         nfcMatchSnapshot?.kind === 'blocked'
                       }
                       className="w-full h-14 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black text-base rounded-2xl shadow-lg shadow-emerald-500/20 disabled:opacity-40 flex items-center justify-center gap-2"
@@ -2637,6 +2633,14 @@ export default function AdminDashboard() {
                       {submitting && <Loader2 className="w-5 h-5 animate-spin" />}
                       제품 매칭 완료
                     </button>
+
+                    <NfcUrlWritePanel
+                      accent="emerald"
+                      status={nfcMatchUrlWrite}
+                      uidReady={!!nfcMatchForm.tag_uid.trim()}
+                      optionalLabel
+                      onWrite={() => handleNFCWriteFor(nfcMatchForm.tag_uid, 'match')}
+                    />
                     <button
                       type="button"
                       onClick={() => {
@@ -2680,7 +2684,7 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  <NfcWorkflowSteps accent="amber" labels={['NFC 스캔', 'URL 기록', '자산 등록']} />
+                  <NfcWorkflowSteps accent="amber" labels={['NFC 스캔', 'UID 확인', '자산 등록']} />
 
                   <form onSubmit={handleUidOnlyRegister} className="space-y-5">
                     <NfcUidScanStep
@@ -2698,36 +2702,28 @@ export default function AdminDashboard() {
                       }}
                     />
 
-                    <NfcUrlWritePanel
-                      accent="amber"
-                      status={nfcRegisterUrlWrite}
-                      uidReady={!!nfcRegisterOnlyForm.tag_uid.trim()}
-                      optionalLabel
-                      onWrite={() => handleNFCWriteFor(nfcRegisterOnlyForm.tag_uid, 'register')}
-                      onSkip={() => setNfcRegisterUrlWrite('done')}
-                    />
-
-                    {nfcRegisterOnlyForm.tag_uid.trim() &&
-                      nfcRegisterUrlWrite !== 'idle' &&
-                      nfcRegisterUrlWrite !== 'done' && (
-                        <p className="text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-center">
-                          URL 기록을 완료하거나 「건너뛰기」를 누른 뒤 UID 자산 등록을 진행하세요.
-                        </p>
-                      )}
-
                     <button
                       type="submit"
                       disabled={
                         submitting ||
                         !nfcRegisterOnlyForm.tag_uid.trim() ||
-                        nfcRegisterUrlWrite === 'writing' ||
-                        nfcRegisterUrlWrite === 'error'
+                        nfcRegisterUrlWrite === 'writing'
                       }
                       className="w-full h-14 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-base rounded-2xl shadow-lg shadow-amber-500/20 disabled:opacity-40 flex items-center justify-center gap-2"
                     >
                       {submitting && <Loader2 className="w-5 h-5 animate-spin" />}
                       UID 자산 등록
                     </button>
+
+                    <NfcUrlWritePanel
+                      accent="amber"
+                      status={nfcRegisterUrlWrite}
+                      uidReady={!!nfcRegisterOnlyForm.tag_uid.trim()}
+                      optionalLabel
+                      showSkip
+                      onWrite={() => handleNFCWriteFor(nfcRegisterOnlyForm.tag_uid, 'register')}
+                      onSkip={() => setNfcRegisterUrlWrite('idle')}
+                    />
                   </form>
                 </div>
               )}
