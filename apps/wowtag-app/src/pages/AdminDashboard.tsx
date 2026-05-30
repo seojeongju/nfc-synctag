@@ -9,8 +9,9 @@ import { mapProductToGuaranteeData } from '../lib/guaranteeCertificateData';
 import type { GuaranteeCertificateData } from '../lib/guaranteeCertificateData';
 import { clearAdminSession } from '../lib/adminSession';
 import { useToast } from '../components/ToastProvider';
+import { AdminUsersPanel } from '../components/admin/AdminUsersPanel';
 
-const ADMIN_TAB_IDS = ['dashboard', 'products', 'nfc', 'goldbars', 'assetMarket', 'releaseRequests'] as const;
+const ADMIN_TAB_IDS = ['dashboard', 'products', 'nfc', 'goldbars', 'assetMarket', 'users', 'releaseRequests'] as const;
 type AdminTabId = (typeof ADMIN_TAB_IDS)[number];
 
 /** NFC 탭 내부: 제품 매칭 / UID 등록 / 목록 조회 */
@@ -2017,6 +2018,8 @@ export default function AdminDashboard() {
             { id: 'nfc', icon: Tag, label: 'NFC 태그 관리' },
             { id: 'goldbars', icon: Award, label: '보증서 관리' },
             { id: 'assetMarket', icon: Hash, label: '자산별 시세 및 유통 관리' },
+            { id: 'users', icon: User, label: '사용자 관리' },
+            { id: 'releaseRequests', icon: Bookmark, label: '소유권 해지 요청' },
           ].map((item) => (
             <button 
               key={item.id}
@@ -2228,16 +2231,20 @@ export default function AdminDashboard() {
                   <p className="text-2xl font-black text-slate-900 tabular-nums">{nfcLinkedList.length}</p>
                   <p className="text-[10px] font-bold text-slate-400 mt-1">제품과 매칭된 태그</p>
                 </button>
-                <div className="bg-white rounded-2xl border border-slate-100 p-4 sm:p-5 shadow-sm">
-                  <div className="flex items-center gap-2 text-slate-500 mb-2">
-                    <Activity className="w-4 h-4 shrink-0" />
-                    <span className="text-[10px] font-black uppercase tracking-wider">스캔한 UID 수</span>
+                <button
+                  type="button"
+                  onClick={() => goToTab('users')}
+                  className="bg-white rounded-2xl border border-violet-100 p-4 sm:p-5 shadow-sm hover:border-violet-300 hover:shadow-md transition-all text-left"
+                >
+                  <div className="flex items-center gap-2 text-violet-700 mb-2">
+                    <User className="w-4 h-4 shrink-0" />
+                    <span className="text-[10px] font-black uppercase tracking-wider">가입 회원</span>
                   </div>
                   <p className="text-2xl font-black text-slate-900 tabular-nums">
-                    {statsLoading ? '…' : Number(stats.activeTags ?? 0).toLocaleString()}
+                    {statsLoading ? '…' : Number(stats.userCount ?? 0).toLocaleString()}
                   </p>
-                  <p className="text-[10px] font-bold text-slate-400 mt-1">누적 고유 태그(verification_logs)</p>
-                </div>
+                  <p className="text-[10px] font-bold text-slate-400 mt-1">소비자 계정 · 태그 연결 확인</p>
+                </button>
                 <button
                   type="button"
                   onClick={() => goToTab('assetMarket')}
@@ -3651,6 +3658,11 @@ export default function AdminDashboard() {
             </>
           )}
 
+          {/* 사용자 관리 */}
+          {currentTab === 'users' && (
+            <AdminUsersPanel getAuthHeaders={adminAuthHeaders} onGoToNfc={() => goToTab('nfc')} />
+          )}
+
           {/* 6. 소유권 해지 요청 관리 탭 */}
           {currentTab === 'releaseRequests' && (
             <>
@@ -4810,8 +4822,8 @@ export default function AdminDashboard() {
            { id: 'dashboard', icon: LayoutDashboard, label: '통계' },
            { id: 'products', icon: Package, label: '제품' },
            { id: 'nfc', icon: Tag, label: '태그' },
+           { id: 'users', icon: User, label: '회원' },
            { id: 'goldbars', icon: Award, label: '보증서' },
-           { id: 'assetMarket', icon: Hash, label: '시세' },
          ].map((nav) => (
            <button 
              key={nav.id} onClick={() => { goToTab(nav.id as AdminTabId); window.scrollTo({ top: 0, behavior: 'smooth' }); }}

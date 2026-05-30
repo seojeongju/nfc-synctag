@@ -2038,24 +2038,124 @@ app.get('/auth/providers', async (c) => {
   return c.json({ google, kakao });
 });
 
-// 관리자: 등록된 사용자 목록 (시세 적용 시 선택용)
+// 관리자: 소비자 회원 목록 (연결 태그·골드바 수 포함)
 app.get('/admin/users', async (c) => {
   try {
-    try {
-      await c.env.DB.prepare(`
-        CREATE TABLE IF NOT EXISTS users (
-          id TEXT PRIMARY KEY,
-          email TEXT UNIQUE NOT NULL,
-          name TEXT,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-      `).run();
-    } catch (_) {}
+    if (!verifyAdminToken(c)) {
+      return c.json({ error: '관리자 인증이 필요합니다.' }, 401);
+    }
+    await ensureUsersPasswordColumn(c.env.DB);
+    await ensureUserTagLinksTable(c.env.DB);
 
     const { results } = await c.env.DB.prepare(
-      `SELECT id, email, name FROM users ORDER BY LOWER(email)`
+      `SELECT
+        u.id,
+        u.email,
+        u.name,
+        u.created_at,
+        CASE WHEN u.password_hash IS NOT NULL AND TRIM(u.password_hash) != '' THEN 1 ELSE 0 END AS has_password,
+        (SELECT COUNT(*) FROM user_tag_links utl WHERE utl.user_id = u.id) AS tag_link_count,
+        (SELECT COUNT(*) FROM user_goldbars ug WHERE ug.user_id = u.id) AS goldbar_link_count
+      FROM users u
+      ORDER BY datetime(COALESCE(u.created_at, '1970-01-01')) DESC, LOWER(u.email)`
     ).all();
-    return c.json(results || []);
+
+    return c.json({ users: results || [] });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// 관리자: 회원 상세 — 연결 NFC 태그·제품 매칭·지갑 항목
+app.get('/admin/users/:userId', async (c) => {
+  try {
+    if (!verifyAdminToken(c)) {
+      return c.json({ error: '관리자 인증이 필요합니다.' }, 401);
+    }
+    const userId = c.req.param('userId');
+    if (!userId?.trim()) {
+      return c.json({ error: 'userId가 필요합니다.' }, 400);
+    }
+
+    await ensureUsersPasswordColumn(c.env.DB);
+    await ensureUserTagLinksTable(c.env.DB);
+
+    const user = (await c.env.DB.prepare(
+      `SELECT id, email, name, created_at,
+        CASE WHEN password_hash IS NOT NULL AND TRIM(password_hash) != '' THEN 1 ELSE 0 END AS has_password
+      FROM users WHERE id = ?`
+    )
+      .bind(userId)
+      .first()) as Record<string, unknown> | null;
+
+    if (!user) {
+      return c.json({ error: '사용자를 찾을 수 없습니다.' }, 404);
+    }
+
+    const { results: tagLinks } = await c.env.DB.prepare(
+      `SELECT
+        utl.tag_uid,
+        utl.linked_at,
+        t.product_id,
+        t.created_at AS tag_registered_at,
+        p.name AS product_name,
+        p.sold_at AS product_sold_at
+      FROM user_tag_links utl
+      LEFT JOIN tags t ON t.tag_uid = utl.tag_uid
+      LEFT JOIN products p ON p.id = t.product_id
+      WHERE utl.user_id = ?
+      ORDER BY utl.id DESC`
+    )
+      .bind(userId)
+      .all();
+
+    const tagRows = ((tagLinks || []) as Record<string, unknown>[]).map((row) => {
+      const productId = row.product_id;
+      let match_status: 'product_linked' | 'asset_only' | 'unknown' = 'unknown';
+      if (productId != null && productId !== '') match_status = 'product_linked';
+      else if (row.tag_uid) match_status = 'asset_only';
+      return { ...row, match_status };
+    });
+
+    try {
+      await c.env.DB.prepare('ALTER TABLE user_goldbars ADD COLUMN added_at DATETIME DEFAULT CURRENT_TIMESTAMP').run();
+    } catch (_) {}
+
+    const { results: goldbarLinks } = await c.env.DB.prepare(
+      `SELECT
+        ug.goldbar_id,
+        ug.added_at,
+        g.serial_number,
+        g.display_name,
+        g.weight,
+        g.purity,
+        g.status,
+        (SELECT c2.tag_uid FROM certificates c2 WHERE c2.goldbar_id = g.id ORDER BY c2.id DESC LIMIT 1) AS tag_uid
+      FROM user_goldbars ug
+      JOIN goldbars g ON ug.goldbar_id = g.id
+      WHERE ug.user_id = ?
+      ORDER BY ug.id DESC`
+    )
+      .bind(userId)
+      .all();
+
+    const walletItems = await fetchUserWalletItems(c.env.DB, userId);
+
+    const { results: pendingReleases } = await c.env.DB.prepare(
+      `SELECT goldbar_id, status, requested_at
+       FROM ownership_release_requests
+       WHERE user_id = ? AND status = 'PENDING'`
+    )
+      .bind(userId)
+      .all();
+
+    return c.json({
+      user: sanitizeUserRow(user),
+      tag_links: tagRows,
+      goldbar_links: goldbarLinks || [],
+      wallet_items: walletItems,
+      pending_release_requests: pendingReleases || [],
+    });
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
   }
