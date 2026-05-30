@@ -2027,7 +2027,7 @@ export default function AdminDashboard() {
             { id: 'dashboard', icon: LayoutDashboard, label: '통계' },
             { id: 'products', icon: Package, label: '제품 정보 관리' },
             { id: 'nfc', icon: Tag, label: 'NFC 태그 관리' },
-            { id: 'goldbars', icon: Award, label: '골드바 정품인증 관리' },
+            { id: 'goldbars', icon: Award, label: '보증서 관리' },
             { id: 'assetMarket', icon: Hash, label: '자산별 시세 및 유통 관리' },
           ].map((item) => (
             <button 
@@ -2164,7 +2164,7 @@ export default function AdminDashboard() {
                     tab: 'products' as AdminTabId
                   },
                   {
-                    label: '골드바 인증',
+                    label: '보증서',
                     sub: '정품 골드바 행',
                     value: goldbars.length,
                     icon: Award,
@@ -3236,8 +3236,8 @@ export default function AdminDashboard() {
             <>
               <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
                 <div>
-                  <h2 className="text-2xl lg:text-3xl font-black text-slate-900">골드바 정품인증 관리</h2>
-                  <p className="text-xs font-bold text-slate-400 mt-1">정품인증서(보증서)를 등록·수정·삭제합니다.</p>
+                  <h2 className="text-2xl lg:text-3xl font-black text-slate-900">보증서 관리</h2>
+                  <p className="text-xs font-bold text-slate-400 mt-1">실물 골드바 보증서를 등록·수정·삭제합니다. 카탈로그 제품 매칭만으로는 보증서가 생성되지 않습니다.</p>
                 </div>
                 <button onClick={() => setIsGoldbarModalOpen(true)} className="bg-amber-600 hover:bg-amber-700 text-white font-black py-3.5 px-6 rounded-2xl shadow-lg shadow-amber-500/20 flex items-center gap-2 transition-all"><Award className="w-5 h-5" /> 골드바 & 보증서 등록</button>
               </div>
@@ -4838,7 +4838,7 @@ export default function AdminDashboard() {
            { id: 'dashboard', icon: LayoutDashboard, label: '통계' },
            { id: 'products', icon: Package, label: '제품' },
            { id: 'nfc', icon: Tag, label: '태그' },
-           { id: 'goldbars', icon: Award, label: '인증' },
+           { id: 'goldbars', icon: Award, label: '보증서' },
            { id: 'assetMarket', icon: Hash, label: '시세' },
          ].map((nav) => (
            <button 

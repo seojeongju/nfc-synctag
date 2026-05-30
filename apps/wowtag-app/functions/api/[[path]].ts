@@ -272,27 +272,6 @@ async function ensureGoldbarsDisplayNameColumn(db: D1Database) {
   } catch (_) {}
 }
 
-/**
- * certificates 행이 하나도 없는 골드바에 대해 placeholder 행을 넣어 제품 연결 목록에 나오게 함
- * (과거: 보증서 PDF만 등록하고 NFC를 안 연결한 경우 테이블에 행이 없었음)
- */
-async function ensureCertificateRowsForGoldbarsWithoutAny(db: D1Database) {
-  await ensureGoldbarsDisplayNameColumn(db);
-  try {
-    await db.prepare(`
-      INSERT INTO certificates (goldbar_id, tag_uid, cert_file_path)
-      SELECT
-        g.id,
-        '__PENDING_GB_' || g.id || '__',
-        'certificates/' || REPLACE(g.serial_number, '/', '_') || '_cert.pdf'
-      FROM goldbars g
-      WHERE NOT EXISTS (SELECT 1 FROM certificates c WHERE c.goldbar_id = g.id)
-    `).run();
-  } catch (_) {
-    /* 동시 요청 등으로 실패해도 무시 */
-  }
-}
-
 const app = new Hono<{ Bindings: Bindings }>().basePath('/api');
 
 // --- 관리자 로그인 API ---
@@ -331,6 +310,7 @@ app.get('/goldbars', async (c) => {
         (SELECT c2f.cert_file_path FROM certificates c2f WHERE c2f.goldbar_id = g.id ORDER BY c2f.issued_at DESC, c2f.id DESC LIMIT 1) AS cert_file_path,
         (SELECT COUNT(*) FROM certificates c3 WHERE c3.goldbar_id = g.id) AS cert_count
       FROM goldbars g
+      WHERE g.serial_number NOT LIKE 'ASSET-%'
       ORDER BY g.created_at DESC
     `).all();
     return c.json(results);
@@ -557,7 +537,6 @@ app.get('/certificates/download/:tagId', async (c) => {
 app.get('/certificates', async (c) => {
   try {
     await ensureGoldbarsDisplayNameColumn(c.env.DB);
-    await ensureCertificateRowsForGoldbarsWithoutAny(c.env.DB);
 
     const rawQ = (c.req.query('q') || '').trim();
     const q = rawQ.length > 0 ? rawQ : '';
@@ -566,16 +545,18 @@ app.get('/certificates', async (c) => {
       SELECT c.id, c.goldbar_id, c.tag_uid, c.cert_file_path, g.serial_number, g.display_name
       FROM certificates c
       JOIN goldbars g ON g.id = c.goldbar_id
+      WHERE c.tag_uid NOT LIKE '__PENDING%'
+        AND g.serial_number NOT LIKE 'ASSET-%'
     `;
     const binds: string[] = [];
     if (q) {
       const needle = q.toLowerCase();
       sql += `
-      WHERE
+        AND (
         INSTR(LOWER(IFNULL(g.serial_number, '')), ?) > 0
         OR INSTR(LOWER(IFNULL(g.display_name, '')), ?) > 0
         OR INSTR(LOWER(IFNULL(c.tag_uid, '')), ?) > 0
-      `;
+        )`;
       binds.push(needle, needle, needle);
     }
     sql += ` ORDER BY c.issued_at DESC, c.id DESC`;
@@ -707,102 +688,7 @@ async function ensureGoldbarsAssetColumns(db: D1Database) {
   }
 }
 
-/**
- * [신규] 태그 매칭(제품 연동) 시 해당 태그를 위한 자산(Goldbar) 레코드를 보장합니다.
- * '태그가 매칭되었다는 것은 자산이 생성되었다'는 원칙을 구현하며, 제품에 연결된 보증서 템플릿이 있다면 이를 자동 상속합니다.
- */
-async function ensureAssetForTag(db: D1Database, tagUid: string, productId?: number | null) {
-  // 스키마 보장
-  await ensureGoldbarsAssetColumns(db);
-
-  // 1. 이미 certificates에 연결된 goldbar가 있는지 확인
-  const existing = await db.prepare(`
-    SELECT g.id, g.status FROM goldbars g
-    INNER JOIN certificates c ON g.id = c.goldbar_id
-    WHERE c.tag_uid = ?
-    LIMIT 1
-  `).bind(tagUid).first();
-
-  let name = "";
-  let weight = "0";
-  let purity = "24K";
-  let templateCertPath = "";
-
-  if (productId) {
-    // 제품 정보 및 카탈로그 보증서 템플릿 정보 조회
-    const product = await db.prepare(`
-      SELECT p.name, p.weight, p.purity,
-             c.cert_file_path as template_cert_path,
-             g.weight as template_weight,
-             g.purity as template_purity
-      FROM products p
-      LEFT JOIN certificates c ON p.certificate_id = c.id
-      LEFT JOIN goldbars g ON c.goldbar_id = g.id
-      WHERE p.id = ?
-    `).bind(productId).first();
-
-    if (product) {
-      const p = product as any;
-      name = p.name;
-      // 제품 자체 정보 우선, 없으면 템플릿(카탈로그) 정보 사용
-      weight = p.weight || p.template_weight || "0";
-      purity = p.purity || p.template_purity || "24K";
-      templateCertPath = p.template_cert_path || "";
-    }
-  }
-
-  // 해제 후 재매칭: 기존 자산/보증서가 있으면 새 제품 정보로 갱신
-  if (existing) {
-    const existingId = (existing as { id: number }).id;
-    if (productId) {
-      await db.prepare(`
-        UPDATE goldbars
-        SET weight = ?, purity = ?, display_name = ?, status = 'SHIPPED'
-        WHERE id = ?
-      `)
-        .bind(weight, purity, name || '신규 매칭 자산', existingId)
-        .run();
-    }
-    return existingId;
-  }
-
-  // 2. 새로운 goldbar 생성 (자산화)
-  // 제품과 매칭된 상태이므로 상태를 'SHIPPED'(출고/정품인증)로 설정합니다.
-  const serial = `ASSET-${tagUid.slice(-6).toUpperCase()}-${Date.now().toString().slice(-4)}`;
-  
-  const result = await db.prepare(`
-    INSERT INTO goldbars (serial_number, weight, purity, status, display_name)
-    VALUES (?, ?, ?, ?, ?)
-  `)
-  .bind(
-    serial,
-    weight,
-    purity,
-    'SHIPPED', // 제품 매칭 시 즉시 출고/인증 상태로 전환
-    name || '신규 매칭 자산'
-  )
-  .run();
-
-  const newGoldbarId = result.meta.last_row_id;
-
-  // 3. certificates 테이블에 연결 (자동 발행)
-  // 템플릿 보증서 파일이 있다면 해당 경로를 사용하고, 없으면 기본 경로를 생성합니다.
-  const certFilePath = templateCertPath || `certificates/auto_${serial}.pdf`;
-
-  await db.prepare(`
-    INSERT OR REPLACE INTO certificates (goldbar_id, tag_uid, issued_at, cert_file_path)
-    VALUES (?, ?, ?, ?)
-  `)
-  .bind(newGoldbarId, tagUid, new Date().toISOString(), certFilePath)
-  .run();
-
-  // 골드바 자산 풀에서 해당 태그 제거 (풀에 있었을 경우)
-  await removeTagFromGoldbarPool(db, tagUid);
-
-  return newGoldbarId;
-}
-
-/** 카탈로그 제품 매칭 시 자동 생성된 ASSET-* 골드바·인증서 연결 해제 (매칭 해제 후 소비자 지갑에 남지 않도록) */
+/** 카탈로그 제품 매칭 시 과거 자동 생성된 ASSET-* 골드바·인증서 정리 (레거시) */
 async function detachCatalogAssetForTag(db: D1Database, tagUid: string) {
   const row = await db
     .prepare(
@@ -930,14 +816,11 @@ app.post('/products', async (c) => {
 
     const productId = (productResult as any).id;
 
-    // 3. 태그 UID가 함께 전달된 경우 즉시 매핑 (덮어쓰기 허용)
+    // 3. 태그 UID가 함께 전달된 경우 즉시 매핑 (보증서·골드바 자동 생성 없음 — NFC 탭에서 매칭)
     if (tag_uid) {
       await c.env.DB.prepare(
         'INSERT OR REPLACE INTO tags (tag_uid, product_id) VALUES (?, ?)'
       ).bind(tag_uid, productId).run();
-      
-      // 자산 생성 보장
-      await ensureAssetForTag(c.env.DB, tag_uid, productId);
     }
 
     return c.json({ success: true, productId }, 201);
@@ -1192,9 +1075,6 @@ app.post('/tags', async (c) => {
 
     await c.env.DB.prepare('INSERT OR REPLACE INTO tags (tag_uid, product_id) VALUES (?, ?)').bind(rawUid, pid).run();
 
-    // 자산 생성 보장 (매칭 = 자산 생성)
-    await ensureAssetForTag(c.env.DB, rawUid, pid);
-
     return c.json({ success: true, mode: 'mapped' });
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
@@ -1229,9 +1109,6 @@ app.put('/tags/link-product', async (c) => {
       }
       return c.json({ error: '이미 제품이 연결된 태그이거나 연동할 수 없습니다.' }, 400);
     }
-
-    // 자산 생성 보장 (매칭 = 자산 생성)
-    await ensureAssetForTag(c.env.DB, rawUid, pid);
 
     return c.json({ success: true });
   } catch (err: any) {
