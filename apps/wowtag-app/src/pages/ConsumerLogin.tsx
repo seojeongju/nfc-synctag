@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
+import { setAdminSession } from '../lib/adminSession';
 
 const ADMIN_EMAIL = 'admin@wowtag.com';
 
@@ -85,6 +86,15 @@ export default function ConsumerLogin() {
     localStorage.setItem('wowtag_current_user', JSON.stringify(user));
   };
 
+  const afterConsumerAuth = () => {
+    const next = searchParams.get('next');
+    if (next === 'wallet') {
+      navigate('/#myWallet', { replace: true });
+      return;
+    }
+    navigate('/', { replace: true });
+  };
+
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password) return;
@@ -107,7 +117,7 @@ export default function ConsumerLogin() {
         const data = await res.json().catch(() => ({}));
         if (res.ok && data.user) {
           persistUser(data.user);
-          navigate('/', { replace: true });
+          afterConsumerAuth();
           return;
         }
         setError(typeof data.error === 'string' ? data.error : '회원가입에 실패했습니다.');
@@ -132,7 +142,7 @@ export default function ConsumerLogin() {
         });
         const data = await res.json().catch(() => ({}));
         if (res.ok && data.token) {
-          localStorage.setItem('admin_token', data.token);
+          setAdminSession(data.token);
           navigate('/admin/dashboard', { replace: true });
           return;
         }
@@ -148,7 +158,7 @@ export default function ConsumerLogin() {
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.user) {
         persistUser(data.user);
-        navigate('/', { replace: true });
+        afterConsumerAuth();
         return;
       }
       setError(typeof data.error === 'string' ? data.error : '로그인에 실패했습니다.');

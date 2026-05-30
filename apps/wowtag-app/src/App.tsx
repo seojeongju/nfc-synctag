@@ -2,14 +2,10 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import UserLanding from './pages/UserLanding';
 import AdminDashboard from './pages/AdminDashboard';
 import ConsumerLogin from './pages/ConsumerLogin';
-
-// Auth Check (localStorage 기반)
-const isAuthenticated = () => {
-  return typeof window !== 'undefined' && !!localStorage.getItem('admin_token');
-};
+import { isAdminSessionValid } from './lib/adminSession';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
-  return isAuthenticated() ? <>{children}</> : <Navigate to="/login" replace />;
+  return isAdminSessionValid() ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
 function App() {

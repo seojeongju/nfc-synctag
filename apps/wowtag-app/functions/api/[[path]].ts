@@ -65,6 +65,207 @@ function nfcTagUidLookupVariants(param: string): string[] {
   return [...out].filter(Boolean);
 }
 
+type ResolveTagWalletResult =
+  | { ok: true; payload: Record<string, unknown>; canonicalUid: string }
+  | { ok: false; status: number; body: Record<string, unknown> };
+
+/** `/goldbars/t/:tagId` 및 사용자 지갑 태그 연결 공통 */
+async function resolveTagWalletItem(db: D1Database, param: string): Promise<ResolveTagWalletResult> {
+  const variants = nfcTagUidLookupVariants(param);
+  if (variants.length === 0) {
+    return { ok: false, status: 404, body: { error: 'not_found' } };
+  }
+
+  for (const v of variants) {
+    const tagOnly = await db.prepare('SELECT product_id FROM tags WHERE tag_uid = ?').bind(v).first();
+    if (tagOnly && tagOnly.product_id == null) {
+      return {
+        ok: false,
+        status: 404,
+        body: {
+          error: 'asset_only',
+          message: '출고 전 등록된 자산 태그입니다. 제품 매칭 후 정품 정보가 표시됩니다.',
+        },
+      };
+    }
+  }
+
+  const certQuery = `
+      SELECT 
+        g.*, c.tag_uid, c.cert_file_path,
+        CASE 
+          WHEN g.show_market_price = 1 
+               AND (g.show_start_at IS NULL OR g.show_start_at = '' OR g.show_start_at <= ?)
+               AND (g.show_end_at IS NULL OR g.show_end_at = '' OR g.show_end_at >= ?)
+          THEN 1 
+          ELSE 0 
+        END as show_market_price,
+        g.market_price_per_gram
+      FROM goldbars g
+      JOIN certificates c ON g.id = c.goldbar_id
+      WHERE c.tag_uid = ?
+    `;
+
+  let matchedUid: string | null = null;
+  let goldbar: Record<string, unknown> | null = null;
+  const now = new Date().toISOString().split('T')[0];
+
+  for (const v of variants) {
+    const row = await db.prepare(certQuery).bind(now, now, v).first();
+    if (row) {
+      goldbar = row as Record<string, unknown>;
+      matchedUid = v;
+      break;
+    }
+  }
+
+  if (goldbar && matchedUid) {
+    const expiry = Date.now() + 10 * 60 * 1000;
+    const downloadToken = btoa(`${matchedUid}:${expiry}`);
+    return {
+      ok: true,
+      canonicalUid: matchedUid,
+      payload: {
+        ...goldbar,
+        wallet_source: 'goldbar_cert',
+        download_token: downloadToken,
+        linked_tag_uid: matchedUid,
+      },
+    };
+  }
+
+  const productQuery = `
+      SELECT p.*, t.tag_uid AS mapped_tag_uid
+      FROM tags t
+      INNER JOIN products p ON p.id = t.product_id
+      WHERE t.tag_uid = ?
+    `;
+  let productRow: Record<string, unknown> | null = null;
+  for (const v of variants) {
+    const row = await db.prepare(productQuery).bind(v).first();
+    if (row) {
+      productRow = row as Record<string, unknown>;
+      matchedUid = v;
+      break;
+    }
+  }
+
+  if (productRow && matchedUid) {
+    const pid = Number(productRow.id);
+    return {
+      ok: true,
+      canonicalUid: matchedUid,
+      payload: {
+        id: `product_${pid}`,
+        wallet_source: 'catalog_product',
+        name: (productRow.name as string) || '',
+        description: (productRow.description as string) || '',
+        options: (productRow.options as string) || '',
+        material: (productRow.material as string) || '',
+        video_url: (productRow.video_url as string) || '',
+        manual_url: (productRow.manual_url as string) || '',
+        serial_number: (productRow.name as string) || String(matchedUid),
+        weight: (productRow.weight as string) || '',
+        purity: (productRow.purity as string) || '',
+        minted_at: '',
+        image_url: (productRow.image_url as string) || '',
+        product_id: pid,
+        mapped_tag_uid: matchedUid,
+        tag_uid: matchedUid,
+        linked_tag_uid: matchedUid,
+        show_market_price: 0,
+        cert_url: null,
+        download_token: null,
+      },
+    };
+  }
+
+  return { ok: false, status: 404, body: { error: 'not_found' } };
+}
+
+async function ensureUserTagLinksTable(db: D1Database) {
+  await db
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS user_tag_links (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        tag_uid TEXT NOT NULL,
+        linked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, tag_uid)
+      )`
+    )
+    .run();
+}
+
+function walletItemKey(item: Record<string, unknown>): string {
+  const src = item.wallet_source;
+  if (src === 'catalog_product') {
+    return `tag:${item.linked_tag_uid || item.tag_uid || item.mapped_tag_uid}`;
+  }
+  const gid = item.id;
+  if (gid != null && gid !== '') return `gb:${gid}`;
+  return `tag:${item.linked_tag_uid || item.tag_uid}`;
+}
+
+async function fetchUserWalletItems(db: D1Database, userId: string): Promise<Record<string, unknown>[]> {
+  await ensureUserTagLinksTable(db);
+  try {
+    await db.prepare('ALTER TABLE user_goldbars ADD COLUMN show_market_price INTEGER DEFAULT 0').run();
+  } catch (_) {}
+  try {
+    await db.prepare('ALTER TABLE user_goldbars ADD COLUMN market_price_per_gram REAL DEFAULT 110000').run();
+  } catch (_) {}
+
+  const now = new Date().toISOString().split('T')[0];
+  const byKey = new Map<string, Record<string, unknown>>();
+
+  const { results: gbRows } = await db
+    .prepare(
+      `SELECT 
+        g.*, c.tag_uid, c.cert_file_path, 
+        CASE 
+          WHEN ug.show_market_price = 1 
+               AND (ug.show_start_at IS NULL OR ug.show_start_at <= ?)
+               AND (ug.show_end_at IS NULL OR ug.show_end_at >= ?)
+          THEN 1 
+          ELSE 0 
+        END as show_market_price,
+        ug.market_price_per_gram,
+        (SELECT status FROM ownership_release_requests WHERE user_id = ug.user_id AND goldbar_id = ug.goldbar_id AND status = 'PENDING' LIMIT 1) as release_status
+      FROM user_goldbars ug
+      JOIN goldbars g ON ug.goldbar_id = g.id
+      LEFT JOIN certificates c ON g.id = c.goldbar_id
+      WHERE ug.user_id = ?
+      ORDER BY ug.id DESC`
+    )
+    .bind(now, now, userId)
+    .all();
+
+  for (const row of (gbRows || []) as Record<string, unknown>[]) {
+    const item = { ...row, wallet_source: 'goldbar_cert', linked_tag_uid: row.tag_uid };
+    byKey.set(walletItemKey(item), item);
+  }
+
+  const { results: linkRows } = await db
+    .prepare('SELECT tag_uid, linked_at FROM user_tag_links WHERE user_id = ? ORDER BY id DESC')
+    .bind(userId)
+    .all();
+
+  for (const link of (linkRows || []) as { tag_uid: string; linked_at?: string }[]) {
+    const resolved = await resolveTagWalletItem(db, link.tag_uid);
+    if (!resolved.ok) continue;
+    const item = {
+      ...resolved.payload,
+      linked_at: link.linked_at,
+      scanned_at: link.linked_at ? String(link.linked_at).slice(0, 10) : undefined,
+    };
+    const key = walletItemKey(item);
+    if (!byKey.has(key)) byKey.set(key, item);
+  }
+
+  return [...byKey.values()];
+}
+
 async function ensureGoldbarsDisplayNameColumn(db: D1Database) {
   try {
     await db.prepare('ALTER TABLE goldbars ADD COLUMN display_name TEXT').run();
@@ -292,115 +493,16 @@ app.post('/goldbar-tag-pool', async (c) => {
 app.get('/goldbars/t/:tagId', async (c) => {
   try {
     const param = c.req.param('tagId');
-    const variants = nfcTagUidLookupVariants(param);
-    if (variants.length === 0) {
-      return c.json({ error: 'not_found' }, 404);
+    const resolved = await resolveTagWalletItem(c.env.DB, param);
+    if (!resolved.ok) {
+      return c.json(resolved.body, resolved.status as 404);
     }
-
-    /** tags에 자산만 등록(product_id NULL)된 카탈로그 태그 — 이전 매칭의 ASSET 인증서를 지갑에 노출하지 않음 */
-    for (const v of variants) {
-      const tagOnly = await c.env.DB.prepare('SELECT product_id FROM tags WHERE tag_uid = ?').bind(v).first();
-      if (tagOnly && tagOnly.product_id == null) {
-        return c.json(
-          { error: 'asset_only', message: '출고 전 등록된 자산 태그입니다. 제품 매칭 후 정품 정보가 표시됩니다.' },
-          404
-        );
-      }
-    }
-
-    const certQuery = `
-      SELECT 
-        g.*, c.tag_uid, c.cert_file_path,
-        CASE 
-          WHEN g.show_market_price = 1 
-               AND (g.show_start_at IS NULL OR g.show_start_at = '' OR g.show_start_at <= ?)
-               AND (g.show_end_at IS NULL OR g.show_end_at = '' OR g.show_end_at >= ?)
-          THEN 1 
-          ELSE 0 
-        END as show_market_price,
-        g.market_price_per_gram
-      FROM goldbars g
-      JOIN certificates c ON g.id = c.goldbar_id
-      WHERE c.tag_uid = ?
-    `;
-
-    let matchedUid: string | null = null;
-    let goldbar: Record<string, unknown> | null = null;
-    const now = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-
-    for (const v of variants) {
-      const row = await c.env.DB.prepare(certQuery).bind(now, now, v).first();
-      if (row) {
-        goldbar = row as Record<string, unknown>;
-        matchedUid = v;
-        break;
-      }
-    }
-
-    if (goldbar && matchedUid) {
-      c.executionCtx.waitUntil(
-        c.env.DB
-          .prepare('INSERT INTO verification_logs (tag_uid, scanned_at, is_valid) VALUES (?, ?, ?)')
-          .bind(matchedUid, new Date().toISOString(), 1)
-          .run()
-      );
-      const expiry = Date.now() + 10 * 60 * 1000;
-      const downloadToken = btoa(`${matchedUid}:${expiry}`);
-      return c.json({
-        ...goldbar,
-        wallet_source: 'goldbar_cert',
-        download_token: downloadToken
-      });
-    }
-
-    const productQuery = `
-      SELECT p.*, t.tag_uid AS mapped_tag_uid
-      FROM tags t
-      INNER JOIN products p ON p.id = t.product_id
-      WHERE t.tag_uid = ?
-    `;
-    let productRow: Record<string, unknown> | null = null;
-    for (const v of variants) {
-      const row = await c.env.DB.prepare(productQuery).bind(v).first();
-      if (row) {
-        productRow = row as Record<string, unknown>;
-        matchedUid = v;
-        break;
-      }
-    }
-
-    if (productRow && matchedUid) {
-      const pid = Number(productRow.id);
-      c.executionCtx.waitUntil(
-        c.env.DB
-          .prepare('INSERT INTO verification_logs (tag_uid, scanned_at, is_valid) VALUES (?, ?, ?)')
-          .bind(matchedUid, new Date().toISOString(), 1)
-          .run()
-      );
-      return c.json({
-        id: `product_${pid}`,
-        wallet_source: 'catalog_product',
-        name: (productRow.name as string) || '',
-        description: (productRow.description as string) || '',
-        options: (productRow.options as string) || '',
-        material: (productRow.material as string) || '',
-        video_url: (productRow.video_url as string) || '',
-        manual_url: (productRow.manual_url as string) || '',
-        serial_number: (productRow.name as string) || String(matchedUid),
-        weight: (productRow.weight as string) || '',
-        purity: (productRow.purity as string) || '',
-        minted_at: '',
-        image_url: (productRow.image_url as string) || '',
-        product_id: pid,
-        mapped_tag_uid: matchedUid,
-        tag_uid: matchedUid,
-        show_market_price: 0,
-        cert_url: null,
-        download_token: null
-      });
-    }
-
-    return c.json({ error: 'not_found' }, 404);
+    c.executionCtx.waitUntil(
+      c.env.DB.prepare('INSERT INTO verification_logs (tag_uid, scanned_at, is_valid) VALUES (?, ?, ?)')
+        .bind(resolved.canonicalUid, new Date().toISOString(), 1)
+        .run()
+    );
+    return c.json(resolved.payload);
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
   }
@@ -2263,6 +2365,66 @@ app.get('/admin/user-goldbars', async (c) => {
   }
 });
 
+
+// 로그인 사용자 지갑 (연결된 태그 + user_goldbars)
+app.get('/user/wallet', async (c) => {
+  try {
+    const userId = c.req.query('userId');
+    if (!userId || typeof userId !== 'string') {
+      return c.json({ error: '인증이 필요합니다.' }, 401);
+    }
+    const items = await fetchUserWalletItems(c.env.DB, userId);
+    return c.json({ success: true, items });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+/** NFC 태그를 계정에 연결 (물리 태그 1회 스캔 후 호출) */
+app.post('/user/wallet/link-tag', async (c) => {
+  try {
+    const { userId, tagUid } = await c.req.json();
+    if (!userId || !tagUid) {
+      return c.json({ error: 'userId와 tagUid가 필요합니다.' }, 400);
+    }
+    const resolved = await resolveTagWalletItem(c.env.DB, String(tagUid));
+    if (!resolved.ok) {
+      const msg =
+        resolved.body.error === 'asset_only' && typeof resolved.body.message === 'string'
+          ? resolved.body.message
+          : '연결할 수 없는 태그입니다.';
+      return c.json({ error: msg }, resolved.status as 404);
+    }
+
+    await ensureUserTagLinksTable(c.env.DB);
+    await c.env.DB.prepare('INSERT OR IGNORE INTO user_tag_links (user_id, tag_uid) VALUES (?, ?)')
+      .bind(userId, resolved.canonicalUid)
+      .run();
+
+    const payload = resolved.payload;
+    const gid = payload.id;
+    if (payload.wallet_source === 'goldbar_cert' && typeof gid === 'number') {
+      await c.env.DB.prepare('INSERT OR IGNORE INTO user_goldbars (user_id, goldbar_id) VALUES (?, ?)')
+        .bind(userId, gid)
+        .run();
+    } else if (payload.wallet_source === 'goldbar_cert' && typeof gid === 'string' && /^\d+$/.test(gid)) {
+      await c.env.DB.prepare('INSERT OR IGNORE INTO user_goldbars (user_id, goldbar_id) VALUES (?, ?)')
+        .bind(userId, Number(gid))
+        .run();
+    }
+
+    c.executionCtx.waitUntil(
+      c.env.DB.prepare('INSERT INTO verification_logs (tag_uid, scanned_at, is_valid) VALUES (?, ?, ?)')
+        .bind(resolved.canonicalUid, new Date().toISOString(), 1)
+        .run()
+    );
+
+    const items = await fetchUserWalletItems(c.env.DB, String(userId));
+    return c.json({ success: true, linked_tag_uid: resolved.canonicalUid, item: payload, items });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
 
 // 2. 사용자의 소유 골드바 목록 조회 및 동기화
 app.post('/user/sync', async (c) => {

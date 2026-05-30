@@ -7,6 +7,7 @@ import { GuaranteePdfHost } from '../components/ProductGuaranteeCertificate';
 import { GuaranteeCertificatePreviewModal } from '../components/GuaranteeCertificatePreviewModal';
 import { mapProductToGuaranteeData } from '../lib/guaranteeCertificateData';
 import type { GuaranteeCertificateData } from '../lib/guaranteeCertificateData';
+import { clearAdminSession } from '../lib/adminSession';
 
 const ADMIN_TAB_IDS = ['dashboard', 'products', 'nfc', 'goldbars', 'assetMarket', 'releaseRequests'] as const;
 type AdminTabId = (typeof ADMIN_TAB_IDS)[number];
@@ -1987,7 +1988,7 @@ export default function AdminDashboard() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('admin_token');
+    clearAdminSession();
     window.location.href = '/login';
   };
 

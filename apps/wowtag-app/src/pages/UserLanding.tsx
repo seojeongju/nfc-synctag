@@ -11,13 +11,17 @@ import {
 import type { GuaranteeCertificateData } from '../lib/guaranteeCertificateData';
 import {
   readTagSession,
+  readTagProof,
   readWalletTagUid,
   rememberWalletTagUid,
   setTagSessionActive,
-  hydrateWalletGoldbarsFromStorage,
-  persistWalletGoldbars,
+  extendDeviceTagTrust,
+  hydrateGuestTagPreviewFromStorage,
+  persistGuestTagPreview,
   clearWalletGoldbarsStorage
 } from '../lib/tagSession';
+import { fetchUserWallet, linkTagToUserWallet } from '../lib/walletApi';
+import { canUseWalletFeatures, isConsumerLoggedIn, loginPathWithNext } from '../lib/sessionPolicy';
 
 /** Chrome BeforeInstallPromptEvent (lib.dom에 없을 수 있음) */
 type AnyBeforeInstallPrompt = {
@@ -33,15 +37,46 @@ function calculateCurrentPrice(weightStr: string, pricePerGram: number | null | 
   return Math.floor(w * p);
 }
 
-/** 헤더 우측 — 통합 로그인(/login)에서 관리자 계정으로 접속 */
-function AdminLoginHeaderLink({ className = '' }: { className?: string }) {
+/** 헤더 우측 — 소비자 로그인 / 관리자 */
+function AuthHeaderLinks({
+  currentUser,
+  onLogout,
+  className = '',
+}: {
+  currentUser: { email?: string } | null;
+  onLogout: () => void;
+  className?: string;
+}) {
   return (
-    <Link
-      to="/login"
-      className={`shrink-0 text-[10px] sm:text-[11px] font-black text-slate-500 hover:text-purple-600 border border-slate-200/80 bg-white/90 rounded-xl px-2.5 py-1.5 no-underline transition-colors shadow-sm ${className}`.trim()}
-    >
-      관리자 로그인
-    </Link>
+    <div className={`flex items-center gap-1.5 shrink-0 ${className}`.trim()}>
+      {currentUser ? (
+        <>
+          <span className="hidden sm:inline text-[10px] font-bold text-slate-500 max-w-[88px] truncate">
+            {currentUser.email}
+          </span>
+          <button
+            type="button"
+            onClick={onLogout}
+            className="text-[10px] sm:text-[11px] font-black text-slate-600 hover:text-rose-600 border border-slate-200/80 bg-white/90 rounded-xl px-2.5 py-1.5 transition-colors shadow-sm"
+          >
+            로그아웃
+          </button>
+        </>
+      ) : (
+        <Link
+          to={loginPathWithNext()}
+          className="text-[10px] sm:text-[11px] font-black text-amber-700 hover:text-amber-800 border border-amber-200/80 bg-amber-50/90 rounded-xl px-2.5 py-1.5 no-underline transition-colors shadow-sm"
+        >
+          로그인
+        </Link>
+      )}
+      <Link
+        to="/login"
+        className="text-[10px] sm:text-[11px] font-black text-slate-500 hover:text-purple-600 border border-slate-200/80 bg-white/90 rounded-xl px-2.5 py-1.5 no-underline transition-colors shadow-sm"
+      >
+        관리자
+      </Link>
+    </div>
   );
 }
 
@@ -86,19 +121,61 @@ export default function UserLanding() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [albumCaption, setAlbumCaption] = useState('');
 
-  // 일반 사용자 인증 관련 상태 (로그인 UI는 /login 단일 화면)
+  // 일반 사용자 인증 (로그인 UI는 /login)
   const [currentUser, setCurrentUser] = useState<any>(null);
-  /** NFC 태그 URL 또는 태그 스캔 안내로 진입한 탭 세션(내 지갑·전자앨범은 이 경우에만 허용) */
+  const [walletLoading, setWalletLoading] = useState(false);
+  /** NFC 태그 스캔·URL 진입(정품 확인·태그 연결용) */
   const [nfcTagSession, setNfcTagSession] = useState(readTagSession);
 
   const PENDING_ALBUM_KEY = 'wowtag_pending_album_goldbar';
+
+  const handleConsumerLogout = useCallback(() => {
+    localStorage.removeItem('wowtag_current_user');
+    setCurrentUser(null);
+    setMyGoldbars(hydrateGuestTagPreviewFromStorage() as any[]);
+  }, []);
+
+  const syncWalletForUser = useCallback(async (userId: string, tagUidToLink?: string | null) => {
+    setWalletLoading(true);
+    try {
+      if (tagUidToLink) {
+        const linked = await linkTagToUserWallet(userId, tagUidToLink);
+        if (linked.ok && linked.items) {
+          setMyGoldbars(linked.items);
+          return;
+        }
+      }
+      const items = await fetchUserWallet(userId);
+      setMyGoldbars(items);
+    } finally {
+      setWalletLoading(false);
+    }
+  }, []);
+
+  const promptLoginForWallet = useCallback(() => {
+    if (window.confirm('내 지갑·전자앨범은 로그인 후 NFC 태그를 연결해야 이용할 수 있습니다. 로그인 화면으로 이동할까요?')) {
+      navigate(loginPathWithNext('wallet'));
+    }
+  }, [navigate]);
 
   useEffect(() => {
     if (!tagId) return;
     setTagSessionActive();
     rememberWalletTagUid(tagId);
+    extendDeviceTagTrust(tagId);
     setNfcTagSession(true);
-  }, [tagId]);
+    if (isConsumerLoggedIn(currentUser)) {
+      void syncWalletForUser(currentUser.id, tagId);
+    }
+  }, [tagId, currentUser?.id, syncWalletForUser]);
+
+  /** 로그인 직후·복귀 시 대기 중인 태그 UID 연결 */
+  useEffect(() => {
+    if (!isConsumerLoggedIn(currentUser)) return;
+    const pending = tagId || readWalletTagUid();
+    if (!pending) return;
+    void syncWalletForUser(currentUser.id, pending);
+  }, [currentUser?.id, tagId, syncWalletForUser]);
 
   useEffect(() => {
     const st = location.state as { nfcScan?: { tag_uid?: string } } | null;
@@ -108,9 +185,13 @@ export default function UserLanding() {
       const uid = st.nfcScan.tag_uid;
       if (typeof uid === 'string' && uid.length > 0) {
         rememberWalletTagUid(uid);
+        extendDeviceTagTrust(uid);
+        if (isConsumerLoggedIn(currentUser)) {
+          void syncWalletForUser(currentUser.id, uid);
+        }
       }
     }
-  }, [location.state]);
+  }, [location.state, currentUser?.id, syncWalletForUser]);
 
   type UserLandingTab = 'home' | 'products' | 'myWallet';
 
@@ -143,14 +224,17 @@ export default function UserLanding() {
     } catch (err) {}
   };
 
-  // 앨범 모달 오픈 — 전자앨범·내 지갑은 NFC 태그 세션에서만 허용
+  // 앨범 — 로그인 + 지갑에 등록된 항목만
   const handleOpenAlbum = (g: any) => {
-    if (!nfcTagSession) {
-      alert(
-        currentUser
-          ? '전자앨범·내 지갑은 NFC 태그로 접속한 경우에만 이용할 수 있습니다. 제품에 동봉된 태그를 스캔해 주세요.'
-          : '전자앨범·내 지갑은 NFC 태그로 이 사이트에 접속한 경우에만 이용할 수 있습니다.'
-      );
+    if (!canUseWalletFeatures(currentUser)) {
+      promptLoginForWallet();
+      return;
+    }
+    const inWallet = myGoldbars.some(
+      (w) => w.id === g.id || (w.serial_number && w.serial_number === g.serial_number)
+    );
+    if (!inWallet) {
+      alert('NFC 태그를 스캔해 내 지갑에 연결한 뒤 전자앨범을 이용해 주세요.');
       return;
     }
     setCurrentGoldbarForAlbum(g);
@@ -179,21 +263,7 @@ export default function UserLanding() {
 
       if (res.ok) {
         alert('소유권 해지 요청이 완료되었습니다. 관리자 승인 후 목록에서 삭제됩니다.');
-        // 목록 갱신 (sync 호출)
-        const st = location.state as { nfcScan?: { tag_uid?: string } } | null;
-        const tagUid = st?.nfcScan?.tag_uid || readWalletTagUid();
-        if (tagUid) {
-          const syncRes = await fetch(`/api/user/sync`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: currentUser.id, goldbarIds: [] }),
-          });
-          if (syncRes.ok) {
-            const syncData = await syncRes.json();
-            setMyGoldbars(syncData.syncGoldbars || []);
-            persistWalletGoldbars(syncData.syncGoldbars || []);
-          }
-        }
+        await syncWalletForUser(currentUser.id);
       } else {
         const d = await res.json();
         alert(d.error || '요청 처리에 실패했습니다.');
@@ -207,6 +277,10 @@ export default function UserLanding() {
   const handleAlbumImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !currentGoldbarForAlbum) return;
+    if (!canUseWalletFeatures(currentUser)) {
+      alert('전자앨범 업로드는 로그인 후 이용할 수 있습니다.');
+      return;
+    }
 
     if (albumData.images.length >= 5) {
       alert('최대 5장까지만 등록 가능합니다.');
@@ -359,10 +433,9 @@ export default function UserLanding() {
     }
   }, [activeTab]);
 
-  // 과거: 비로그인 → /login → 복귀 시 앨범 자동 오픈. 이제는 태그 세션에서만 앨범 사용.
   useEffect(() => {
-    if (!currentUser) return;
-    if (!nfcTagSession) {
+    if (!canUseWalletFeatures(currentUser)) return;
+    if (!nfcTagSession && !readTagProof()) {
       try {
         sessionStorage.removeItem(PENDING_ALBUM_KEY);
       } catch {
@@ -396,10 +469,15 @@ export default function UserLanding() {
     try {
       const storedUser = localStorage.getItem('wowtag_current_user');
       if (storedUser) {
-        setCurrentUser(JSON.parse(storedUser));
+        const parsed = JSON.parse(storedUser);
+        setCurrentUser(parsed);
+        if (isConsumerLoggedIn(parsed)) {
+          const pendingTag = readWalletTagUid();
+          void syncWalletForUser(parsed.id, pendingTag);
+        }
+      } else {
+        setMyGoldbars(hydrateGuestTagPreviewFromStorage() as any[]);
       }
-      // 내 지갑: NFC 세션(sessionStorage)과 동일 수명 — 앱 종료·새 접속 시 태그 미스캔이면 목록 없음 (localStorage 미사용)
-      setMyGoldbars(hydrateWalletGoldbarsFromStorage() as any[]);
     } catch (e) {
       console.error(e);
     }
@@ -477,9 +555,10 @@ export default function UserLanding() {
     fetchData();
   }, [tagId, navigate, location.search]);
 
-  // 태그로 진입: 관리자가 매칭한 골드바를 내 지갑에 자동 반영(추가 스캔 없음)
+  // 게스트: 태그 세션 중 현재 태그 1건만 프리뷰 (로그인 시 서버 지갑으로 전환)
   useEffect(() => {
     if (tagId) return;
+    if (isConsumerLoggedIn(currentUser)) return;
     if (!readTagSession()) return;
     const st = location.state as { nfcScan?: { tag_uid?: string; nfc_mode?: string } } | null;
     const scan = st?.nfcScan;
@@ -507,14 +586,14 @@ export default function UserLanding() {
       setMyGoldbars((prev) => {
         if (prev.some((g) => g.id === wid)) return prev;
         const next = [...prev, { ...goldbarData, scanned_at: new Date().toLocaleDateString() }];
-        persistWalletGoldbars(next);
+        persistGuestTagPreview(next);
         return next;
       });
     })();
     return () => {
       cancelled = true;
     };
-  }, [tagId, location.state, location.key]);
+  }, [tagId, location.state, location.key, currentUser]);
 
   const handlePurchaseSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -539,7 +618,7 @@ export default function UserLanding() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#F0FDF4] p-6 text-center relative">
         <div className="absolute top-4 right-4 sm:top-6 sm:right-6">
-          <AdminLoginHeaderLink />
+          <AuthHeaderLinks currentUser={currentUser} onLogout={handleConsumerLogout} />
         </div>
         <div className="w-16 h-16 bg-emerald-100 border border-emerald-200 rounded-3xl flex items-center justify-center text-emerald-600 mb-4">
           <CheckCircle2 className="w-9 h-9" />
@@ -571,12 +650,24 @@ export default function UserLanding() {
             <img src="/gold_synctag_logo_v2.png" alt="Logo" className="w-7 h-7 object-contain rounded-lg shrink-0" />
             <span className="text-lg sm:text-xl font-extrabold text-slate-800 tracking-tight truncate">Gold SyncTag</span>
           </div>
-          <AdminLoginHeaderLink />
+          <AuthHeaderLinks currentUser={currentUser} onLogout={handleConsumerLogout} />
         </header>
 
         {nfcWelcome?.message && (
           <div className="w-full max-w-md mb-3 rounded-2xl border border-emerald-200/90 bg-emerald-50/95 px-4 py-3 shadow-sm animate-in fade-in duration-300">
             <p className="text-xs font-black text-emerald-900 leading-relaxed">{nfcWelcome.message}</p>
+          </div>
+        )}
+
+        {readTagProof() && !canUseWalletFeatures(currentUser) && (
+          <div className="w-full max-w-md mb-3 rounded-2xl border border-amber-200/90 bg-amber-50/95 px-4 py-3 shadow-sm">
+            <p className="text-xs font-black text-amber-900 leading-relaxed">
+              NFC 태그로 정품 확인이 가능합니다.{' '}
+              <Link to={loginPathWithNext('wallet')} className="text-amber-700 underline underline-offset-2">
+                로그인
+              </Link>
+              하시면 내 지갑에 저장되어 나중에도 볼 수 있습니다.
+            </p>
           </div>
         )}
 
@@ -647,12 +738,8 @@ export default function UserLanding() {
               {/* 내 지갑 바로가기 */}
               <div 
                 onClick={() => {
-                  if (!nfcTagSession) {
-                    alert(
-                      currentUser
-                        ? '내 지갑은 NFC 태그로 접속한 경우에만 이용할 수 있습니다.'
-                        : '내 지갑은 NFC 태그로 이 사이트에 접속한 경우에만 이용할 수 있습니다.'
-                    );
+                  if (!canUseWalletFeatures(currentUser)) {
+                    promptLoginForWallet();
                     return;
                   }
                   goToUserTab('myWallet');
@@ -671,12 +758,8 @@ export default function UserLanding() {
               {/* 추억 전자앨범 바로가기 */}
               <div 
                 onClick={() => {
-                  if (!nfcTagSession) {
-                    alert(
-                      currentUser
-                        ? '전자앨범은 NFC 태그로 접속한 경우에만 이용할 수 있습니다.'
-                        : '전자앨범은 NFC 태그로 이 사이트에 접속한 경우에만 이용할 수 있습니다.'
-                    );
+                  if (!canUseWalletFeatures(currentUser)) {
+                    promptLoginForWallet();
                     return;
                   }
                   if (myGoldbars.length > 0) {
@@ -763,15 +846,20 @@ export default function UserLanding() {
         {/* 탭 3: 내 지갑 — NFC 태그 세션에서만 사용, 관리자 매칭 골드바 자동 표시 */}
         {activeTab === 'myWallet' && (
           <div className="w-full max-w-md space-y-5 flex-1 flex flex-col h-full animate-in fade-in duration-300">
-            {!nfcTagSession ? (
+            {!canUseWalletFeatures(currentUser) ? (
               <div className="bg-white rounded-[2rem] border border-amber-200/70 p-8 flex flex-col items-center text-center shadow-sm">
                 <ShieldCheck className="w-14 h-14 text-amber-500 mb-4" />
                 <h3 className="text-lg font-black text-slate-800 tracking-tight">내 지갑 · 전자앨범</h3>
                 <p className="text-xs font-bold text-slate-500 mt-3 leading-relaxed">
-                  {currentUser
-                    ? '회원가입·간편 로그인으로만 접속한 경우 이 기능을 사용할 수 없습니다. 제품에 동봉된 NFC 태그를 스캔해 접속해 주세요.'
-                    : '이 기능은 NFC 태그로 이 사이트에 접속한 경우에만 이용할 수 있습니다. 주소만 입력해 들어온 경우에는 사용할 수 없습니다.'}
+                  로그인한 뒤 제품 NFC 태그를 스캔하면 정품 정보가 계정 지갑에 저장됩니다. 주소만 입력해 들어온 경우에는
+                  이용할 수 없습니다.
                 </p>
+                <Link
+                  to={loginPathWithNext('wallet')}
+                  className="mt-5 inline-flex h-12 items-center justify-center px-6 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-sm rounded-2xl shadow-lg"
+                >
+                  로그인 / 회원가입
+                </Link>
               </div>
             ) : (
               <>
@@ -779,10 +867,17 @@ export default function UserLanding() {
               <div>
                 <h3 className="text-xl font-black tracking-tight text-slate-800">내 지갑</h3>
                 <p className="text-xs font-bold text-slate-400 mt-0.5">
-                  태그로 접속 시 관리자가 매칭한 제품(카탈로그) 또는 골드바 인증 정보가 자동으로 표시됩니다.
+                  NFC 태그를 스캔해 연결한 정품이 표시됩니다. 다른 기기에서도 같은 계정으로 확인할 수 있습니다.
                 </p>
               </div>
+              {walletLoading && <Loader2 className="w-5 h-5 text-amber-500 animate-spin shrink-0" />}
             </div>
+
+            {!nfcTagSession && myGoldbars.length === 0 && (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[11px] font-bold text-slate-600 leading-relaxed">
+                아직 연결된 태그가 없습니다. 제품에 동봉된 NFC 태그를 스캔하면 지갑에 자동으로 추가됩니다.
+              </div>
+            )}
 
             {/* 지갑에 저장된 상품 카드 리스트 */}
             <div className="grid gap-4">
@@ -814,7 +909,9 @@ export default function UserLanding() {
                         if (confirm('정말 내 지갑에서 이 골드바를 제거하시겠습니까?')) {
                           const updated = myGoldbars.filter((_, i) => i !== index);
                           setMyGoldbars(updated);
-                          persistWalletGoldbars(updated);
+                          if (!canUseWalletFeatures(currentUser)) {
+                            persistGuestTagPreview(updated);
+                          }
                         }
                       }}
                       className="p-2 bg-slate-50 text-slate-400 hover:text-rose-500 hover:bg-rose-50 border border-slate-100 rounded-xl transition-all shadow-sm"
@@ -1183,14 +1280,14 @@ export default function UserLanding() {
                     },
                     {
                       step: '03',
-                      title: '내 지갑에 자동 반영',
-                      desc: '관리자가 태그와 골드바를 매칭해 두었다면, 태그로 접속만으로 내 지갑에 정품 정보가 자동으로 표시됩니다.',
+                      title: '로그인 후 내 지갑에 저장',
+                      desc: '로그인하고 NFC 태그를 스캔하면 정품 정보가 계정 지갑에 저장됩니다. 다른 날·다른 기기에서도 같은 계정으로 확인할 수 있습니다.',
                       icon: Bookmark
                     },
                     {
                       step: '04',
                       title: '추억 전자 앨범에 기록',
-                      desc: '전자앨범도 NFC 태그 접속 세션에서만 이용할 수 있습니다. 소중한 사진을 최대 5장까지 등록해 보세요.',
+                      desc: '전자앨범은 로그인 후 지갑에 연결한 제품에서만 이용할 수 있습니다. 소중한 사진을 최대 5장까지 등록해 보세요.',
                       icon: Award
                     }
                   ].map((item, index) => (
@@ -1454,7 +1551,7 @@ export default function UserLanding() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC] p-6 text-center relative">
         <div className="absolute top-4 right-4 sm:top-6 sm:right-6">
-          <AdminLoginHeaderLink />
+          <AuthHeaderLinks currentUser={currentUser} onLogout={handleConsumerLogout} />
         </div>
         <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-3xl flex items-center justify-center text-rose-500 mb-4 animate-bounce">
           <Award className="w-8 h-8" />
@@ -1481,7 +1578,7 @@ export default function UserLanding() {
             <Link to="/" className="text-xs font-black text-amber-600 bg-amber-50 px-4 py-2 rounded-xl border border-amber-200/60 hover:bg-amber-100 transition-all no-underline shrink-0">
               ← 홈으로
             </Link>
-            <AdminLoginHeaderLink />
+            <AuthHeaderLinks currentUser={currentUser} onLogout={handleConsumerLogout} />
           </div>
           <div className="flex justify-end">
             <span className="text-xs font-black text-emerald-600 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl inline-flex items-center gap-1">
@@ -1550,7 +1647,7 @@ export default function UserLanding() {
           <Link to="/" className="text-xs font-black text-purple-600 bg-purple-50 px-4 py-2 rounded-xl border border-purple-200/60 hover:bg-purple-100 transition-all no-underline shrink-0">
             ← 홈으로
           </Link>
-          <AdminLoginHeaderLink />
+          <AuthHeaderLinks currentUser={currentUser} onLogout={handleConsumerLogout} />
         </div>
         <div className="flex justify-end">
           <span className="text-xs font-black text-emerald-600 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl inline-flex items-center gap-1">
