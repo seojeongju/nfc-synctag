@@ -2031,9 +2031,9 @@ app.post('/user/login', async (c) => {
   }
 });
 
-// 소셜 로그인 연동 가능 여부 (클라이언트에서 버튼 활성화용)
+// 소셜 로그인 연동 가능 여부 (클라이언트에서 버튼 활성화 및 클라이언트 ID 전달용)
 app.get('/auth/providers', async (c) => {
-  const google = !!(c.env as Bindings).GOOGLE_OAUTH_CLIENT_ID;
+  const google = (c.env as Bindings).GOOGLE_OAUTH_CLIENT_ID || null;
   const kakao = !!(c.env as Bindings).KAKAO_REST_API_KEY;
   return c.json({ google, kakao });
 });

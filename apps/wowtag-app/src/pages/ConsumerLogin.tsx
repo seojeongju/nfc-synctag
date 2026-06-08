@@ -50,8 +50,8 @@ export default function ConsumerLogin() {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [providers, setProviders] = useState<{ google: boolean; kakao: boolean }>({
-    google: false,
+  const [providers, setProviders] = useState<{ google: string | null; kakao: boolean }>({
+    google: null,
     kakao: false
   });
 
@@ -69,7 +69,7 @@ export default function ConsumerLogin() {
         const res = await fetch('/api/auth/providers');
         if (res.ok && !cancelled) {
           const d = await res.json();
-          setProviders({ google: !!d.google, kakao: !!d.kakao });
+          setProviders({ google: d.google || null, kakao: !!d.kakao });
         }
       } catch {
         /* ignore */
@@ -171,8 +171,66 @@ export default function ConsumerLogin() {
     }
   };
 
+  const handleGoogleLogin = () => {
+    if (!providers.google) return;
+
+    if (typeof window === 'undefined' || !(window as any).google) {
+      showToast('error', 'Google 로그인 라이브러리를 로드하는 중입니다. 잠시 후 다시 시도해 주세요.');
+      return;
+    }
+
+    try {
+      const client = (window as any).google.accounts.oauth2.initTokenClient({
+        client_id: providers.google,
+        scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+        callback: async (tokenResponse: any) => {
+          if (tokenResponse.error_subtype === 'access_denied') {
+            return;
+          }
+          if (tokenResponse.access_token) {
+            setLoading(true);
+            setError('');
+            try {
+              const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { Authorization: `Bearer ${tokenResponse.access_token}` }
+              });
+              if (!userInfoRes.ok) {
+                throw new Error('Google 사용자 정보를 가져오지 못했습니다.');
+              }
+              const userInfo = await userInfoRes.json();
+              
+              const res = await fetch('/api/user/auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  email: userInfo.email,
+                  name: userInfo.name || userInfo.given_name || ''
+                })
+              });
+              const data = await res.json().catch(() => ({}));
+              if (res.ok && data.user) {
+                persistUser(data.user);
+                afterConsumerAuth();
+                showToast('success', 'Google 로그인에 성공했습니다.');
+              } else {
+                setError(data.error || 'Google 로그인 처리에 실패했습니다.');
+              }
+            } catch (err: any) {
+              setError(err.message || '오류가 발생했습니다.');
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      });
+      client.requestAccessToken();
+    } catch (err: any) {
+      showToast('error', `Google 로그인 초기화 실패: ${err.message}`);
+    }
+  };
+
   const handleSocial = (kind: 'google' | 'kakao') => {
-    const enabled = kind === 'google' ? providers.google : providers.kakao;
+    const enabled = kind === 'google' ? !!providers.google : providers.kakao;
     if (!enabled) {
       showToast(
         'info',
@@ -181,6 +239,12 @@ export default function ConsumerLogin() {
       );
       return;
     }
+
+    if (kind === 'google') {
+      handleGoogleLogin();
+      return;
+    }
+
     showToast('info', 'OAuth 리다이렉트 연동은 클라이언트 등록 후 콜백 URL과 함께 설정합니다.');
   };
 
