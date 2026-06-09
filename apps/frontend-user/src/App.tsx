@@ -1,7 +1,10 @@
 
-import { Share2, Download, Play, ChevronRight, Bookmark } from 'lucide-react';
+import { Share2, Download, Play, ChevronRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import LanguageSwitcher from './components/LanguageSwitcher';
 
 function App() {
+  const { t } = useTranslation();
   return (
     <div className="min-h-screen bg-bg-soft flex flex-col items-center p-6 pb-20">
       {/* Header Space */}
@@ -9,10 +12,8 @@ function App() {
         <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center shadow-sm">
           <ChevronRight className="w-6 h-6 text-primary rotate-180" />
         </div>
-        <h1 className="text-xl font-bold text-slate-800">WowTag</h1>
-        <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center shadow-sm">
-          <Bookmark className="w-5 h-5 text-slate-400" />
-        </div>
+        <h1 className="text-xl font-bold text-slate-800">{t('user_app.title')}</h1>
+        <LanguageSwitcher />
       </div>
 
       {/* Main Visual Card */}
@@ -26,13 +27,13 @@ function App() {
           />
           {/* Floating Glass UI */}
           <div className="absolute bottom-6 left-6 right-6 glass-card p-6 rounded-3xl">
-            <h2 className="text-2xl font-bold text-slate-800 mb-1">Premium Jewelry</h2>
+            <h2 className="text-2xl font-bold text-slate-800 mb-1">{t('user_app.premium_jewelry')}</h2>
             <p className="text-slate-500 mb-4 text-sm leading-relaxed">
-              Experience the craftsmanship and history behind our unique collection.
+              {t('user_app.jewelry_desc')}
             </p>
             <button className="w-full purple-btn flex items-center justify-center gap-2">
               <Play className="w-5 h-5 fill-current" />
-              Watch Manual Video
+              {t('user_app.watch_video')}
             </button>
           </div>
         </div>
@@ -41,8 +42,8 @@ function App() {
       {/* Info Cards */}
       <div className="w-full max-w-md space-y-4">
         {[
-          { icon: Share2, title: 'Share Certificate', desc: 'Send this digital copy' },
-          { icon: Download, title: 'Download Manual', desc: 'Available in PDF' },
+          { icon: Share2, title: t('user_app.share_cert'), desc: t('user_app.share_cert_desc') },
+          { icon: Download, title: t('user_app.download_manual'), desc: t('user_app.download_manual_desc') },
         ].map((item, idx) => (
           <div key={idx} className="bg-white p-5 rounded-3xl flex items-center gap-4 shadow-sm border border-white">
             <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">

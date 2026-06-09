@@ -1,0 +1,35 @@
+{
+  "common": {
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "error_occurred": "An error occurred.",
+    "network_error": "A network error occurred.",
+    "back_to_main": "← Back to Main"
+  },
+  "login": {
+    "title": "Login",
+    "signup": "Sign Up",
+    "email": "Email",
+    "password": "Password",
+    "password_placeholder_signup": "Password (8+ characters)",
+    "name": "Name (Optional)",
+    "login_email_btn": "Login with Email",
+    "signup_email_btn": "Sign Up with Email",
+    "social_continue": "Or continue with social account",
+    "google_continue": "Continue with Google",
+    "kakao_continue": "Continue with Kakao",
+    "signup_prompt": "New here? You can create an email account in the ",
+    "signup_prompt_end": " tab above.",
+    "consent_info": "Required consents for initial login are processed automatically depending on account state.",
+    "admin_email_signup_error": "Cannot sign up with the administrator email.",
+    "signup_failed": "Failed to sign up.",
+    "admin_login_failed": "Failed to log in as administrator.",
+    "login_failed": "Failed to log in.",
+    "google_lib_loading": "Loading Google Login library. Please try again in a moment.",
+    "google_login_success": "Successfully logged in with Google.",
+    "google_login_failed": "Failed to process Google login.",
+    "oauth_env_error": "{{kind}} login will be enabled once OAuth Client ID is set in wrangler environment variables.\n\nPlease use email login for now.",
+    "oauth_redirect_info": "OAuth redirect integration will be set up with callback URL after client registration.",
+    "login_info": "Both regular members and administrators log in with their email on this screen. Administrators, please enter {{adminEmail}} and the admin password."
+  }
+}

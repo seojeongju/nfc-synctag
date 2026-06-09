@@ -1,0 +1,29 @@
+{
+  "admin": {
+    "sidebar_title": "WowTag Admin",
+    "menu_dashboard": "Dashboard",
+    "menu_products": "Products",
+    "menu_tags": "Tag Mapping",
+    "menu_analytics": "Analytics",
+    "menu_customers": "Customers",
+    "menu_settings": "Settings",
+    "search_placeholder": "Search everything...",
+    "super_admin": "Super Admin",
+    "overview_title": "Overview Dashboard",
+    "welcome_message": "Hello Jay, here's what's happening with WowTag today.",
+    "btn_download_report": "Download Report",
+    "btn_add_product": "Add New Product",
+    "stat_total_scans": "Total Scans",
+    "stat_active_tags": "Active Tags",
+    "stat_revenue": "Revenue",
+    "stat_conversion": "Conversion",
+    "chart_title": "Scan Activity Map",
+    "chart_desc": "Daily scanning trends across all active tags",
+    "tab_daily": "Daily",
+    "tab_weekly": "Weekly",
+    "chart_placeholder": "Activity Visualization Coming Soon",
+    "popular_tags": "Popular Tags",
+    "scans_unit": "scans",
+    "btn_view_all": "View All Activity"
+  }
+}

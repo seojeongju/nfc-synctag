@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { setAdminSession } from '../lib/adminSession';
 import { useToast } from '../components/ToastProvider';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 const ADMIN_EMAIL = 'admin@wowtag.com';
 
@@ -41,6 +43,7 @@ function KakaoMark() {
 
 /** 소비자·관리자 공통 로그인 (/login) — 관리자는 admin@wowtag.com + 관리자 비밀번호 */
 export default function ConsumerLogin() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { showToast } = useToast();
@@ -105,7 +108,7 @@ export default function ConsumerLogin() {
 
     if (tab === 'signup') {
       if (em === ADMIN_EMAIL) {
-        setError('관리자 이메일로는 회원가입할 수 없습니다.');
+        setError(t('login.admin_email_signup_error'));
         return;
       }
       setLoading(true);
@@ -122,9 +125,9 @@ export default function ConsumerLogin() {
           afterConsumerAuth();
           return;
         }
-        setError(typeof data.error === 'string' ? data.error : '회원가입에 실패했습니다.');
+        setError(typeof data.error === 'string' ? data.error : t('login.signup_failed'));
       } catch {
-        setError('네트워크 오류가 발생했습니다.');
+        setError(t('common.network_error'));
       } finally {
         setLoading(false);
       }
@@ -148,7 +151,7 @@ export default function ConsumerLogin() {
           navigate('/admin/dashboard', { replace: true });
           return;
         }
-        setError(typeof data.error === 'string' ? data.error : '관리자 로그인에 실패했습니다.');
+        setError(typeof data.error === 'string' ? data.error : t('login.admin_login_failed'));
         return;
       }
 
@@ -163,9 +166,9 @@ export default function ConsumerLogin() {
         afterConsumerAuth();
         return;
       }
-      setError(typeof data.error === 'string' ? data.error : '로그인에 실패했습니다.');
+      setError(typeof data.error === 'string' ? data.error : t('login.login_failed'));
     } catch {
-      setError('네트워크 오류가 발생했습니다.');
+      setError(t('common.network_error'));
     } finally {
       setLoading(false);
     }
@@ -175,7 +178,7 @@ export default function ConsumerLogin() {
     if (!providers.google) return;
 
     if (typeof window === 'undefined' || !(window as any).google) {
-      showToast('error', 'Google 로그인 라이브러리를 로드하는 중입니다. 잠시 후 다시 시도해 주세요.');
+      showToast('error', t('login.google_lib_loading'));
       return;
     }
 
@@ -211,12 +214,12 @@ export default function ConsumerLogin() {
               if (res.ok && data.user) {
                 persistUser(data.user);
                 afterConsumerAuth();
-                showToast('success', 'Google 로그인에 성공했습니다.');
+                showToast('success', t('login.google_login_success'));
               } else {
-                setError(data.error || 'Google 로그인 처리에 실패했습니다.');
+                setError(data.error || t('login.google_login_failed'));
               }
             } catch (err: any) {
-              setError(err.message || '오류가 발생했습니다.');
+              setError(err.message || t('common.error_occurred'));
             } finally {
               setLoading(false);
             }
@@ -234,7 +237,7 @@ export default function ConsumerLogin() {
     if (!enabled) {
       showToast(
         'info',
-        `${kind === 'google' ? 'Google' : 'Kakao'} 로그인은 OAuth 클라이언트 ID를 워커 환경 변수에 설정하면 활성화됩니다.\n\n지금은 이메일 로그인을 이용해 주세요.`,
+        t('login.oauth_env_error', { kind: kind === 'google' ? 'Google' : 'Kakao' }),
         7000
       );
       return;
@@ -245,19 +248,22 @@ export default function ConsumerLogin() {
       return;
     }
 
-    showToast('info', 'OAuth 리다이렉트 연동은 클라이언트 등록 후 콜백 URL과 함께 설정합니다.');
+    showToast('info', t('login.oauth_redirect_info'));
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#EEF2F7] p-4 font-sans text-slate-900">
-      <div className="w-full max-w-md bg-white rounded-[2rem] shadow-[0_8px_40px_rgba(15,23,42,0.08)] border border-slate-100/90 px-6 py-10 sm:px-10 sm:py-12">
+      <div className="w-full max-w-md bg-white rounded-[2rem] shadow-[0_8px_40px_rgba(15,23,42,0.08)] border border-slate-100/90 px-6 py-10 sm:px-10 sm:py-12 relative">
+        <div className="absolute top-6 right-6 sm:top-8 sm:right-8">
+          <LanguageSwitcher />
+        </div>
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center mb-5">
             <img src="/gold_synctag_logo_v2.png" alt="" className="w-12 h-12 object-contain rounded-xl shadow-sm" />
           </div>
-          <h1 className="text-2xl sm:text-[1.65rem] font-black text-slate-900 tracking-tight">로그인</h1>
+          <h1 className="text-2xl sm:text-[1.65rem] font-black text-slate-900 tracking-tight">{t('login.title')}</h1>
           <p className="text-sm font-bold text-slate-500 mt-2 leading-relaxed px-1">
-            일반 회원·관리자 모두 이 화면에서 이메일로 로그인합니다. 관리자는 {ADMIN_EMAIL} 과 관리자 비밀번호를 입력하세요.
+            {t('login.login_info', { adminEmail: ADMIN_EMAIL })}
           </p>
         </div>
 
@@ -269,7 +275,7 @@ export default function ConsumerLogin() {
               tab === 'login' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            로그인
+            {t('login.title')}
           </button>
           <button
             type="button"
@@ -278,17 +284,17 @@ export default function ConsumerLogin() {
               tab === 'signup' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            회원가입
+            {t('login.signup')}
           </button>
         </div>
 
         <form onSubmit={handleEmailSubmit} className="space-y-4">
           {tab === 'signup' && (
             <div>
-              <label className="sr-only">이름</label>
+              <label className="sr-only">{t('login.name')}</label>
               <input
                 type="text"
-                placeholder="이름 (선택)"
+                placeholder={t('login.name')}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 autoComplete="name"
@@ -297,11 +303,11 @@ export default function ConsumerLogin() {
             </div>
           )}
           <div>
-            <label className="sr-only">이메일</label>
+            <label className="sr-only">{t('login.email')}</label>
             <input
               required
               type="email"
-              placeholder="이메일"
+              placeholder={t('login.email')}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
@@ -309,11 +315,11 @@ export default function ConsumerLogin() {
             />
           </div>
           <div>
-            <label className="sr-only">비밀번호</label>
+            <label className="sr-only">{t('login.password')}</label>
             <input
               required
               type="password"
-              placeholder={tab === 'signup' ? '비밀번호 (8자 이상)' : '비밀번호'}
+              placeholder={tab === 'signup' ? t('login.password_placeholder_signup') : t('login.password')}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
@@ -332,7 +338,7 @@ export default function ConsumerLogin() {
             className="w-full h-12 rounded-xl bg-[#1e293b] hover:bg-slate-800 text-white text-sm font-black shadow-lg shadow-slate-900/15 flex items-center justify-center gap-2 transition-all disabled:opacity-45 active:scale-[0.99]"
           >
             {loading && <Loader2 className="w-5 h-5 animate-spin" />}
-            {tab === 'login' ? '이메일로 로그인' : '이메일로 회원가입'}
+            {tab === 'login' ? t('login.login_email_btn') : t('login.signup_email_btn')}
           </button>
         </form>
 
@@ -341,7 +347,7 @@ export default function ConsumerLogin() {
             <div className="w-full border-t border-slate-200" />
           </div>
           <div className="relative flex justify-center">
-            <span className="bg-white px-4 text-[11px] font-bold text-slate-400">또는 소셜 계정으로 계속하기</span>
+            <span className="bg-white px-4 text-[11px] font-bold text-slate-400">{t('login.social_continue')}</span>
           </div>
         </div>
 
@@ -352,7 +358,7 @@ export default function ConsumerLogin() {
             className="w-full h-12 rounded-xl border border-slate-200 bg-white text-sm font-black text-slate-800 flex items-center justify-center gap-3 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
           >
             <GoogleMark />
-            Google로 계속하기
+            {t('login.google_continue')}
           </button>
           <button
             type="button"
@@ -360,25 +366,25 @@ export default function ConsumerLogin() {
             className="w-full h-12 rounded-xl bg-[#FEE500] text-[#181600] text-sm font-black flex items-center justify-center gap-3 hover:bg-[#fdd835] transition-all shadow-sm border border-[#f0d500]"
           >
             <KakaoMark />
-            카카오로 계속하기
+            {t('login.kakao_continue')}
           </button>
         </div>
 
         <p className="text-center text-xs font-bold text-slate-500 mt-8 leading-relaxed">
-          처음이신가요? 상단의{' '}
+          {t('login.signup_prompt')}
           <button type="button" onClick={() => setTab('signup')} className="text-slate-800 underline underline-offset-2 font-black">
-            회원가입
+            {t('login.signup')}
           </button>{' '}
-          탭에서 이메일 계정을 만들 수 있어요.
+          {t('login.signup_prompt_end')}
         </p>
 
         <p className="text-[10px] font-bold text-slate-400 text-center mt-6 leading-relaxed">
-          최초 로그인 시 필요한 동의는 계정 상태에 따라 자동 처리됩니다.
+          {t('login.consent_info')}
         </p>
 
         <div className="mt-8 pt-6 border-t border-slate-100 text-center">
           <Link to="/" className="text-xs font-black text-slate-500 hover:text-slate-800 transition-colors">
-            ← 메인으로 돌아가기
+            {t('common.back_to_main')}
           </Link>
         </div>
       </div>

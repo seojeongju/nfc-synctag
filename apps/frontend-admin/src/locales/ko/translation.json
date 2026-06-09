@@ -1,0 +1,29 @@
+{
+  "admin": {
+    "sidebar_title": "WowTag 관리자",
+    "menu_dashboard": "대시보드",
+    "menu_products": "상품 관리",
+    "menu_tags": "태그 매핑",
+    "menu_analytics": "통계 분석",
+    "menu_customers": "고객 관리",
+    "menu_settings": "설정",
+    "search_placeholder": "검색...",
+    "super_admin": "최고 관리자",
+    "overview_title": "대시보드 개요",
+    "welcome_message": "안녕하세요 Jay님, 오늘 WowTag의 현황입니다.",
+    "btn_download_report": "리포트 다운로드",
+    "btn_add_product": "새 상품 추가",
+    "stat_total_scans": "총 스캔 횟수",
+    "stat_active_tags": "활성 태그 수",
+    "stat_revenue": "매출",
+    "stat_conversion": "전환율",
+    "chart_title": "스캔 활동 맵",
+    "chart_desc": "모든 활성 태그의 일일 스캔 트렌드",
+    "tab_daily": "일간",
+    "tab_weekly": "주간",
+    "chart_placeholder": "활동 시각화 기능 준비 중",
+    "popular_tags": "인기 태그",
+    "scans_unit": "회 스캔",
+    "btn_view_all": "모든 활동 보기"
+  }
+}

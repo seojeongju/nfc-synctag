@@ -1,0 +1,35 @@
+{
+  "common": {
+    "confirm": "확인",
+    "cancel": "취소",
+    "error_occurred": "오류가 발생했습니다.",
+    "network_error": "네트워크 오류가 발생했습니다.",
+    "back_to_main": "← 메인으로 돌아가기"
+  },
+  "login": {
+    "title": "로그인",
+    "signup": "회원가입",
+    "email": "이메일",
+    "password": "비밀번호",
+    "password_placeholder_signup": "비밀번호 (8자 이상)",
+    "name": "이름 (선택)",
+    "login_email_btn": "이메일로 로그인",
+    "signup_email_btn": "이메일로 회원가입",
+    "social_continue": "또는 소셜 계정으로 계속하기",
+    "google_continue": "Google로 계속하기",
+    "kakao_continue": "카카오로 계속하기",
+    "signup_prompt": "처음이신가요? 상단의 ",
+    "signup_prompt_end": " 탭에서 이메일 계정을 만들 수 있어요.",
+    "consent_info": "최초 로그인 시 필요한 동의는 계정 상태에 따라 자동 처리됩니다.",
+    "admin_email_signup_error": "관리자 이메일로는 회원가입할 수 없습니다.",
+    "signup_failed": "회원가입에 실패했습니다.",
+    "admin_login_failed": "관리자 로그인에 실패했습니다.",
+    "login_failed": "로그인에 실패했습니다.",
+    "google_lib_loading": "Google 로그인 라이브러리를 로드하는 중입니다. 잠시 후 다시 시도해 주세요.",
+    "google_login_success": "Google 로그인에 성공했습니다.",
+    "google_login_failed": "Google 로그인 처리에 실패했습니다.",
+    "oauth_env_error": "{{kind}} 로그인은 OAuth 클라이언트 ID를 워커 환경 변수에 설정하면 활성화됩니다.\n\n지금은 이메일 로그인을 이용해 주세요.",
+    "oauth_redirect_info": "OAuth 리다이렉트 연동은 클라이언트 등록 후 콜백 URL과 함께 설정합니다.",
+    "login_info": "일반 회원·관리자 모두 이 화면에서 이메일로 로그인합니다. 관리자는 {{adminEmail}} 과 관리자 비밀번호를 입력하세요."
+  }
+}
