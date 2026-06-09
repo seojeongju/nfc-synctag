@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect, Fra
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Tag, Package, Plus, Bell, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Link2Off, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut, Eye, ChevronDown, ChevronUp, RefreshCw, Download, Box, User, Activity, ScanLine, Bookmark, CheckCircle2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 import { ImeTextInput } from '../components/ImeTextInput';
 import { GuaranteePdfHost } from '../components/ProductGuaranteeCertificate';
 import { GuaranteeCertificatePreviewModal } from '../components/GuaranteeCertificatePreviewModal';
@@ -560,6 +562,7 @@ function NfcWorkflowSteps({
 }
 
 export default function AdminDashboard() {
+  const { t } = useTranslation();
   const { tab: tabParam } = useParams<{ tab: string }>();
   const navigate = useNavigate();
 
@@ -2013,13 +2016,13 @@ export default function AdminDashboard() {
         
         <nav className="flex flex-col gap-2 flex-1">
           {[
-            { id: 'dashboard', icon: LayoutDashboard, label: '통계' },
-            { id: 'products', icon: Package, label: '제품 정보 관리' },
-            { id: 'nfc', icon: Tag, label: 'NFC 태그 관리' },
-            { id: 'goldbars', icon: Award, label: '보증서 관리' },
-            { id: 'assetMarket', icon: Hash, label: '자산별 시세 및 유통 관리' },
-            { id: 'users', icon: User, label: '사용자 관리' },
-            { id: 'releaseRequests', icon: Bookmark, label: '소유권 해지 요청' },
+            { id: 'dashboard', icon: LayoutDashboard, label: t('admin.menu_dashboard') },
+            { id: 'products', icon: Package, label: t('admin.menu_products') },
+            { id: 'nfc', icon: Tag, label: t('admin.menu_nfc') },
+            { id: 'goldbars', icon: Award, label: t('admin.menu_goldbars') },
+            { id: 'assetMarket', icon: Hash, label: t('admin.menu_asset_market') },
+            { id: 'users', icon: User, label: t('admin.menu_users') },
+            { id: 'releaseRequests', icon: Bookmark, label: t('admin.menu_release_requests') },
           ].map((item) => (
             <button 
               key={item.id}
@@ -2041,7 +2044,7 @@ export default function AdminDashboard() {
             className="flex items-center gap-4 px-5 py-3.5 rounded-2xl text-purple-600 bg-purple-50/40 hover:bg-purple-50 hover:text-purple-700 border border-purple-100/40 hover:border-purple-200/60 transition-all font-black text-sm shadow-sm hover:shadow-md active:scale-[0.98]"
           >
             <Eye className="w-5 h-5 transition-transform" />
-            사용자 화면 보기
+            {t('admin.user_view')}
           </button>
 
           <button 
@@ -2049,7 +2052,7 @@ export default function AdminDashboard() {
             className="flex items-center gap-4 px-5 py-3.5 rounded-2xl text-rose-500 bg-rose-50/30 hover:bg-rose-50 hover:text-rose-600 border border-rose-100/40 hover:border-rose-200/60 transition-all font-black text-sm shadow-sm hover:shadow-md active:scale-[0.98]"
           >
             <LogOut className="w-5 h-5 transition-transform group-hover:translate-x-0.5" />
-            로그아웃
+            {t('admin.logout')}
           </button>
         </div>
       </aside>
@@ -2089,6 +2092,9 @@ export default function AdminDashboard() {
             <button type="button" className="p-2.5 rounded-2xl text-slate-400 hover:bg-slate-50 transition-colors relative" aria-label="알림">
               <Bell className="w-5 h-5" />
             </button>
+            <div className="mx-1.5 sm:mx-2">
+              <LanguageSwitcher />
+            </div>
             <div className="w-9 h-9 rounded-2xl bg-amber-100 border border-amber-200 flex items-center justify-center text-amber-700 shrink-0" title="관리자">
               <User className="w-5 h-5" />
             </div>

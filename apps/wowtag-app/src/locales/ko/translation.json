@@ -31,5 +31,16 @@
     "oauth_env_error": "{{kind}} 로그인은 OAuth 클라이언트 ID를 워커 환경 변수에 설정하면 활성화됩니다.\n\n지금은 이메일 로그인을 이용해 주세요.",
     "oauth_redirect_info": "OAuth 리다이렉트 연동은 클라이언트 등록 후 콜백 URL과 함께 설정합니다.",
     "login_info": "일반 회원·관리자 모두 이 화면에서 이메일로 로그인합니다. 관리자는 {{adminEmail}} 과 관리자 비밀번호를 입력하세요."
+  },
+  "admin": {
+    "menu_dashboard": "통계",
+    "menu_products": "제품 정보 관리",
+    "menu_nfc": "NFC 태그 관리",
+    "menu_goldbars": "보증서 관리",
+    "menu_asset_market": "자산별 시세 및 유동 관리",
+    "menu_users": "사용자 관리",
+    "menu_release_requests": "소유권 해지 요청",
+    "user_view": "사용자 화면 보기",
+    "logout": "로그아웃"
   }
 }
