@@ -137,6 +137,7 @@ function ProductCertificatePicker({
   searchQuery: string;
   onSearchQueryChange: (q: string) => void;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
   const [panel, setPanel] = useState<{ top: number; left: number; width: number; maxH: number } | null>(null);
@@ -192,10 +193,10 @@ function ProductCertificatePicker({
   const selected = options.find((c) => c.id === value);
   const label =
     value === ''
-      ? '연결 안 함'
+      ? t('admin_dashboard.products.picker_no_link')
       : selected
         ? `${selected.serial_number}${selected.display_name ? ` · ${selected.display_name}` : ''} · ${formatCertTagForUi(selected.tag_uid)}`
-        : '선택됨';
+        : t('admin_dashboard.products.picker_selected');
 
   return (
     <>
@@ -234,7 +235,7 @@ function ProductCertificatePicker({
                     type="search"
                     value={searchQuery}
                     onChange={(e) => onSearchQueryChange(e.target.value)}
-                    placeholder="일련번호 · 보증서명 · NFC UID"
+                    placeholder={t('admin_dashboard.products.picker_placeholder')}
                     className="w-full rounded-lg border border-amber-100 bg-amber-50/40 py-2 pl-9 pr-2 text-xs font-bold text-slate-800 placeholder:text-slate-400 outline-none focus:border-amber-200 focus:bg-white"
                     onClick={(e) => e.stopPropagation()}
                     onKeyDown={(e) => e.stopPropagation()}
@@ -253,7 +254,7 @@ function ProductCertificatePicker({
                   value === '' ? 'bg-amber-50 text-amber-900' : 'text-slate-800'
                 }`}
               >
-                연결 안 함
+                {t('admin_dashboard.products.picker_no_link')}
               </button>
               {options.map((c) => (
                 <button
@@ -316,6 +317,7 @@ function NfcUidScanStep({
   scanLabel?: string;
   scanSubLabel?: string;
 }) {
+  const { t } = useTranslation();
   const scanGradient =
     accent === 'emerald'
       ? 'from-emerald-600 via-emerald-500 to-teal-600 shadow-emerald-500/35 ring-emerald-400/40'
@@ -341,7 +343,7 @@ function NfcUidScanStep({
             className="text-[11px] font-black text-slate-500 hover:text-rose-600 flex items-center gap-1 shrink-0"
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            초기화
+            {t('admin_dashboard.common.reset_btn')}
           </button>
         ) : null}
       </div>
@@ -362,10 +364,10 @@ function NfcUidScanStep({
           </div>
           <div className="flex-1 text-left min-w-0">
             <p className="text-sm sm:text-base font-black leading-tight">
-              {scanning ? '태그를 기기에 대 주세요…' : scanLabel}
+              {scanning ? t('admin_dashboard.nfc.scan_prompt') : scanLabel}
             </p>
             <p className="text-[10px] sm:text-[11px] font-bold text-white/90 mt-1 leading-snug">
-              {scanning ? '스캔이 끝나면 아래 UID 칸에 자동 입력됩니다' : scanSubLabel}
+              {scanning ? t('admin_dashboard.nfc.scan_success_desc') : scanSubLabel}
             </p>
           </div>
           {!scanning ? <Smartphone className="w-6 h-6 sm:w-7 sm:h-7 shrink-0 opacity-90" /> : null}
@@ -378,13 +380,13 @@ function NfcUidScanStep({
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
           </span>
-          NFC 스캔 대기 중 — 태그를 떼지 마세요.
+          {t('admin_dashboard.nfc.scan_waiting')}
         </p>
       ) : null}
 
       <div className="flex items-center gap-3 py-0.5">
         <div className="flex-1 h-px bg-slate-200" />
-        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider shrink-0">또는 UID 직접 입력</span>
+        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider shrink-0">{t('admin_dashboard.nfc.or_direct_input')}</span>
         <div className="flex-1 h-px bg-slate-200" />
       </div>
 
@@ -418,7 +420,8 @@ function NfcUrlWritePanel({
   optionalLabel?: boolean;
   showSkip?: boolean;
 }) {
-  const title = optionalLabel ? '태그 URL 굽기 (선택 · 나중에 해도 됨)' : '태그 URL 기록';
+  const { t } = useTranslation();
+  const title = optionalLabel ? t('admin_dashboard.nfc.write_title_optional') : t('admin_dashboard.nfc.write_title_required');
   const doneRing = accent === 'emerald' ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-amber-300 bg-amber-50 text-amber-900';
   const activeRing =
     accent === 'emerald'
@@ -432,10 +435,10 @@ function NfcUrlWritePanel({
   else if (status === 'writing') btnClass += 'border-amber-300 bg-amber-50 text-amber-900';
   else btnClass += activeRing;
 
-  let label = '태그에 URL 굽기';
-  if (status === 'writing') label = '태그를 대 주세요… 기록 중';
-  else if (status === 'done') label = '기록 완료';
-  else if (status === 'error') label = '기록 실패 — 다시 시도';
+  let label = t('admin_dashboard.nfc.write_btn_ready');
+  if (status === 'writing') label = t('admin_dashboard.nfc.write_btn_writing');
+  else if (status === 'done') label = t('admin_dashboard.nfc.write_btn_done');
+  else if (status === 'error') label = t('admin_dashboard.nfc.write_btn_error');
 
   return (
     <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 space-y-3">
@@ -451,16 +454,13 @@ function NfcUrlWritePanel({
                 : 'bg-slate-200 text-slate-600'
           }`}
         >
-          {status === 'done' ? '✓' : optionalLabel ? '선택' : '3'}
+          {status === 'done' ? '✓' : optionalLabel ? t('admin_dashboard.nfc.badge_optional') : '3'}
         </span>
         <p className="text-xs font-black text-slate-600">{title}</p>
       </div>
 
       {optionalLabel ? (
-        <p className="text-[11px] font-bold text-slate-500 leading-relaxed -mt-1">
-          폰에서 「<strong className="text-slate-700">비어있는 태그</strong>」로 보이면 여기서 기록하세요. 매칭 직후 안내창에서
-          기록하는 것을 권장합니다.
-        </p>
+        <p className="text-[11px] font-bold text-slate-500 leading-relaxed -mt-1" dangerouslySetInnerHTML={{ __html: t('admin_dashboard.nfc.write_desc_optional') }} />
       ) : null}
 
       <button
@@ -480,10 +480,7 @@ function NfcUrlWritePanel({
       </button>
 
       {status === 'writing' ? (
-        <p className="text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-relaxed">
-          {Math.round(NFC_WRITE_TIMEOUT_MS / 1000)}초 안에 태그를 스마트폰 <strong>NFC 안테나</strong>에 대 주세요. 기록이 끝나면
-          「기록 완료」로 바뀝니다.
-        </p>
+        <p className="text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-relaxed" dangerouslySetInnerHTML={{ __html: t('admin_dashboard.nfc.write_prompt_desc', { timeout: Math.round(NFC_WRITE_TIMEOUT_MS / 1000) }) }} />
       ) : null}
 
       {status === 'done' ? (
@@ -494,7 +491,7 @@ function NfcUrlWritePanel({
               : 'text-amber-900 bg-amber-50 border-amber-200'
           }`}
         >
-          {optionalLabel ? '태그에 URL을 기록했습니다.' : 'URL 기록이 완료되었습니다. 이제 마지막 단계 버튼을 눌러 주세요.'}
+          {optionalLabel ? t('admin_dashboard.nfc.write_success_optional') : t('admin_dashboard.nfc.write_success_required')}
         </p>
       ) : null}
 
@@ -1677,7 +1674,7 @@ export default function AdminDashboard() {
   const handleProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!productFormData.name) {
-      showToast('error', '제품 이름을 입력해 주세요.');
+      showToast('error', t('admin_dashboard.common.toast_product_name_required'));
       return;
     }
     setSubmitting(true);
@@ -1749,14 +1746,14 @@ export default function AdminDashboard() {
   const handleEditProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editProductFormData.name) {
-      showToast('error', '이름을 입력하세요.');
+      showToast('error', t('admin_dashboard.common.toast_product_name_required'));
       return;
     }
     setSubmitting(true);
     try {
       const normalizedProductId = String(editProductFormData.id).match(/^(?:product_)?(\d+)$/)?.[1];
       if (!normalizedProductId) {
-        showToast('error', '유효하지 않은 제품 ID입니다. 목록을 새로고침한 뒤 다시 시도해 주세요.');
+        showToast('error', t('admin_dashboard.common.toast_invalid_product_id'));
         return;
       }
       const { certificate_id, ...editPayload } = editProductFormData;
@@ -1770,14 +1767,14 @@ export default function AdminDashboard() {
       });
       if (res.ok) {
         setIsEditProductModalOpen(false);
-        showToast('success', '수정되었습니다.');
+        showToast('success', t('admin_dashboard.common.toast_edit_success'));
         fetchProducts();
       } else {
         const d = await res.json();
-        showToast('error', `수정 실패: ${d.error}`);
+        showToast('error', t('admin_dashboard.common.toast_edit_failed', { error: d.error }));
       }
     } catch (err: any) {
-      showToast('error', `수정 요청 실패: ${err.message}`);
+      showToast('error', t('admin_dashboard.common.toast_edit_failed', { error: err.message }));
     } finally {
       setSubmitting(false);
     }
@@ -1785,27 +1782,27 @@ export default function AdminDashboard() {
 
   // --- 제품 삭제 ---
   const handleDeleteProduct = async (id: string) => {
-    if (!confirm('정말로 이 제품 정보와 연관된 NFC 태그 매핑 정보를 모두 영구 삭제하시겠습니까?')) return;
+    if (!confirm(t('admin_dashboard.common.confirm_delete_product'))) return;
     try {
       const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        showToast('success', '삭제 성공!');
+        showToast('success', t('admin_dashboard.common.toast_delete_success'));
         fetchProducts();
         fetchTags();
       }
     } catch (err: any) {
-      showToast('error', '삭제 요청 실패');
+      showToast('error', t('admin_dashboard.common.toast_delete_failed'));
     }
   };
 
   const handleNfcMappingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nfcFormData.tag_uid) {
-      showToast('error', '태그 UID를 스캔하세요.');
+      showToast('error', t('admin_dashboard.common.toast_tag_uid_required'));
       return;
     }
     if (nfcRegisterMode === 'product' && !nfcFormData.product_id) {
-      showToast('error', '제품을 선택하세요.');
+      showToast('error', t('admin_dashboard.common.toast_product_select_required'));
       return;
     }
     setSubmitting(true);
@@ -1825,13 +1822,13 @@ export default function AdminDashboard() {
         setNfcRegisterMode('asset');
         setNfcFormData({ tag_uid: '', product_id: '' });
         setNfcExistingSnapshot(null);
-        showToast('success', data.mode === 'asset' ? '자산 태그로 등록되었습니다.' : '태그 매핑이 완료되었습니다.');
+        showToast('success', data.mode === 'asset' ? t('admin_dashboard.common.toast_uid_asset_success') : t('admin_dashboard.common.toast_server_match_completed'));
         fetchProducts();
         fetchTags();
         fetchAssets();
         fetchGoldbars();
       } else {
-        showToast('error', typeof data.error === 'string' ? data.error : '등록에 실패했습니다.');
+        showToast('error', typeof data.error === 'string' ? data.error : t('admin_dashboard.common.toast_register_failed'));
       }
     } finally {
       setSubmitting(false);
@@ -1870,7 +1867,7 @@ export default function AdminDashboard() {
   const handleGoldbarSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!goldbarFormData.serial_number || !goldbarFormData.weight) {
-      showToast('error', '필수 입력 항목을 모두 채워주세요.');
+      showToast('error', t('admin_dashboard.common.toast_goldbar_form_required'));
       return;
     }
     setSubmitting(true);
@@ -1899,15 +1896,15 @@ export default function AdminDashboard() {
           status: 'CATALOG',
           cert_url: ''
         });
-        showToast('success', '골드바 및 정품인증서 등록 성공!');
+        showToast('success', t('admin_dashboard.common.toast_goldbar_register_success'));
         fetchGoldbars();
         fetchStats();
       } else {
         const errData = await res.json();
-        showToast('error', `오류 발생: ${errData.error || '알 수 없는 오류'}`);
+        showToast('error', t('admin_dashboard.common.toast_goldbar_register_failed', { error: errData.error || t('common.error_occurred') }));
       }
     } catch (err: any) {
-      showToast('error', `요청 실패: ${err.message}`);
+      showToast('error', t('admin_dashboard.common.toast_goldbar_register_failed', { error: err.message }));
     } finally {
       setSubmitting(false);
     }
@@ -1939,7 +1936,7 @@ export default function AdminDashboard() {
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editGoldbarData.serial_number || !editGoldbarData.weight) {
-      showToast('error', '정보를 입력하세요.');
+      showToast('error', t('admin_dashboard.common.toast_info_required'));
       return;
     }
     setSubmitting(true);
@@ -1951,14 +1948,14 @@ export default function AdminDashboard() {
       });
       if (res.ok) {
         setIsEditModalOpen(false);
-        showToast('success', '수정되었습니다.');
+        showToast('success', t('admin_dashboard.common.toast_edit_success'));
         fetchGoldbars();
       } else {
         const d = await res.json();
-        showToast('error', `수정 실패: ${d.error}`);
+        showToast('error', t('admin_dashboard.common.toast_edit_failed', { error: d.error }));
       }
     } catch (err: any) {
-      showToast('error', `수정 요청 실패: ${err.message}`);
+      showToast('error', t('admin_dashboard.common.toast_edit_failed', { error: err.message }));
     } finally {
       setSubmitting(false);
     }
@@ -1966,16 +1963,16 @@ export default function AdminDashboard() {
 
   // --- 골드바 삭제 ---
   const handleDeleteGoldbar = async (id: string) => {
-    if (!confirm('정말로 이 골드바와 연결된 모든 보증서 정보를 영구 삭제하시겠습니까?')) return;
+    if (!confirm(t('admin_dashboard.common.confirm_delete_goldbar'))) return;
     try {
       const res = await fetch(`/api/goldbars/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        showToast('success', '삭제 성공!');
+        showToast('success', t('admin_dashboard.common.toast_delete_success'));
         fetchGoldbars();
         fetchStats();
       }
     } catch (err: any) {
-      showToast('error', '삭제 요청 실패');
+      showToast('error', t('admin_dashboard.common.toast_delete_failed'));
     }
   };
 
@@ -2119,9 +2116,9 @@ export default function AdminDashboard() {
                     </div>
                     <div>
                       <h4 className="font-black text-slate-800 text-sm flex items-center gap-2 group-hover:text-amber-700 transition-colors">
-                        📱 모바일 앱(PWA) NFC 사용방법 및 주의사항
+                        📱 {t('admin_dashboard.dashboard.pwa_title')}
                       </h4>
-                      <p className="text-[10px] font-bold text-slate-400 mt-0.5">NFC 발행 및 안정적인 백그라운드 작동 가이드</p>
+                      <p className="text-[10px] font-bold text-slate-400 mt-0.5">{t('admin_dashboard.dashboard.pwa_desc')}</p>
                     </div>
                   </div>
                   <div className="w-8 h-8 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 group-hover:text-slate-600 group-hover:bg-slate-100 transition-all">
@@ -2141,9 +2138,9 @@ export default function AdminDashboard() {
 
               <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
                 <div>
-                  <h2 className="text-2xl lg:text-4xl font-black text-slate-900 tracking-tight">운영 현황</h2>
+                  <h2 className="text-2xl lg:text-4xl font-black text-slate-900 tracking-tight">{t('admin_dashboard.dashboard.summary_title')}</h2>
                   <p className="text-sm font-bold text-slate-400 mt-1">
-                    카탈로그·골드바·NFC 태그·스캔 로그를 실시간 집계합니다. 카드 클릭 시 해당 메뉴로 이동합니다.
+                    {t('admin_dashboard.dashboard.summary_desc')}
                   </p>
                 </div>
               </div>
@@ -2152,8 +2149,8 @@ export default function AdminDashboard() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 min-w-0 w-full">
                 {[
                   {
-                    label: '카탈로그 제품',
-                    sub: '판매용 제품 등록',
+                    label: t('admin_dashboard.dashboard.kpi_catalog'),
+                    sub: t('admin_dashboard.dashboard.kpi_catalog_sub'),
                     value: products.length,
                     icon: Package,
                     color: 'text-blue-600',
@@ -2161,8 +2158,8 @@ export default function AdminDashboard() {
                     tab: 'products' as AdminTabId
                   },
                   {
-                    label: '보증서',
-                    sub: '정품 골드바 행',
+                    label: t('admin_dashboard.dashboard.kpi_cert'),
+                    sub: t('admin_dashboard.dashboard.kpi_cert_sub'),
                     value: goldbars.length,
                     icon: Award,
                     color: 'text-amber-600',
@@ -2170,8 +2167,8 @@ export default function AdminDashboard() {
                     tab: 'goldbars' as AdminTabId
                   },
                   {
-                    label: '누적 NFC 스캔',
-                    sub: `오늘 ${statsLoading ? '…' : Number(stats.scanCountToday ?? 0).toLocaleString()}건`,
+                    label: t('admin_dashboard.dashboard.kpi_scans'),
+                    sub: t('admin_dashboard.dashboard.kpi_scans_today', { count: statsLoading ? '…' : Number(stats.scanCountToday ?? 0).toLocaleString() }),
                     value: statsLoading ? '…' : Number(stats.scanCount ?? 0).toLocaleString(),
                     icon: ScanLine,
                     color: 'text-emerald-600',
@@ -2179,8 +2176,8 @@ export default function AdminDashboard() {
                     tab: 'dashboard' as AdminTabId
                   },
                   {
-                    label: '제품 매칭률',
-                    sub: '출고 완료 / 제품용 태그',
+                    label: t('admin_dashboard.dashboard.kpi_match_rate'),
+                    sub: t('admin_dashboard.dashboard.kpi_match_rate_sub'),
                     value:
                       nfcProductMatchRate === null
                         ? '—'
@@ -2220,10 +2217,10 @@ export default function AdminDashboard() {
                 >
                   <div className="flex items-center gap-2 text-amber-700 mb-2">
                     <Box className="w-4 h-4 shrink-0" />
-                    <span className="text-[10px] font-black uppercase tracking-wider">출고 대기</span>
+                    <span className="text-[10px] font-black uppercase tracking-wider">{t('admin_dashboard.dashboard.sub_kpi_wait')}</span>
                   </div>
                   <p className="text-2xl font-black text-slate-900 tabular-nums">{nfcUnlinkedList.length}</p>
-                  <p className="text-[10px] font-bold text-slate-400 mt-1">제품 미연결 NFC (자산 태그)</p>
+                  <p className="text-[10px] font-bold text-slate-400 mt-1">{t('admin_dashboard.dashboard.sub_kpi_wait_desc')}</p>
                 </button>
                 <button
                   type="button"
@@ -2232,10 +2229,10 @@ export default function AdminDashboard() {
                 >
                   <div className="flex items-center gap-2 text-emerald-700 mb-2">
                     <LinkIcon className="w-4 h-4 shrink-0" />
-                    <span className="text-[10px] font-black uppercase tracking-wider">출고 완료</span>
+                    <span className="text-[10px] font-black uppercase tracking-wider">{t('admin_dashboard.dashboard.sub_kpi_shipped')}</span>
                   </div>
                   <p className="text-2xl font-black text-slate-900 tabular-nums">{nfcLinkedList.length}</p>
-                  <p className="text-[10px] font-bold text-slate-400 mt-1">제품과 매칭된 태그</p>
+                  <p className="text-[10px] font-bold text-slate-400 mt-1">{t('admin_dashboard.dashboard.sub_kpi_shipped_desc')}</p>
                 </button>
                 <button
                   type="button"
@@ -2244,12 +2241,12 @@ export default function AdminDashboard() {
                 >
                   <div className="flex items-center gap-2 text-violet-700 mb-2">
                     <User className="w-4 h-4 shrink-0" />
-                    <span className="text-[10px] font-black uppercase tracking-wider">가입 회원</span>
+                    <span className="text-[10px] font-black uppercase tracking-wider">{t('admin_dashboard.dashboard.sub_kpi_users')}</span>
                   </div>
                   <p className="text-2xl font-black text-slate-900 tabular-nums">
                     {statsLoading ? '…' : Number(stats.userCount ?? 0).toLocaleString()}
                   </p>
-                  <p className="text-[10px] font-bold text-slate-400 mt-1">소비자 계정 · 태그 연결 확인</p>
+                  <p className="text-[10px] font-bold text-slate-400 mt-1">{t('admin_dashboard.dashboard.sub_kpi_users_desc')}</p>
                 </button>
                 <button
                   type="button"
@@ -2258,20 +2255,20 @@ export default function AdminDashboard() {
                 >
                   <div className="flex items-center gap-2 text-purple-600 mb-2">
                     <Activity className="w-4 h-4 shrink-0" />
-                    <span className="text-[10px] font-black uppercase tracking-wider">자산별 시세 관리</span>
+                    <span className="text-[10px] font-black uppercase tracking-wider">{t('admin_dashboard.dashboard.sub_kpi_market')}</span>
                   </div>
                   <p className="text-2xl font-black text-slate-900 tabular-nums">
                     {loadingAssets ? '…' : assets.length.toLocaleString()}
                   </p>
-                  <p className="text-[10px] font-bold text-slate-400 mt-1">시세 설정 가능 자산(보증서)</p>
+                  <p className="text-[10px] font-bold text-slate-400 mt-1">{t('admin_dashboard.dashboard.sub_kpi_market_desc')}</p>
                 </button>
               </div>
 
-              {/* 정품인증 태그 등록 가이드 섹션 */}
+              {/* 정품인증 태그(NFC) 등록 및 출고 프로세스 가이드 */}
               <div className="bg-white rounded-[2.5rem] p-6 lg:p-8 border border-slate-50 shadow-sm space-y-6">
                 <div className="flex items-center gap-2">
                   <div className="w-1.5 h-6 bg-purple-600 rounded-full"></div>
-                  <h3 className="text-lg font-black text-slate-800">정품인증 태그(NFC) 등록 및 출고 프로세스 가이드</h3>
+                  <h3 className="text-lg font-black text-slate-800">{t('admin_dashboard.dashboard.guide_title')}</h3>
                 </div>
 
                 {/* 1행×3열 아이콘 — 설명은 아래 전체 너비 패널 */}
@@ -2290,7 +2287,7 @@ export default function AdminDashboard() {
                           <FileText className="w-5 h-5 sm:w-6 sm:h-6" />
                         </div>
                         <span className="text-[9px] sm:text-[10px] font-black uppercase text-amber-600 tracking-widest">STEP 01</span>
-                        <h4 className="font-black text-slate-800 text-[11px] sm:text-base leading-snug">카탈로그(제품) 생성</h4>
+                        <h4 className="font-black text-slate-800 text-[11px] sm:text-base leading-snug">{t('admin_dashboard.dashboard.step1_title')}</h4>
                         <div className="text-slate-400 mt-0.5">
                           {activeGuide === 1 ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 mx-auto" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 mx-auto" />}
                         </div>
@@ -2310,7 +2307,7 @@ export default function AdminDashboard() {
                           <Smartphone className="w-5 h-5 sm:w-6 sm:h-6" />
                         </div>
                         <span className="text-[9px] sm:text-[10px] font-black uppercase text-blue-600 tracking-widest">STEP 02</span>
-                        <h4 className="font-black text-slate-800 text-[11px] sm:text-base leading-snug">신규 NFC 태그 등록</h4>
+                        <h4 className="font-black text-slate-800 text-[11px] sm:text-base leading-snug">{t('admin_dashboard.dashboard.step2_title')}</h4>
                         <div className="text-slate-400 mt-0.5">
                           {activeGuide === 2 ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 mx-auto" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 mx-auto" />}
                         </div>
@@ -2330,7 +2327,7 @@ export default function AdminDashboard() {
                           <LinkIcon className="w-5 h-5 sm:w-6 sm:h-6" />
                         </div>
                         <span className="text-[9px] sm:text-[10px] font-black uppercase text-emerald-600 tracking-widest">STEP 03</span>
-                        <h4 className="font-black text-slate-800 text-[11px] sm:text-base leading-snug">정품인증 및 출고 연동</h4>
+                        <h4 className="font-black text-slate-800 text-[11px] sm:text-base leading-snug">{t('admin_dashboard.dashboard.step3_title')}</h4>
                         <div className="text-slate-400 mt-0.5">
                           {activeGuide === 3 ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 mx-auto" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 mx-auto" />}
                         </div>
@@ -2358,26 +2355,20 @@ export default function AdminDashboard() {
                           STEP 0{activeGuide}
                         </span>
                         <span className="text-xs sm:text-sm font-black text-slate-800">
-                          {activeGuide === 1 && '카탈로그(제품) 생성'}
-                          {activeGuide === 2 && '신규 NFC 태그 등록'}
-                          {activeGuide === 3 && '정품인증 및 출고 연동'}
+                          {activeGuide === 1 && t('admin_dashboard.dashboard.step1_title')}
+                          {activeGuide === 2 && t('admin_dashboard.dashboard.step2_title')}
+                          {activeGuide === 3 && t('admin_dashboard.dashboard.step3_title')}
                         </span>
                       </div>
                       <p className="text-sm sm:text-base font-bold text-slate-600 leading-relaxed max-w-none">
                         {activeGuide === 1 && (
-                          <>
-                            골드바의 <strong className="text-slate-800 font-black">일련번호, 중량, 순도, 제조일자</strong> 등의 제원 정보를 등록하여 정품인증서 카탈로그를 생성합니다.
-                          </>
+                          <span dangerouslySetInnerHTML={{ __html: t('admin_dashboard.dashboard.step1_desc_html') }} />
                         )}
                         {activeGuide === 2 && (
-                          <>
-                            실물 NFC 태그의 고유 <strong className="text-slate-800 font-black">UID를 스캔하여 매핑</strong>하고, 카탈로그와 연결하여 데이터가 태그에 반영될 수 있도록 준비합니다.
-                          </>
+                          <span dangerouslySetInnerHTML={{ __html: t('admin_dashboard.dashboard.step2_desc_html') }} />
                         )}
                         {activeGuide === 3 && (
-                          <>
-                            출고 시점에 <strong className="text-slate-800 font-black">정품인증서 URL을 등록</strong>하면 최종 출고 처리가 되며, 사용자는 태그 스캔 시 웹 보증서로 바로 연결됩니다.
-                          </>
+                          <span dangerouslySetInnerHTML={{ __html: t('admin_dashboard.dashboard.step3_desc_html') }} />
                         )}
                       </p>
                     </div>
@@ -2391,7 +2382,7 @@ export default function AdminDashboard() {
                 <div className="lg:col-span-1 bg-white rounded-[2.5rem] p-6 lg:p-8 border border-slate-50 shadow-sm flex flex-col h-full">
                   <div className="flex items-center gap-2 mb-6">
                     <div className="w-1.5 h-6 bg-amber-500 rounded-full"></div>
-                    <h3 className="text-lg font-black text-slate-800">스캔 Top (태그·제품·골드바)</h3>
+                    <h3 className="text-lg font-black text-slate-800">{t('admin_dashboard.dashboard.rank_title')}</h3>
                   </div>
 
                   <div className="space-y-3 flex-1 flex flex-col justify-start">
@@ -2407,13 +2398,13 @@ export default function AdminDashboard() {
                           ) : null}
                         </div>
                         <div className="text-right shrink-0">
-                          <p className="text-xs font-bold text-slate-400">누적</p>
-                          <p className="text-lg font-black text-amber-600 tabular-nums">{g.scan_count}회</p>
+                          <p className="text-xs font-bold text-slate-400">{t('admin_dashboard.dashboard.rank_accumulated')}</p>
+                          <p className="text-lg font-black text-amber-600 tabular-nums">{t('admin_dashboard.dashboard.scan_count_unit', { count: g.scan_count })}</p>
                         </div>
                       </div>
                     ))}
                     {(!stats.topGoldbars || stats.topGoldbars.length === 0) && (
-                      <p className="text-xs font-bold text-slate-400 text-center py-6">아직 스캔된 데이터가 없습니다.</p>
+                      <p className="text-xs font-bold text-slate-400 text-center py-6">{t('admin_dashboard.dashboard.rank_empty')}</p>
                     )}
                   </div>
                 </div>
@@ -2423,7 +2414,7 @@ export default function AdminDashboard() {
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-2">
                       <div className="w-1.5 h-6 bg-emerald-500 rounded-full"></div>
-                      <h3 className="text-lg font-black text-slate-800">최근 스캔 기록</h3>
+                      <h3 className="text-lg font-black text-slate-800">{t('admin_dashboard.dashboard.recent_title')}</h3>
                     </div>
                     {logsLoading && <Loader2 className="w-5 h-5 animate-spin text-emerald-500" />}
                   </div>
@@ -2437,7 +2428,7 @@ export default function AdminDashboard() {
                           </div>
                           <div>
                             <p className="text-sm font-black text-slate-800 line-clamp-2">
-                              {log.display_label || log.serial_number || '이름 없음'}
+                              {log.display_label || log.serial_number || t('admin_dashboard.users.name_empty')}
                             </p>
                             <p className="text-xs font-bold text-slate-400 font-mono mt-0.5 break-all">UID: {log.tag_uid}</p>
                           </div>
@@ -2445,7 +2436,7 @@ export default function AdminDashboard() {
 
                         <div className="flex flex-col items-end">
                           <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-xl flex items-center gap-1 mb-1">
-                            정품인증 성공
+                            {t('admin_dashboard.dashboard.recent_success')}
                           </span>
                           <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
                             <Calendar className="w-3 h-3" /> {new Date(log.scanned_at).toLocaleString()}
@@ -2456,7 +2447,7 @@ export default function AdminDashboard() {
 
                     {(!stats.recentLogs || stats.recentLogs.length === 0) && !logsLoading && (
                       <div className="p-8 text-center text-slate-400 font-bold">
-                        아직 접수된 스캔 기록이 없습니다.
+                        {t('admin_dashboard.dashboard.recent_empty')}
                       </div>
                     )}
 
@@ -2467,17 +2458,17 @@ export default function AdminDashboard() {
                         onClick={() => setCurrentPageLogs(p => Math.max(1, p - 1))}
                         className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm"
                       >
-                        이전
+                        {t('admin_dashboard.dashboard.page_prev')}
                       </button>
                       <span className="text-xs font-black text-slate-400 px-2">
-                        {currentPageLogs} 페이지
+                        {t('admin_dashboard.dashboard.page_num', { page: currentPageLogs })}
                       </span>
                       <button
                         disabled={(stats.recentLogs?.length ?? 0) < LOGS_PER_PAGE || logsLoading}
                         onClick={() => setCurrentPageLogs(p => p + 1)}
                         className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm"
                       >
-                        다음
+                        {t('admin_dashboard.dashboard.page_next')}
                       </button>
                     </div>
                   </div>
@@ -2491,11 +2482,11 @@ export default function AdminDashboard() {
             <>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between w-full min-w-0">
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 break-words">제품 정보 관리</h2>
-                  <p className="text-[11px] sm:text-xs font-bold text-slate-400 mt-1 leading-relaxed">NFC 태그를 매핑할 순수 제품의 제원 정보를 관리합니다.</p>
+                  <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 break-words">{t('admin_dashboard.products.title')}</h2>
+                  <p className="text-[11px] sm:text-xs font-bold text-slate-400 mt-1 leading-relaxed">{t('admin_dashboard.products.desc')}</p>
                 </div>
                 <button type="button" onClick={() => setIsProductModalOpen(true)} className="purple-btn !py-3 !px-5 sm:!py-3.5 sm:!px-6 flex items-center justify-center gap-2 shrink-0 w-full sm:w-auto text-sm">
-                  <Plus className="w-5 h-5 shrink-0" /> 제품 등록
+                  <Plus className="w-5 h-5 shrink-0" /> {t('admin_dashboard.products.register_btn')}
                 </button>
               </div>
 
@@ -2504,7 +2495,7 @@ export default function AdminDashboard() {
                 <Search className="w-5 h-5 text-slate-300" />
                 <input 
                   type="text" 
-                  placeholder="제품 이름 검색..." 
+                  placeholder={t('admin_dashboard.products.search_placeholder')}
                   value={productSearchTerm}
                   onChange={(e) => setProductSearchTerm(e.target.value)}
                   className="w-full text-sm font-bold outline-none bg-transparent"
@@ -2523,16 +2514,16 @@ export default function AdminDashboard() {
                           <h4 className="font-black text-slate-800 text-base sm:text-lg break-words line-clamp-2">{p.name}</h4>
                           {p.sold_at ? (
                             <span className="text-[10px] font-black uppercase tracking-wider bg-rose-50 text-rose-700 px-2 py-0.5 rounded-lg border border-rose-100 shrink-0">
-                              판매완료
+                              {t('admin_dashboard.products.sold_tag')}
                             </span>
                           ) : null}
                         </div>
-                        <p className="text-xs text-slate-400 font-bold line-clamp-2 mt-0.5 break-words">{p.description || '상세 설명 없음'}</p>
+                        <p className="text-xs text-slate-400 font-bold line-clamp-2 mt-0.5 break-words">{p.description || t('admin_dashboard.products.empty_description')}</p>
                         {(p.cert_serial_number || p.cert_tag_uid || p.cert_display_name) && (
                           <p className="text-[10px] font-bold text-amber-700 mt-1.5 flex items-start gap-1.5 min-w-0">
                             <Award className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                             <span className="min-w-0 leading-snug">
-                              <span className="text-amber-800/90">인증서 </span>
+                              <span className="text-amber-800/90">{t('admin_dashboard.products.cert_label')} </span>
                               {p.cert_display_name ? (
                                 <>
                                   <span className="font-black text-amber-900">{p.cert_display_name}</span>
@@ -2556,8 +2547,8 @@ export default function AdminDashboard() {
                           type="button"
                           onClick={() => setGuaranteePreviewData(mapProductToGuaranteeData(p as Record<string, unknown>))}
                           className="p-2 rounded-lg sm:rounded-xl hover:bg-slate-100 text-slate-400 hover:text-amber-600 transition-all"
-                          aria-label="보증서 미리보기"
-                          title="보증서 미리보기"
+                          aria-label={t('user_landing.wallet.preview_cert')}
+                          title={t('user_landing.wallet.preview_cert')}
                         >
                           <Eye className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                         </button>
@@ -2565,15 +2556,15 @@ export default function AdminDashboard() {
                           type="button"
                           onClick={() => setGuaranteePdfPayload(mapProductToGuaranteeData(p as Record<string, unknown>))}
                           className="p-2 rounded-lg sm:rounded-xl hover:bg-amber-50 text-slate-400 hover:text-amber-700 transition-all"
-                          aria-label="제품 보증서 PDF"
-                          title="제품 보증서 PDF"
+                          aria-label={t('user_landing.wallet.pdf_save')}
+                          title={t('user_landing.wallet.pdf_save')}
                         >
                           <Download className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                         </button>
-                        <button type="button" onClick={() => handleEditProductOpen(p)} className="p-2 rounded-lg sm:rounded-xl hover:bg-slate-50 text-slate-400 hover:text-primary transition-all" aria-label="수정">
+                        <button type="button" onClick={() => handleEditProductOpen(p)} className="p-2 rounded-lg sm:rounded-xl hover:bg-slate-50 text-slate-400 hover:text-primary transition-all" aria-label={t('common.edit', '수정')}>
                           <Edit3 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                         </button>
-                        <button type="button" onClick={() => handleDeleteProduct(p.id)} className="p-2 rounded-lg sm:rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-all" aria-label="삭제">
+                        <button type="button" onClick={() => handleDeleteProduct(p.id)} className="p-2 rounded-lg sm:rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-all" aria-label={t('common.delete')}>
                           <Trash2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                         </button>
                       </div>
@@ -2595,7 +2586,7 @@ export default function AdminDashboard() {
                 {filteredProducts.length === 0 && (
                   <div className="col-span-2 bg-white rounded-3xl border border-slate-100 p-12 flex flex-col items-center justify-center text-center">
                     <Package className="w-16 h-16 text-slate-200 mb-4" />
-                    <p className="font-black text-slate-400">등록된 제품이 없거나 검색 결과가 없습니다.</p>
+                    <p className="font-black text-slate-400">{t('admin_dashboard.products.empty_notice')}</p>
                   </div>
                 )}
               </div>
@@ -2608,7 +2599,7 @@ export default function AdminDashboard() {
                     onClick={() => setCurrentPageProducts(p => p - 1)}
                     className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm shrink-0"
                   >
-                    이전
+                    {t('admin_dashboard.dashboard.page_prev')}
                   </button>
                   {Array.from({ length: Math.ceil(filteredProducts.length / ITEMS_PER_PAGE) }).map((_, i) => (
                     <button
@@ -2624,7 +2615,7 @@ export default function AdminDashboard() {
                     onClick={() => setCurrentPageProducts(p => p + 1)}
                     className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm shrink-0"
                   >
-                    다음
+                    {t('admin_dashboard.dashboard.page_next')}
                   </button>
                 </div>
               )}
@@ -2638,19 +2629,19 @@ export default function AdminDashboard() {
                 <div>
                   <div className="flex items-center gap-2">
                     <div className="w-1.5 h-6 bg-gradient-to-b from-emerald-400 to-teal-600 rounded-full"></div>
-                    <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">NFC 태그 관리</h2>
+                    <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">{t('admin_dashboard.nfc.title')}</h2>
                   </div>
                   <p className="text-[11px] sm:text-xs font-bold text-slate-400 mt-1 leading-relaxed pl-3.5">
-                    UID 등록과 제품 매칭을 분리했습니다. 출고 시에는 「제품 매칭」에서 태그를 스캔해 바로 연결하세요.
+                    {t('admin_dashboard.nfc.desc')}
                   </p>
                 </div>
 
                 <div className="flex flex-wrap gap-2 p-1.5 bg-slate-100/90 rounded-2xl border border-slate-200/60">
                   {(
                     [
-                      { id: 'match' as NfcWorkbenchTab, label: '제품 매칭', icon: LinkIcon },
-                      { id: 'register' as NfcWorkbenchTab, label: 'UID 등록', icon: Hash },
-                      { id: 'browse' as NfcWorkbenchTab, label: '태그 목록', icon: Tag },
+                      { id: 'match' as NfcWorkbenchTab, label: t('admin_dashboard.nfc.tab_match'), icon: LinkIcon },
+                      { id: 'register' as NfcWorkbenchTab, label: t('admin_dashboard.nfc.tab_register'), icon: Hash },
+                      { id: 'browse' as NfcWorkbenchTab, label: t('admin_dashboard.nfc.tab_browse'), icon: Tag },
                     ] as const
                   ).map((tab) => (
                     <button
@@ -2676,17 +2667,17 @@ export default function AdminDashboard() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-center">
                   <div className="rounded-xl bg-amber-50/80 border border-amber-100 px-3 py-2">
                     <p className="text-lg font-black text-amber-900 tabular-nums">{nfcUnlinkedList.length}</p>
-                    <p className="text-[10px] font-bold text-amber-700/90">UID만 등록</p>
+                    <p className="text-[10px] font-bold text-amber-700/90">{t('admin_dashboard.nfc.stat_asset')}</p>
                   </div>
                   <div className="rounded-xl bg-emerald-50/80 border border-emerald-100 px-3 py-2">
                     <p className="text-lg font-black text-emerald-900 tabular-nums">{nfcLinkedList.length}</p>
-                    <p className="text-[10px] font-bold text-emerald-700/90">제품 매칭 완료</p>
+                    <p className="text-[10px] font-bold text-emerald-700/90">{t('admin_dashboard.nfc.stat_linked')}</p>
                   </div>
                   <div className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2 col-span-2 sm:col-span-1">
                     <p className="text-lg font-black text-slate-800 tabular-nums">
                       {nfcProductMatchRate === null ? '—' : `${nfcProductMatchRate}%`}
                     </p>
-                    <p className="text-[10px] font-bold text-slate-500">매칭률</p>
+                    <p className="text-[10px] font-bold text-slate-500">{t('admin_dashboard.nfc.stat_rate')}</p>
                   </div>
                 </div>
               </div>
@@ -2699,16 +2690,16 @@ export default function AdminDashboard() {
                       <LinkIcon className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="text-base sm:text-lg font-black text-slate-900">제품 매칭 (출고)</h3>
+                      <h3 className="text-base sm:text-lg font-black text-slate-900">{t('admin_dashboard.nfc.match_title')}</h3>
                       <p className="text-xs font-bold text-slate-500 mt-1 leading-relaxed">
-                        ① NFC 스캔 → ② 출고 제품 선택 → ③ 제품 매칭(URL 자동 기록)
+                        {t('admin_dashboard.nfc.match_desc')}
                       </p>
                     </div>
                   </div>
 
                   <NfcWorkflowSteps
                     accent="emerald"
-                    labels={['NFC 스캔', '출고 제품 선택', '제품 매칭']}
+                    labels={[t('admin_dashboard.nfc.match_step1'), t('admin_dashboard.nfc.match_step2'), t('admin_dashboard.nfc.match_step3')]}
                     activeStep={nfcMatchActiveStep}
                     allDone={!!nfcMatchResult}
                   />
@@ -2726,13 +2717,12 @@ export default function AdminDashboard() {
                       />
                       <div className="min-w-0">
                         <p className="text-sm font-black text-slate-900">
-                          {nfcMatchResult.urlWritten ? '매칭 완료' : '매칭 완료 · URL만 다시 기록'}
+                          {nfcMatchResult.urlWritten ? t('admin_dashboard.nfc.match_success_title') : t('admin_dashboard.nfc.match_success_title_write')}
                         </p>
                         <p className="text-xs font-bold text-slate-700 mt-1 leading-relaxed">
-                          「{nfcMatchResult.productName}」 제품과 서버 연결은 완료되었습니다.
                           {nfcMatchResult.urlWritten
-                            ? ' 태그 URL도 기록되었습니다. 다음 태그를 스캔해 주세요.'
-                            : ' 태그 칩에 URL이 들어가지 않았습니다. 아래 버튼으로 같은 태그를 폰에 대 주세요.'}
+                            ? t('admin_dashboard.nfc.match_success_desc', { name: nfcMatchResult.productName })
+                            : t('admin_dashboard.nfc.match_success_desc_write', { name: nfcMatchResult.productName })}
                         </p>
                         {!nfcMatchResult.urlWritten && nfcMatchResult.tagUid ? (
                           <button
@@ -2754,7 +2744,7 @@ export default function AdminDashboard() {
                             ) : (
                               <PenTool className="w-4 h-4" />
                             )}
-                            {nfcWriting ? '태그를 기기에 대 주세요…' : '태그에 URL 다시 기록'}
+                            {nfcWriting ? t('admin_dashboard.nfc.match_btn_action_scanning') : t('admin_dashboard.nfc.match_btn_rewrite')}
                           </button>
                         ) : null}
                         <button
@@ -2762,7 +2752,7 @@ export default function AdminDashboard() {
                           onClick={clearNfcMatchWorkbench}
                           className="mt-2 text-[11px] font-black text-emerald-700 underline underline-offset-2"
                         >
-                          새 태그 매칭하기
+                          {t('admin_dashboard.nfc.match_btn_new')}
                         </button>
                       </div>
                     </div>
@@ -2772,7 +2762,7 @@ export default function AdminDashboard() {
                   <form onSubmit={handleQuickProductMatch} className="space-y-5">
                     <NfcUidScanStep
                       stepNumber={1}
-                      stepTitle="제품 매칭 NFC 스캔"
+                      stepTitle={t('admin_dashboard.nfc.match_scan_label')}
                       accent="emerald"
                       tagUid={nfcMatchForm.tag_uid}
                       scanning={nfcScanning}
@@ -2781,8 +2771,8 @@ export default function AdminDashboard() {
                         void handleNFCScanMatch();
                       }}
                       onClear={clearNfcMatchWorkbench}
-                      scanLabel="NFC 스캔"
-                      scanSubLabel="태그를 스마트폰 뒷면에 대면 UID가 입력됩니다"
+                      scanLabel={t('admin_dashboard.nfc.match_step1')}
+                      scanSubLabel={t('admin_dashboard.nfc.match_scan_sub')}
                       onTagUidChange={(v) => {
                         if (!v.trim()) {
                           clearNfcMatchWorkbench();
@@ -2808,13 +2798,9 @@ export default function AdminDashboard() {
                         }`}
                       >
                         {nfcMatchSnapshot.kind === 'blocked' && nfcMatchSnapshot.message}
-                        {nfcMatchSnapshot.kind === 'new' && '신규 태그입니다. 매칭 시 UID 등록과 제품 연결이 한 번에 진행됩니다.'}
-                        {nfcMatchSnapshot.kind === 'asset' && '자산으로 등록된 태그입니다. 아래에서 제품을 선택해 출고(매칭)하세요.'}
-                        {nfcMatchSnapshot.kind === 'linked' && (
-                          <>
-                            이미 「{nfcMatchSnapshot.productName || '제품'}」에 연결되어 있습니다. 제품을 바꾸면 덮어쓰기 됩니다.
-                          </>
-                        )}
+                        {nfcMatchSnapshot.kind === 'new' && t('admin_dashboard.nfc.match_snapshot_new')}
+                        {nfcMatchSnapshot.kind === 'asset' && t('admin_dashboard.nfc.match_snapshot_asset')}
+                        {nfcMatchSnapshot.kind === 'linked' && t('admin_dashboard.nfc.match_snapshot_linked', { name: nfcMatchSnapshot.productName || t('admin_dashboard.common.selected_product') })}
                       </div>
                     )}
 
@@ -2823,9 +2809,9 @@ export default function AdminDashboard() {
                         <span className="shrink-0 w-7 h-7 rounded-lg bg-emerald-600 text-white text-xs font-black flex items-center justify-center shadow-sm">
                           2
                         </span>
-                        <label className="text-xs sm:text-sm font-black text-slate-800">출고할 제품 선택</label>
+                        <label className="text-xs sm:text-sm font-black text-slate-800">{t('admin_dashboard.nfc.match_select_label')}</label>
                       </div>
-                      <p className="text-[11px] font-bold text-slate-500 pl-9 -mt-1">카탈로그에서 출고할 제품을 고릅니다.</p>
+                      <p className="text-[11px] font-bold text-slate-500 pl-9 -mt-1">{t('admin_dashboard.nfc.match_select_desc')}</p>
                       <div className="relative">
                         <select
                           required
@@ -2833,7 +2819,7 @@ export default function AdminDashboard() {
                           onChange={(e) => setNfcMatchForm((prev) => ({ ...prev, product_id: e.target.value }))}
                           className="w-full h-12 rounded-xl border border-slate-200 bg-slate-50 pl-4 pr-10 text-sm font-bold outline-none focus:border-emerald-500 focus:bg-white appearance-none cursor-pointer"
                         >
-                          <option value="">제품을 선택하세요</option>
+                          <option value="">{t('admin_dashboard.nfc.match_select_placeholder')}</option>
                           {products.map((p: { id: number | string; name: string }) => (
                             <option key={p.id} value={String(p.id)}>
                               {p.name}
@@ -2849,10 +2835,10 @@ export default function AdminDashboard() {
                         <span className="shrink-0 w-7 h-7 rounded-lg bg-emerald-600 text-white text-xs font-black flex items-center justify-center shadow-sm">
                           3
                         </span>
-                        <label className="text-xs sm:text-sm font-black text-slate-800">제품 매칭 (URL 자동 기록)</label>
+                        <label className="text-xs sm:text-sm font-black text-slate-800">{t('admin_dashboard.nfc.match_action_label')}</label>
                       </div>
                       <p className="text-[11px] font-bold text-slate-500 pl-9">
-                        버튼을 누른 뒤 <strong className="text-slate-700">같은 태그</strong>를 폰에 1~2초 대 주세요.
+                        {t('admin_dashboard.nfc.match_action_desc')}
                       </p>
                       <button
                         type="submit"
@@ -2866,23 +2852,22 @@ export default function AdminDashboard() {
                       >
                         {(submitting || nfcWriting) && <Loader2 className="w-5 h-5 animate-spin" />}
                         {nfcWriting
-                          ? '태그를 기기에 대 주세요…'
+                          ? t('admin_dashboard.nfc.match_btn_action_scanning')
                           : submitting
-                            ? '매칭 중…'
-                            : '제품 매칭'}
+                            ? t('admin_dashboard.nfc.match_btn_action_submitting')
+                            : t('admin_dashboard.nfc.match_btn_action')}
                       </button>
                       {nfcWriting && (
                         <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
                           <p className="text-[11px] font-bold text-amber-900 leading-relaxed">
-                            같은 태그를 <strong>NFC 안테나</strong>에 붙인 채 유지하세요. (Galaxy: NFC 「기본
-                            모드」) 최대 {Math.round(NFC_WRITE_TIMEOUT_MS / 1000)}초
+                            <span dangerouslySetInnerHTML={{ __html: t('admin_dashboard.nfc.match_write_guide', { timeout: Math.round(NFC_WRITE_TIMEOUT_MS / 1000) }) }} />
                           </p>
                           <button
                             type="button"
                             onClick={cancelNfcWrite}
                             className="w-full h-10 rounded-xl border border-amber-300 bg-white text-amber-900 text-xs font-black"
                           >
-                            기록 취소
+                            {t('admin_dashboard.nfc.match_btn_cancel')}
                           </button>
                         </div>
                       )}
@@ -2919,7 +2904,7 @@ export default function AdminDashboard() {
                       }}
                       className="w-full text-center text-[11px] font-bold text-slate-400 hover:text-emerald-700 underline-offset-2 hover:underline"
                     >
-                      통합 발행 모달 (고급 · URL 덮어쓰기)
+                      {t('admin_dashboard.nfc.modal_advanced_link')}
                     </button>
                   </form>
                   )}
@@ -2934,25 +2919,25 @@ export default function AdminDashboard() {
                       <Hash className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="text-base sm:text-lg font-black text-slate-900">UID만 등록 (자산)</h3>
+                      <h3 className="text-base sm:text-lg font-black text-slate-900">{t('admin_dashboard.nfc.register_title')}</h3>
                       <p className="text-xs font-bold text-slate-500 mt-1 leading-relaxed">
-                        제품·URL 없이 NFC UID만 재고 자산으로 등록합니다. 랜딩 URL은 출고 시 「제품 매칭」에서 태그에 기록됩니다.
+                        {t('admin_dashboard.nfc.register_desc')}
                       </p>
                     </div>
                   </div>
 
-                  <NfcWorkflowSteps accent="amber" labels={['NFC 스캔', 'UID 확인', '자산 등록']} />
+                  <NfcWorkflowSteps accent="amber" labels={[t('admin_dashboard.nfc.register_step1'), t('admin_dashboard.nfc.register_step2'), t('admin_dashboard.nfc.register_step3')]} />
 
                   <form onSubmit={handleUidOnlyRegister} className="space-y-5">
                     <NfcUidScanStep
                       stepNumber={1}
-                      stepTitle="태그 UID — 아래 주황 버튼부터 누르세요"
+                      stepTitle={t('admin_dashboard.nfc.register_scan_label')}
                       accent="amber"
                       tagUid={nfcRegisterOnlyForm.tag_uid}
                       scanning={nfcScanning}
                       onScan={() => void handleNFCScanRegisterOnly()}
-                      scanLabel="UID 자산 등록 · NFC 스캔 시작"
-                      scanSubLabel="① 이 버튼 → ② UID 확인 → ③ 맨 아래 「UID 자산 등록」"
+                      scanLabel={t('admin_dashboard.nfc.register_scan_btn')}
+                      scanSubLabel={t('admin_dashboard.nfc.register_scan_sub')}
                       onTagUidChange={(v) => setNfcRegisterOnlyForm({ tag_uid: v })}
                     />
 
@@ -2962,13 +2947,12 @@ export default function AdminDashboard() {
                       className="w-full h-14 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-base rounded-2xl shadow-lg shadow-amber-500/20 disabled:opacity-40 flex items-center justify-center gap-2"
                     >
                       {submitting && <Loader2 className="w-5 h-5 animate-spin" />}
-                      {submitting ? '등록 중…' : 'UID 자산 등록'}
+                      {submitting ? t('admin_dashboard.nfc.match_btn_action_submitting') : t('admin_dashboard.nfc.register_btn_submit')}
                     </button>
 
                     <div className="rounded-xl border border-amber-100 bg-amber-50/50 px-4 py-3">
                       <p className="text-[11px] font-bold text-amber-900 leading-relaxed">
-                        이 단계에서는 서버에 UID만 저장합니다. 소비자용 랜딩 URL은 「제품 매칭」 탭에서 제품을 연결할 때 NFC 태그에
-                        기록됩니다.
+                        {t('admin_dashboard.nfc.register_notice')}
                       </p>
                     </div>
                   </form>
@@ -2985,14 +2969,14 @@ export default function AdminDashboard() {
                       <Hash className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="text-base sm:text-lg lg:text-xl font-black text-slate-900 flex items-center gap-2">① UID만 등록된 태그 <span className="text-xs font-black text-amber-700 bg-amber-50/80 px-2 py-0.5 rounded-lg border border-amber-200/50">(자산)</span></h3>
+                      <h3 className="text-base sm:text-lg lg:text-xl font-black text-slate-900 flex items-center gap-2">{t('admin_dashboard.nfc.browse_unlinked_title')} <span className="text-xs font-black text-amber-700 bg-amber-50/80 px-2 py-0.5 rounded-lg border border-amber-200/50">({t('admin_dashboard.nfc.stat_asset')})</span></h3>
                       <p className="text-xs font-bold text-slate-400 mt-0.5 leading-relaxed">
-                        출고 전 재고 목록입니다. 「이 태그로 매칭」을 누르면 제품 매칭 워크벤치로 이동합니다.
+                        {t('admin_dashboard.nfc.browse_unlinked_desc')}
                       </p>
                     </div>
                   </div>
                   <span className="text-xs font-black text-amber-800 bg-amber-50 px-3.5 py-1.5 rounded-2xl border border-amber-200/80 shadow-sm shrink-0">
-                    총 {nfcUnlinkedList.length}건
+                    {t('admin_dashboard.nfc.browse_unlinked_count', { count: nfcUnlinkedList.length })}
                   </span>
                 </div>
 
@@ -3013,7 +2997,7 @@ export default function AdminDashboard() {
                               {t.tag_uid}
                             </p>
                             <p className="text-[11px] font-bold text-slate-400 mt-1">
-                              등록일{' '}
+                              {t('admin_dashboard.nfc.modal_nfc_snapshot_date')}{' '}
                               <span className="font-mono bg-white px-1.5 py-0.5 border border-slate-100 rounded text-slate-500 text-[10px]">
                                 {t.created_at
                                   ? new Date(t.created_at).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' })
@@ -3027,14 +3011,14 @@ export default function AdminDashboard() {
                           onClick={() => openMatchWorkbench(t.tag_uid)}
                           className="shrink-0 h-10 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-black hover:from-emerald-700 hover:to-teal-700 transition-all flex items-center justify-center gap-1.5 shadow-md active:scale-[0.98]"
                         >
-                          <LinkIcon className="w-4 h-4" /> 이 태그로 매칭
+                          <LinkIcon className="w-4 h-4" /> {t('admin_dashboard.nfc.browse_unlinked_btn_match')}
                         </button>
                       </div>
                     ))}
                   {nfcUnlinkedList.length === 0 && (
                     <div className="flex flex-col items-center justify-center p-12 bg-slate-50/50 rounded-3xl border border-dashed border-slate-200/80">
                       <Smartphone className="w-12 h-12 text-slate-200 mb-2" />
-                      <p className="text-xs sm:text-sm font-black text-slate-400">등록된 빈 자산 태그가 없습니다.</p>
+                      <p className="text-xs sm:text-sm font-black text-slate-400">{t('admin_dashboard.nfc.browse_unlinked_empty')}</p>
                     </div>
                   )}
                 </div>
@@ -3046,7 +3030,7 @@ export default function AdminDashboard() {
                       onClick={() => setCurrentPageNfcAsset((p) => p - 1)}
                       className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 hover:border-slate-200 transition-all shadow-sm shrink-0"
                     >
-                      이전
+                      {t('admin_dashboard.dashboard.page_prev')}
                     </button>
                     {Array.from({ length: Math.ceil(nfcUnlinkedList.length / ITEMS_PER_PAGE) }).map((_, i) => (
                       <button
@@ -3067,7 +3051,7 @@ export default function AdminDashboard() {
                       onClick={() => setCurrentPageNfcAsset((p) => p + 1)}
                       className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 hover:border-slate-200 transition-all shadow-sm shrink-0"
                     >
-                      다음
+                      {t('admin_dashboard.dashboard.page_next')}
                     </button>
                   </div>
                 )}
@@ -3081,14 +3065,14 @@ export default function AdminDashboard() {
                       <LinkIcon className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="text-base sm:text-lg lg:text-xl font-black text-slate-900 flex items-center gap-2">② 제품과 매칭된 태그 <span className="text-xs font-black text-emerald-700 bg-emerald-50/80 px-2 py-0.5 rounded-lg border border-emerald-200/50">(매칭 완료)</span></h3>
+                      <h3 className="text-base sm:text-lg lg:text-xl font-black text-slate-900 flex items-center gap-2">{t('admin_dashboard.nfc.browse_linked_title')} <span className="text-xs font-black text-emerald-700 bg-emerald-50/80 px-2 py-0.5 rounded-lg border border-emerald-200/50">({t('admin_dashboard.nfc.stat_linked')})</span></h3>
                       <p className="text-xs font-bold text-slate-400 mt-0.5 leading-relaxed">
-                        출고 완료된 태그입니다. 필요시 제품을 변경하거나 URL을 덮어써 재발행할 수 있습니다.
+                        {t('admin_dashboard.nfc.browse_linked_desc')}
                       </p>
                     </div>
                   </div>
                   <span className="text-xs font-black text-emerald-800 bg-emerald-50 px-3.5 py-1.5 rounded-2xl border border-emerald-200/80 shadow-sm shrink-0">
-                    총 {nfcLinkedList.length}건
+                    {t('admin_dashboard.nfc.browse_linked_count', { count: nfcLinkedList.length })}
                   </span>
                 </div>
 
@@ -3098,7 +3082,7 @@ export default function AdminDashboard() {
                     <Search className="absolute left-3.5 w-4 h-4 text-slate-300" />
                     <input 
                       type="text"
-                      placeholder="태그 UID 검색"
+                      placeholder={t('admin_dashboard.nfc.browse_filter_uid')}
                       value={nfcSearchUid}
                       onChange={(e) => {
                         setNfcSearchUid(e.target.value);
@@ -3111,7 +3095,7 @@ export default function AdminDashboard() {
                     <Award className="absolute left-3.5 w-4 h-4 text-slate-300" />
                     <input 
                       type="text"
-                      placeholder="보증서 일련번호 검색"
+                      placeholder={t('admin_dashboard.nfc.browse_filter_serial')}
                       value={nfcFilterCertSerial}
                       onChange={(e) => {
                         setNfcFilterCertSerial(e.target.value);
@@ -3128,7 +3112,7 @@ export default function AdminDashboard() {
                     }}
                     className="h-11 bg-slate-50 border border-slate-100 rounded-xl px-4 text-xs font-bold outline-none focus:border-emerald-200 focus:bg-white transition-all cursor-pointer"
                   >
-                    <option value="">모든 제품 보기</option>
+                    <option value="">{t('admin_dashboard.nfc.browse_filter_all_products')}</option>
                     {products.map(p => (
                       <option key={p.id} value={String(p.id)}>{p.name}</option>
                     ))}
@@ -3151,15 +3135,15 @@ export default function AdminDashboard() {
                             <p className="font-black text-slate-800 text-sm sm:text-base break-all leading-snug">{t.tag_uid}</p>
                             <div className="flex flex-wrap items-center gap-2 mt-1">
                               <span className="text-[10px] font-black tracking-wider uppercase bg-emerald-50 border border-emerald-100 text-emerald-800 px-2.5 py-1 rounded-xl">
-                                {t.target_name || '(알 수 없음)'}
+                                {t.target_name || t('admin_dashboard.users.name_empty')}
                               </span>
                               <span className="text-[10px] font-bold bg-white text-slate-500 border border-slate-100 px-2 py-0.5 rounded-xl flex items-center gap-1">
-                                <span>등록</span>
+                                <span>{t('admin_dashboard.nfc.modal_nfc_snapshot_date')}</span>
                                 {t.created_at ? new Date(t.created_at).toLocaleDateString() : '-'}
                               </span>
                               {t.product_sold_at ? (
                                 <span className="text-[10px] font-black uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-100 px-2 py-0.5 rounded-xl flex items-center gap-1 animate-pulse">
-                                  판매완료
+                                  {t('admin_dashboard.products.sold_tag')}
                                 </span>
                               ) : null}
                             </div>
@@ -3173,7 +3157,7 @@ export default function AdminDashboard() {
                             className="h-10 flex-1 lg:flex-initial lg:px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-black shadow-md hover:from-emerald-700 hover:to-teal-700 transition-all duration-200 flex items-center justify-center gap-1.5 active:scale-[0.98] select-none"
                           >
                             <LinkIcon className="w-4 h-4" />
-                            <span>제품 변경 매칭</span>
+                            <span>{t('admin_dashboard.nfc.browse_linked_btn_change')}</span>
                           </button>
                           <button
                             type="button"
@@ -3181,7 +3165,7 @@ export default function AdminDashboard() {
                             className="h-10 flex-1 lg:flex-initial lg:px-4 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs font-black hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 flex items-center justify-center gap-1.5 active:scale-[0.98] shadow-sm select-none"
                           >
                             <Link2Off className="w-4 h-4" />
-                            <span>매칭 해제</span>
+                            <span>{t('admin_dashboard.nfc.browse_linked_btn_unmap')}</span>
                           </button>
                         </div>
                       </div>
@@ -3189,7 +3173,7 @@ export default function AdminDashboard() {
                   {nfcLinkedList.length === 0 && (
                     <div className="flex flex-col items-center justify-center p-12 bg-slate-50/50 rounded-3xl border border-dashed border-slate-200/80">
                       <LinkIcon className="w-12 h-12 text-slate-200 mb-2" />
-                      <p className="text-xs sm:text-sm font-black text-slate-400">매칭된 태그 데이터가 없습니다.</p>
+                      <p className="text-xs sm:text-sm font-black text-slate-400">{t('admin_dashboard.nfc.browse_linked_empty')}</p>
                     </div>
                   )}
                 </div>
@@ -3201,7 +3185,7 @@ export default function AdminDashboard() {
                       onClick={() => setCurrentPageNfcLinked((p) => p - 1)}
                       className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 hover:border-slate-200 transition-all shadow-sm shrink-0"
                     >
-                      이전
+                      {t('admin_dashboard.dashboard.page_prev')}
                     </button>
                     {Array.from({ length: Math.ceil(nfcLinkedList.length / ITEMS_PER_PAGE) }).map((_, i) => (
                       <button
@@ -3222,7 +3206,7 @@ export default function AdminDashboard() {
                       onClick={() => setCurrentPageNfcLinked((p) => p + 1)}
                       className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 hover:border-slate-200 transition-all shadow-sm shrink-0"
                     >
-                      다음
+                      {t('admin_dashboard.dashboard.page_next')}
                     </button>
                   </div>
                 )}
@@ -3237,10 +3221,10 @@ export default function AdminDashboard() {
             <>
               <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
                 <div>
-                  <h2 className="text-2xl lg:text-3xl font-black text-slate-900">보증서 관리</h2>
-                  <p className="text-xs font-bold text-slate-400 mt-1">실물 골드바 보증서를 등록·수정·삭제합니다. 카탈로그 제품 매칭만으로는 보증서가 생성되지 않습니다.</p>
+                  <h2 className="text-2xl lg:text-3xl font-black text-slate-900">{t('admin_dashboard.goldbars.title')}</h2>
+                  <p className="text-xs font-bold text-slate-400 mt-1">{t('admin_dashboard.goldbars.desc')}</p>
                 </div>
-                <button onClick={() => setIsGoldbarModalOpen(true)} className="bg-amber-600 hover:bg-amber-700 text-white font-black py-3.5 px-6 rounded-2xl shadow-lg shadow-amber-500/20 flex items-center gap-2 transition-all"><Award className="w-5 h-5" /> 골드바 & 보증서 등록</button>
+                <button onClick={() => setIsGoldbarModalOpen(true)} className="bg-amber-600 hover:bg-amber-700 text-white font-black py-3.5 px-6 rounded-2xl shadow-lg shadow-amber-500/20 flex items-center gap-2 transition-all"><Award className="w-5 h-5" /> {t('admin_dashboard.goldbars.register_btn')}</button>
               </div>
 
               {/* 검색 및 필터 패널 */}
@@ -3249,7 +3233,7 @@ export default function AdminDashboard() {
                   <Search className="absolute left-4 w-5 h-5 text-slate-300" />
                   <input 
                     type="text" 
-                    placeholder="일련번호 검색 (예: GB)"
+                    placeholder={t('admin_dashboard.goldbars.search_placeholder')}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full h-12 bg-slate-50 rounded-xl pl-12 pr-4 text-sm font-bold border border-transparent focus:border-amber-200 focus:bg-white outline-none transition-all"
@@ -3262,7 +3246,7 @@ export default function AdminDashboard() {
                     onChange={(e) => setFilterPurity(e.target.value)}
                     className="h-12 bg-slate-50 rounded-xl px-4 text-sm font-bold border-none outline-none ring-1 ring-slate-100 cursor-pointer flex-1 sm:flex-initial"
                   >
-                    <option value="">순도 전체</option>
+                    <option value="">{t('admin_dashboard.goldbars.filter_purity_all')}</option>
                     <option value="99.99%">99.99%</option>
                     <option value="99.9%">99.9%</option>
                     <option value="24K">24K</option>
@@ -3284,16 +3268,16 @@ export default function AdminDashboard() {
                               <span className="block text-xs font-mono font-bold text-slate-500 mt-1">{g.serial_number}</span>
                             </>
                           ) : (
-                            <>일련번호: {g.serial_number}</>
+                            <>{t('user_landing.wallet.serial_number')}: {g.serial_number}</>
                           )}
                         </h4>
-                        <p className="text-xs font-bold text-slate-400 mt-0.5">등록일: {new Date(g.created_at).toLocaleDateString()}</p>
+                        <p className="text-xs font-bold text-slate-400 mt-0.5">{t('admin_dashboard.nfc.modal_nfc_snapshot_date')}: {new Date(g.created_at).toLocaleDateString()}</p>
                       </div>
                       <div className="shrink-0 flex flex-col sm:flex-row items-end gap-0.5">
-                        <button type="button" onClick={() => handleEditOpen(g)} className="p-2 rounded-lg sm:rounded-xl hover:bg-slate-50 text-slate-400 hover:text-amber-600 transition-all" aria-label="수정">
+                        <button type="button" onClick={() => handleEditOpen(g)} className="p-2 rounded-lg sm:rounded-xl hover:bg-slate-50 text-slate-400 hover:text-amber-600 transition-all" aria-label={t('common.edit', '수정')}>
                           <Edit3 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                         </button>
-                        <button type="button" onClick={() => handleDeleteGoldbar(g.id)} className="p-2 rounded-lg sm:rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-all" aria-label="삭제">
+                        <button type="button" onClick={() => handleDeleteGoldbar(g.id)} className="p-2 rounded-lg sm:rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-all" aria-label={t('common.delete')}>
                           <Trash2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
                         </button>
                       </div>
@@ -3301,11 +3285,11 @@ export default function AdminDashboard() {
 
                     <div className="grid grid-cols-2 gap-3 sm:gap-4 bg-slate-50 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-100/60 text-sm min-w-0">
                       <div className="min-w-0">
-                        <span className="text-slate-400 font-bold block text-[11px]">중량</span>
+                        <span className="text-slate-400 font-bold block text-[11px]">{t('admin_dashboard.goldbars.label_weight')}</span>
                         <span className="font-black text-slate-700 break-words">{g.weight}</span>
                       </div>
                       <div className="min-w-0">
-                        <span className="text-slate-400 font-bold block text-[11px]">제조일자</span>
+                        <span className="text-slate-400 font-bold block text-[11px]">{t('admin_dashboard.goldbars.label_minted')}</span>
                         <span className="font-black text-slate-700 break-words">{g.minted_at || '-'}</span>
                       </div>
                       <div className="col-span-2 border-t border-slate-100 pt-2 mt-1 flex justify-between items-center min-w-0">
@@ -3317,7 +3301,7 @@ export default function AdminDashboard() {
                 {filteredGoldbars.length === 0 && (
                   <div className="col-span-2 bg-white rounded-3xl border border-slate-100 p-12 flex flex-col items-center justify-center text-center">
                     <Award className="w-16 h-16 text-slate-200 mb-4" />
-                    <p className="font-black text-slate-400">등록된 골드바가 없거나 검색 결과가 없습니다.</p>
+                    <p className="font-black text-slate-400">{t('admin_dashboard.goldbars.empty_notice')}</p>
                   </div>
                 )}
               </div>
@@ -3330,7 +3314,7 @@ export default function AdminDashboard() {
                     onClick={() => setCurrentPageGoldbars(p => p - 1)}
                     className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm shrink-0"
                   >
-                    이전
+                    {t('admin_dashboard.dashboard.page_prev')}
                   </button>
                   {Array.from({ length: Math.ceil(filteredGoldbars.length / ITEMS_PER_PAGE) }).map((_, i) => (
                     <button
@@ -3346,7 +3330,7 @@ export default function AdminDashboard() {
                     onClick={() => setCurrentPageGoldbars(p => p + 1)}
                     className="h-10 px-4 text-xs font-black bg-white rounded-xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm shrink-0"
                   >
-                    다음
+                    {t('admin_dashboard.dashboard.page_next')}
                   </button>
                 </div>
               )}
@@ -3357,16 +3341,16 @@ export default function AdminDashboard() {
             <>
               <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
                 <div>
-                  <h2 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">자산별 시세 및 유통 관리</h2>
+                  <h2 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">{t('admin_dashboard.assetMarket.title')}</h2>
                   <p className="text-xs font-bold text-slate-400 mt-1">
-                    실물 태그와 연결된 자산별로 시세를 설정하고 유통 현황(제품 매칭, 출고일)을 관리합니다.
+                    {t('admin_dashboard.assetMarket.desc')}
                   </p>
                 </div>
                 <button
                   onClick={fetchAssets}
                   className="px-4 py-2.5 bg-white border border-slate-200 text-slate-600 font-black text-xs rounded-xl hover:bg-slate-50 transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${loadingAssets ? 'animate-spin' : ''}`} /> 새로고침
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingAssets ? 'animate-spin' : ''}`} /> {t('admin_dashboard.assetMarket.refresh_btn')}
                 </button>
               </div>
 
@@ -3378,20 +3362,20 @@ export default function AdminDashboard() {
                       <Activity className="w-5 h-5 text-amber-500" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-black text-slate-800">일괄 시세 설정</h3>
-                      <p className="text-[10px] font-bold text-slate-400">선택한 여러 자산에 동일한 시세를 한 번에 적용합니다.</p>
+                      <h3 className="text-lg font-black text-slate-800">{t('admin_dashboard.assetMarket.bulk_title')}</h3>
+                      <p className="text-[10px] font-bold text-slate-400">{t('admin_dashboard.assetMarket.bulk_desc')}</p>
                     </div>
                   </div>
                   {selectedAssetIds.length > 0 && (
                     <span className="px-3 py-1 bg-amber-500 text-white text-[10px] font-black rounded-full animate-pulse">
-                      {selectedAssetIds.length}개 선택됨
+                      {t('admin_dashboard.assetMarket.bulk_count_selected', { count: selectedAssetIds.length })}
                     </span>
                   )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">1g당 매입 시세 (원)</label>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">{t('admin_dashboard.assetMarket.bulk_price_per_gram')}</label>
                     <input
                       type="number"
                       placeholder="예: 115000"
@@ -3401,7 +3385,7 @@ export default function AdminDashboard() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">시세 노출</label>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">{t('admin_dashboard.assetMarket.bulk_show_market')}</label>
                     <div className="flex h-12 items-center gap-2">
                       <button
                         onClick={() => setBulkShowMarket(true)}
@@ -3418,7 +3402,7 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">시작일 (선택)</label>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">{t('admin_dashboard.assetMarket.bulk_start_date')}</label>
                     <input
                       type="date"
                       value={bulkShowStart}
@@ -3427,7 +3411,7 @@ export default function AdminDashboard() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">종료일 (선택)</label>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">{t('admin_dashboard.assetMarket.bulk_end_date')}</label>
                     <input
                       type="date"
                       value={bulkShowEnd}
@@ -3446,7 +3430,7 @@ export default function AdminDashboard() {
                     }}
                     className="px-6 h-12 bg-slate-100 text-slate-600 font-black text-xs rounded-xl hover:bg-slate-200 transition-all"
                   >
-                    {selectedAssetIds.length === (assets.length) ? '전체 해제' : '전체 선택'}
+                    {selectedAssetIds.length === (assets.length) ? t('admin_dashboard.assetMarket.bulk_btn_none') : t('admin_dashboard.assetMarket.bulk_btn_all')}
                   </button>
                   <button
                     onClick={handleBulkApplyAssetMarket}
@@ -3454,7 +3438,7 @@ export default function AdminDashboard() {
                     className="flex-1 h-12 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-sm rounded-xl shadow-lg shadow-amber-500/25 hover:opacity-95 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
                   >
                     {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {selectedAssetIds.length}개 자산에 시세 적용하기
+                    {t('admin_dashboard.assetMarket.bulk_btn_apply', { count: selectedAssetIds.length })}
                   </button>
                 </div>
               </div>
@@ -3477,10 +3461,10 @@ export default function AdminDashboard() {
                             className="w-5 h-5 rounded-lg border-slate-200 text-amber-500 focus:ring-amber-500 cursor-pointer"
                           />
                         </th>
-                        <th className="p-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">상태 & 자산 정보</th>
-                        <th className="p-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest hidden sm:table-cell">매칭 제품</th>
-                        <th className="p-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest hidden lg:table-cell">태그 UID</th>
-                        <th className="p-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest w-24">상세설정</th>
+                        <th className="p-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('admin_dashboard.assetMarket.th_status')}</th>
+                        <th className="p-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest hidden sm:table-cell">{t('admin_dashboard.assetMarket.th_product')}</th>
+                        <th className="p-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest hidden lg:table-cell">{t('admin_dashboard.assetMarket.th_uid')}</th>
+                        <th className="p-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest w-24">{t('admin_dashboard.assetMarket.th_detail')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -3513,12 +3497,12 @@ export default function AdminDashboard() {
                                     <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border shrink-0 ${
                                       asset.id ? 'text-amber-600 bg-amber-50 border-amber-200/50' : 'text-slate-500 bg-slate-50 border-slate-200/50'
                                     }`}>
-                                      {asset.id ? 'CERTIFIED' : 'TAG ONLY'}
+                                      {asset.id ? t('admin_dashboard.assetMarket.status_certified') : t('admin_dashboard.assetMarket.status_tag_only')}
                                     </span>
                                     <div className="min-w-0">
-                                      <p className="text-sm font-black text-slate-800 truncate">{asset.serial_number || '보증서 미발행'}</p>
+                                      <p className="text-sm font-black text-slate-800 truncate">{asset.serial_number || t('admin_dashboard.common.unregistered_cert')}</p>
                                       <p className="text-[10px] font-bold text-slate-400">
-                                        {asset.matching_date ? `매칭일: ${new Date(asset.matching_date).toLocaleDateString()}` : '출고 대기'}
+                                        {asset.matching_date ? t('admin_dashboard.assetMarket.label_matching_date', { date: new Date(asset.matching_date).toLocaleDateString() }) : t('admin_dashboard.assetMarket.label_shipped_wait')}
                                       </p>
                                     </div>
                                   </div>
@@ -3547,7 +3531,7 @@ export default function AdminDashboard() {
                                     <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm flex flex-col lg:flex-row gap-8 items-start lg:items-center">
                                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 flex-1 w-full">
                                         <div className="space-y-2">
-                                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">1g당 개별 시세 (원)</label>
+                                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">{t('admin_dashboard.assetMarket.accordion_price')}</label>
                                           <div className="relative flex items-center">
                                             <input 
                                               type="number" 
@@ -3555,28 +3539,28 @@ export default function AdminDashboard() {
                                               onBlur={(e) => handleUpdateAssetMarket(asset, { market_price_per_gram: Number(e.target.value) })}
                                               className="w-full h-11 bg-slate-50 border border-slate-100 rounded-xl px-4 font-black text-xs outline-none focus:border-amber-400 transition-all pr-10" 
                                             />
-                                            <span className="absolute right-4 text-[10px] font-bold text-slate-400">원</span>
+                                            <span className="absolute right-4 text-[10px] font-bold text-slate-400">{t('admin_dashboard.common.currency_won')}</span>
                                           </div>
                                         </div>
                                         <div className="space-y-2">
-                                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">시세 노출 상태</label>
+                                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">{t('admin_dashboard.assetMarket.accordion_show')}</label>
                                           <div className="flex h-11 items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
                                             <button
                                               onClick={() => handleUpdateAssetMarket(asset, { show_market_price: true })}
                                               className={`flex-1 h-full rounded-lg font-black text-[10px] transition-all ${asset.show_market_price ? 'bg-white text-amber-600 shadow-sm' : 'text-slate-400 hover:text-slate-500'}`}
                                             >
-                                              노출
+                                              {t('admin_dashboard.assetMarket.accordion_show_on')}
                                             </button>
                                             <button
                                               onClick={() => handleUpdateAssetMarket(asset, { show_market_price: false })}
                                               className={`flex-1 h-full rounded-lg font-black text-[10px] transition-all ${!asset.show_market_price ? 'bg-white text-slate-600 shadow-sm' : 'text-slate-400 hover:text-slate-500'}`}
                                             >
-                                              비노출
+                                              {t('admin_dashboard.assetMarket.accordion_show_off')}
                                             </button>
                                           </div>
                                         </div>
                                         <div className="space-y-2">
-                                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">시작일</label>
+                                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">{t('admin_dashboard.assetMarket.accordion_start')}</label>
                                           <input 
                                             type="date" 
                                             defaultValue={asset.show_start_at ? asset.show_start_at.split('T')[0] : ''} 
@@ -3585,7 +3569,7 @@ export default function AdminDashboard() {
                                           />
                                         </div>
                                         <div className="space-y-2">
-                                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">종료일</label>
+                                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">{t('admin_dashboard.assetMarket.accordion_end')}</label>
                                           <input 
                                             type="date" 
                                             defaultValue={asset.show_end_at ? asset.show_end_at.split('T')[0] : ''} 
@@ -3606,7 +3590,7 @@ export default function AdminDashboard() {
                                             isSelected ? 'bg-amber-500 text-white border-transparent shadow-md shadow-amber-500/20' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                                           }`}
                                         >
-                                          {isSelected ? '선택 취소' : '항목 선택'}
+                                          {isSelected ? t('admin_dashboard.assetMarket.accordion_btn_cancel') : t('admin_dashboard.assetMarket.accordion_btn_select')}
                                         </button>
                                       </div>
                                     </div>
@@ -3620,7 +3604,7 @@ export default function AdminDashboard() {
                         <tr>
                           <td colSpan={5} className="p-20 text-center">
                             <Box className="w-16 h-16 text-slate-200 mx-auto mb-4" />
-                            <p className="font-black text-slate-400">등록된 자산이 없거나 데이터를 불러오는 중입니다.</p>
+                            <p className="font-black text-slate-400">{t('admin_dashboard.assetMarket.empty_notice')}</p>
                           </td>
                         </tr>
                       )}
@@ -3637,7 +3621,7 @@ export default function AdminDashboard() {
                     onClick={() => setCurrentPageAssets(p => p - 1)}
                     className="h-11 px-4 text-xs font-black bg-white rounded-2xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm shrink-0"
                   >
-                    이전
+                    {t('admin_dashboard.dashboard.page_prev')}
                   </button>
                   {Array.from({ length: Math.ceil(assets.length / ITEMS_PER_PAGE) }).map((_, i) => (
                     <button
@@ -3657,7 +3641,7 @@ export default function AdminDashboard() {
                     onClick={() => setCurrentPageAssets(p => p + 1)}
                     className="h-11 px-4 text-xs font-black bg-white rounded-2xl border border-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-all shadow-sm shrink-0"
                   >
-                    다음
+                    {t('admin_dashboard.dashboard.page_next')}
                   </button>
                 </div>
               )}
@@ -3674,16 +3658,16 @@ export default function AdminDashboard() {
             <>
               <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
                 <div>
-                  <h2 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">소유권 해지(재판매) 요청 관리</h2>
+                  <h2 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">{t('admin_dashboard.releaseRequests.title')}</h2>
                   <p className="text-xs font-bold text-slate-400 mt-1">
-                    사용자가 신청한 소유권 해지 요청을 검토하고 승인합니다. 승인 시 사용자의 지갑에서 제품이 제거됩니다.
+                    {t('admin_dashboard.releaseRequests.desc')}
                   </p>
                 </div>
                 <button
                   onClick={fetchReleaseRequests}
                   className="px-4 py-2.5 bg-white border border-slate-200 text-slate-600 font-black text-xs rounded-xl hover:bg-slate-50 transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${loadingRelease ? 'animate-spin' : ''}`} /> 새로고침
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingRelease ? 'animate-spin' : ''}`} /> {t('admin_dashboard.releaseRequests.refresh_btn')}
                 </button>
               </div>
 
@@ -3695,27 +3679,27 @@ export default function AdminDashboard() {
                       <div>
                         <div className="flex justify-between items-start mb-4">
                           <span className="text-[10px] font-black uppercase text-rose-600 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200/40 tracking-widest">
-                            RELEASE REQUEST
+                            {t('admin_dashboard.releaseRequests.card_label')}
                           </span>
                           <span className="text-[11px] font-bold text-slate-400">{new Date(req.requested_at).toLocaleDateString()}</span>
                         </div>
                         
                         <div className="space-y-3">
                           <div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">USER</p>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('admin_dashboard.releaseRequests.label_user')}</p>
                             <h4 className="text-sm font-black text-slate-800 break-all">{req.user_email}</h4>
-                            <p className="text-xs font-bold text-slate-500">{req.user_name || '이름 없음'}</p>
+                            <p className="text-xs font-bold text-slate-500">{req.user_name || t('admin_dashboard.users.name_empty')}</p>
                           </div>
                           
                           <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100/60">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">GOLDBAR</p>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{t('admin_dashboard.releaseRequests.label_goldbar')}</p>
                             <p className="text-xs font-black text-slate-800">{req.serial_number}</p>
                             <p className="text-[10px] font-bold text-slate-500">{req.weight}g</p>
                           </div>
 
                           {req.message && (
                             <div className="bg-amber-50/40 p-3 rounded-2xl border border-amber-100/40">
-                              <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest mb-1">MESSAGE</p>
+                              <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest mb-1">{t('admin_dashboard.releaseRequests.label_message')}</p>
                               <p className="text-xs font-bold text-slate-600 italic">"{req.message}"</p>
                             </div>
                           )}
@@ -3727,13 +3711,13 @@ export default function AdminDashboard() {
                           onClick={() => handleHandleRelease(req.id, 'APPROVE')}
                           className="flex-1 h-11 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs rounded-xl transition-all shadow-lg shadow-emerald-500/20"
                         >
-                          승인
+                          {t('admin_dashboard.releaseRequests.btn_approve')}
                         </button>
                         <button
                           onClick={() => handleHandleRelease(req.id, 'REJECT')}
                           className="flex-1 h-11 bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-xs rounded-xl transition-all"
                         >
-                          반려
+                          {t('admin_dashboard.releaseRequests.btn_reject')}
                         </button>
                       </div>
                     </div>
@@ -3743,7 +3727,7 @@ export default function AdminDashboard() {
                     <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300 mb-4">
                       <Bookmark className="w-8 h-8" />
                     </div>
-                    <p className="font-black text-slate-400 text-sm">대기 중인 해지 요청이 없습니다.</p>
+                    <p className="font-black text-slate-400 text-sm">{t('admin_dashboard.releaseRequests.empty_notice')}</p>
                   </div>
                 )}
               </div>
@@ -3758,22 +3742,22 @@ export default function AdminDashboard() {
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setIsProductModalOpen(false)}></div>
           <div className="relative w-full max-w-lg bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh]">
             <header className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
-              <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">순수 제품 등록</h3>
-              <button onClick={() => setIsProductModalOpen(false)} className="p-2 bg-white rounded-xl text-slate-400 shadow-sm"><X className="w-6 h-6" /></button>
+              <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">{t('admin_dashboard.products.modal_register_title')}</h3>
+              <button onClick={() => setIsProductModalOpen(false)} className="p-2 bg-white rounded-xl text-slate-400 shadow-sm" aria-label={t('common.close')}><X className="w-6 h-6" /></button>
             </header>
             <form onSubmit={handleProductSubmit} className="p-8 space-y-4 overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-12">
                <div className="space-y-2">
-                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">품명 *</label>
-                 <input required type="text" placeholder="예: 골드바3.75g" value={productFormData.name} onChange={(e) => setProductFormData({ ...productFormData, name: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent hover:border-primary/20 focus:border-primary/50 focus:bg-white transition-all" />
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">{t('admin_dashboard.products.form_name')}</label>
+                 <input required type="text" placeholder={t('admin_dashboard.products.form_name_placeholder')} value={productFormData.name} onChange={(e) => setProductFormData({ ...productFormData, name: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent hover:border-primary/20 focus:border-primary/50 focus:bg-white transition-all" />
                </div>
 
                <div className="grid grid-cols-2 gap-4">
                  <div className="space-y-2">
-                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">소재</label>
-                   <input type="text" placeholder="예: 999.9" value={productFormData.material} onChange={(e) => setProductFormData({ ...productFormData, material: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">{t('admin_dashboard.products.form_material')}</label>
+                   <input type="text" placeholder={t('admin_dashboard.products.form_material_placeholder')} value={productFormData.material} onChange={(e) => setProductFormData({ ...productFormData, material: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
                  </div>
                  <div className="space-y-2">
-                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">금 함량</label>
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">{t('admin_dashboard.products.form_purity')}</label>
                    <select value={productFormData.purity} onChange={(e) => setProductFormData({ ...productFormData, purity: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-3 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all cursor-pointer">
                      <option value="24K">24K</option>
                      <option value="18K">18K</option>
@@ -3783,42 +3767,42 @@ export default function AdminDashboard() {
                </div>
 
                <div className="space-y-2 relative">
-                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">중량(g)</label>
-                 <input type="text" placeholder="예: 3.75" value={productFormData.weight} onChange={(e) => setProductFormData({ ...productFormData, weight: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-12 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">{t('admin_dashboard.products.form_weight')}</label>
+                 <input type="text" placeholder={t('admin_dashboard.products.form_weight_placeholder')} value={productFormData.weight} onChange={(e) => setProductFormData({ ...productFormData, weight: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-12 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
                  <span className="absolute right-4 bottom-3 font-bold text-slate-400 select-none">g</span>
                </div>
 
                <div className="grid grid-cols-2 gap-4">
                  <div className="space-y-2 relative">
-                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">가로 길이(mm)</label>
-                   <input type="text" placeholder="예: 17" value={productFormData.width_mm} onChange={(e) => setProductFormData({ ...productFormData, width_mm: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-14 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">{t('admin_dashboard.products.form_width')}</label>
+                   <input type="text" placeholder={t('admin_dashboard.products.form_width_placeholder')} value={productFormData.width_mm} onChange={(e) => setProductFormData({ ...productFormData, width_mm: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-14 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
                    <span className="absolute right-4 bottom-3 font-bold text-slate-400 select-none">mm</span>
                  </div>
                  <div className="space-y-2 relative">
-                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">세로 길이(mm)</label>
-                   <input type="text" placeholder="예: 25" value={productFormData.height_mm} onChange={(e) => setProductFormData({ ...productFormData, height_mm: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-14 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">{t('admin_dashboard.products.form_height')}</label>
+                   <input type="text" placeholder={t('admin_dashboard.products.form_height_placeholder')} value={productFormData.height_mm} onChange={(e) => setProductFormData({ ...productFormData, height_mm: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-14 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
                    <span className="absolute right-4 bottom-3 font-bold text-slate-400 select-none">mm</span>
                  </div>
                </div>
 
                <div className="space-y-2 relative">
-                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">가격</label>
-                 <input type="number" placeholder="예: 850000" value={productFormData.price} onChange={(e) => setProductFormData({ ...productFormData, price: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-12 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
-                 <span className="absolute right-4 bottom-3 font-bold text-slate-400 select-none">원</span>
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">{t('admin_dashboard.products.form_price')}</label>
+                 <input type="number" placeholder={t('admin_dashboard.products.form_price_placeholder')} value={productFormData.price} onChange={(e) => setProductFormData({ ...productFormData, price: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-12 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+                 <span className="absolute right-4 bottom-3 font-bold text-slate-400 select-none">{t('admin_dashboard.common.currency_won')}</span>
                </div>
 
                <div className="space-y-2">
-                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">메모</label>
-                 <input type="text" placeholder="메모를 입력해 주세요" value={productFormData.memo} onChange={(e) => setProductFormData({ ...productFormData, memo: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">{t('admin_dashboard.products.form_memo')}</label>
+                 <input type="text" placeholder={t('admin_dashboard.products.form_memo_placeholder')} value={productFormData.memo} onChange={(e) => setProductFormData({ ...productFormData, memo: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
                </div>
 
                <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-4 space-y-2">
                  <label className="text-xs font-black text-slate-600 uppercase tracking-widest pl-1 flex items-center gap-2">
                    <Award className="w-4 h-4 text-amber-600 shrink-0" />
-                   정품인증서(보증서) 연결
+                   {t('admin_dashboard.products.form_cert_id')}
                  </label>
                  <p className="text-[11px] font-bold text-slate-500 pl-1 leading-relaxed">
-                   골드바 정품인증 관리에 등록된 보증서입니다. 일련번호·보증서명(표시명)·NFC UID로 검색할 수 있습니다. NFC는 나중에 연결해도 목록에 표시됩니다.
+                   {t('admin_dashboard.products.form_cert_desc')}
                  </p>
                  <ProductCertificatePicker
                    buttonId="product-cert-picker-create"
@@ -3835,49 +3819,49 @@ export default function AdminDashboard() {
 
                <div className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3 space-y-1.5">
                  <p className="text-xs font-bold text-slate-500">
-                   현재 금 시세 :{' '}
+                   {t('admin_dashboard.products.gold_summary_current_price')} :{' '}
                    <span className="text-slate-800 font-black">{formatProductGoldSummary(productFormData.weight, productFormData.price).totalStr}</span>
                  </p>
                  <p className="text-xs font-bold text-slate-500">
-                   g 당 금 시세 :{' '}
+                   {t('admin_dashboard.products.gold_summary_price_per_gram')} :{' '}
                    <span className="text-slate-800 font-black">{formatProductGoldSummary(productFormData.weight, productFormData.price).perG}</span>
                  </p>
                </div>
 
                <div className="pt-2 border-t border-slate-100 space-y-4">
-                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">추가 · 옵션 및 미디어</p>
+                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('admin_dashboard.products.form_options_media')}</p>
                  <div className="space-y-2">
-                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">제품 옵션 (콤마로 구분)</label>
-                   <input type="text" placeholder="예: 골드, 실버, 로즈골드" value={productFormData.options} onChange={(e) => setProductFormData({ ...productFormData, options: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">{t('admin_dashboard.products.form_options_label')}</label>
+                   <input type="text" placeholder={t('admin_dashboard.products.form_options_label')} value={productFormData.options} onChange={(e) => setProductFormData({ ...productFormData, options: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
                  </div>
                  <div className="space-y-2">
-                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">상세 설명</label>
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">{t('admin_dashboard.products.form_desc_label')}</label>
                    <textarea rows={2} value={productFormData.description} onChange={(e) => setProductFormData({ ...productFormData, description: e.target.value })} className="w-full p-4 bg-slate-100/50 rounded-xl font-bold outline-none resize-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
                  </div>
                  <div className="space-y-2 bg-slate-50 p-4 rounded-xl border border-slate-100/80">
-                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">제품 이미지 업로드 (자동 500x500 압축)</label>
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">{t('admin_dashboard.products.form_image')}</label>
                    <div className="mt-2 flex flex-wrap items-center gap-3">
                      <label className="bg-white border border-slate-200 px-4 py-2.5 rounded-xl font-bold text-xs text-slate-600 hover:bg-slate-50 cursor-pointer flex items-center gap-2 shadow-sm">
-                       <FileText className="w-4 h-4" /> 이미지 파일 선택
+                       <FileText className="w-4 h-4" /> {t('admin_dashboard.common.form_file_select')}
                        <input type="file" accept="image/*" onChange={(e) => handleProductImageChange(e, 'create')} className="hidden" />
                      </label>
-                     <span className="text-xs font-bold text-slate-400 line-clamp-1 flex-1 min-w-0">{productFormData.file_name || '선택된 파일이 없습니다.'}</span>
+                     <span className="text-xs font-bold text-slate-400 line-clamp-1 flex-1 min-w-0">{productFormData.file_name || t('admin_dashboard.products.form_image_empty')}</span>
                    </div>
                  </div>
                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                    <div className="space-y-2">
-                     <label className="text-xs font-black text-slate-400 tracking-widest pl-1">영상 URL</label>
+                     <label className="text-xs font-black text-slate-400 tracking-widest pl-1">{t('admin_dashboard.products.form_video')}</label>
                     <input type="text" inputMode="url" placeholder="https://..." value={productFormData.video_url} onChange={(e) => setProductFormData({ ...productFormData, video_url: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 outline-none text-sm font-bold border border-transparent focus:border-primary/50 focus:bg-white" />
                    </div>
                    <div className="space-y-2">
-                     <label className="text-xs font-black text-slate-400 tracking-widest pl-1">매뉴얼 URL</label>
+                     <label className="text-xs font-black text-slate-400 tracking-widest pl-1">{t('admin_dashboard.products.form_manual')}</label>
                     <input type="text" inputMode="url" placeholder="https://..." value={productFormData.manual_url} onChange={(e) => setProductFormData({ ...productFormData, manual_url: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 outline-none text-sm font-bold border border-transparent focus:border-primary/50 focus:bg-white" />
                    </div>
                  </div>
                </div>
 
                <button type="submit" disabled={submitting} className="w-full h-16 purple-btn text-lg font-black shadow-xl shadow-primary/30 mt-2 disabled:opacity-50">
-                 {submitting && <Loader2 className="w-5 h-5 animate-spin" />} 정보 저장
+                 {submitting && <Loader2 className="w-5 h-5 animate-spin" />} {t('admin_dashboard.products.submit_btn_register')}
                </button>
             </form>
           </div>
@@ -3890,22 +3874,22 @@ export default function AdminDashboard() {
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setIsEditProductModalOpen(false)}></div>
           <div className="relative w-full max-w-lg bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh]">
             <header className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
-              <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">제품 정보 수정</h3>
+              <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">{t('admin_dashboard.products.modal_edit_title')}</h3>
               <button onClick={() => setIsEditProductModalOpen(false)} className="p-2 bg-white rounded-xl text-slate-400 shadow-sm"><X className="w-6 h-6" /></button>
             </header>
             <form onSubmit={handleEditProductSubmit} className="p-8 space-y-4 overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-12">
                <div className="space-y-2">
-                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">품명 *</label>
-                 <input required type="text" placeholder="예: 골드바3.75g" value={editProductFormData.name} onChange={(e) => setEditProductFormData({ ...editProductFormData, name: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent hover:border-primary/20 focus:border-primary/50 focus:bg-white transition-all" />
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">{t('admin_dashboard.products.form_name')}</label>
+                 <input required type="text" placeholder={t('admin_dashboard.products.form_name_placeholder')} value={editProductFormData.name} onChange={(e) => setEditProductFormData({ ...editProductFormData, name: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent hover:border-primary/20 focus:border-primary/50 focus:bg-white transition-all" />
                </div>
 
                <div className="grid grid-cols-2 gap-4">
                  <div className="space-y-2">
-                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">소재</label>
-                   <input type="text" placeholder="예: 999.9" value={editProductFormData.material} onChange={(e) => setEditProductFormData({ ...editProductFormData, material: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">{t('admin_dashboard.products.form_material')}</label>
+                   <input type="text" placeholder={t('admin_dashboard.products.form_material_placeholder')} value={editProductFormData.material} onChange={(e) => setEditProductFormData({ ...editProductFormData, material: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
                  </div>
                  <div className="space-y-2">
-                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">금 함량</label>
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">{t('admin_dashboard.products.form_purity')}</label>
                    <select value={editProductFormData.purity} onChange={(e) => setEditProductFormData({ ...editProductFormData, purity: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-3 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all cursor-pointer">
                      <option value="24K">24K</option>
                      <option value="18K">18K</option>
@@ -3915,42 +3899,42 @@ export default function AdminDashboard() {
                </div>
 
                <div className="space-y-2 relative">
-                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">중량(g)</label>
-                 <input type="text" placeholder="예: 3.75" value={editProductFormData.weight} onChange={(e) => setEditProductFormData({ ...editProductFormData, weight: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-12 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">{t('admin_dashboard.products.form_weight')}</label>
+                 <input type="text" placeholder={t('admin_dashboard.products.form_weight_placeholder')} value={editProductFormData.weight} onChange={(e) => setEditProductFormData({ ...editProductFormData, weight: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-12 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
                  <span className="absolute right-4 bottom-3 font-bold text-slate-400 select-none">g</span>
                </div>
 
                <div className="grid grid-cols-2 gap-4">
                  <div className="space-y-2 relative">
-                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">가로 길이(mm)</label>
-                   <input type="text" placeholder="예: 17" value={editProductFormData.width_mm} onChange={(e) => setEditProductFormData({ ...editProductFormData, width_mm: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-14 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">{t('admin_dashboard.products.form_width')}</label>
+                   <input type="text" placeholder={t('admin_dashboard.products.form_width_placeholder')} value={editProductFormData.width_mm} onChange={(e) => setEditProductFormData({ ...editProductFormData, width_mm: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-14 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
                    <span className="absolute right-4 bottom-3 font-bold text-slate-400 select-none">mm</span>
                  </div>
                  <div className="space-y-2 relative">
-                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">세로 길이(mm)</label>
-                   <input type="text" placeholder="예: 25" value={editProductFormData.height_mm} onChange={(e) => setEditProductFormData({ ...editProductFormData, height_mm: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-14 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">{t('admin_dashboard.products.form_height')}</label>
+                   <input type="text" placeholder={t('admin_dashboard.products.form_height_placeholder')} value={editProductFormData.height_mm} onChange={(e) => setEditProductFormData({ ...editProductFormData, height_mm: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-14 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
                    <span className="absolute right-4 bottom-3 font-bold text-slate-400 select-none">mm</span>
                  </div>
                </div>
 
                <div className="space-y-2 relative">
-                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">가격</label>
-                 <input type="number" placeholder="예: 850000" value={editProductFormData.price} onChange={(e) => setEditProductFormData({ ...editProductFormData, price: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-12 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
-                 <span className="absolute right-4 bottom-3 font-bold text-slate-400 select-none">원</span>
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">{t('admin_dashboard.products.form_price')}</label>
+                 <input type="number" placeholder={t('admin_dashboard.products.form_price_placeholder')} value={editProductFormData.price} onChange={(e) => setEditProductFormData({ ...editProductFormData, price: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 pr-12 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+                 <span className="absolute right-4 bottom-3 font-bold text-slate-400 select-none">{t('admin_dashboard.common.currency_won')}</span>
                </div>
 
                <div className="space-y-2">
-                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">메모</label>
-                 <input type="text" placeholder="메모를 입력해 주세요" value={editProductFormData.memo} onChange={(e) => setEditProductFormData({ ...editProductFormData, memo: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">{t('admin_dashboard.products.form_memo')}</label>
+                 <input type="text" placeholder={t('admin_dashboard.products.form_memo_placeholder')} value={editProductFormData.memo} onChange={(e) => setEditProductFormData({ ...editProductFormData, memo: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
                </div>
 
                <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-4 space-y-2">
                  <label className="text-xs font-black text-slate-600 uppercase tracking-widest pl-1 flex items-center gap-2">
                    <Award className="w-4 h-4 text-amber-600 shrink-0" />
-                   정품인증서(보증서) 연결
+                   {t('admin_dashboard.products.form_cert_link')}
                  </label>
                  <p className="text-[11px] font-bold text-slate-500 pl-1 leading-relaxed">
-                   골드바 정품인증 관리에 등록된 보증서입니다. 일련번호·보증서명·NFC UID로 검색할 수 있습니다.
+                   {t('admin_dashboard.products.form_cert_desc')}
                  </p>
                  <ProductCertificatePicker
                    buttonId="product-cert-picker-edit"
@@ -3973,55 +3957,55 @@ export default function AdminDashboard() {
                    className="mt-1 size-4 rounded border-rose-200 text-rose-600 focus:ring-rose-400"
                  />
                  <span className="text-xs font-bold text-slate-700 leading-relaxed">
-                   <span className="font-black text-rose-800">판매 완료</span>로 표시합니다. 표시 후 이 제품에 매칭된 태그는 관리자 화면에서 바로 해제할 수 없으며, NFC로 태그를 스캔해 인증한 뒤에만 매칭 해제됩니다.
+                   <span className="font-black text-rose-800">{t('admin_dashboard.products.sold_tag')}</span>{t('admin_dashboard.products.form_sold_desc')}
                  </span>
                </label>
 
                <div className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3 space-y-1.5">
                  <p className="text-xs font-bold text-slate-500">
-                   현재 금 시세 :{' '}
+                   {t('admin_dashboard.products.gold_summary_current_price')} :{' '}
                    <span className="text-slate-800 font-black">{formatProductGoldSummary(editProductFormData.weight, editProductFormData.price).totalStr}</span>
                  </p>
                  <p className="text-xs font-bold text-slate-500">
-                   g 당 금 시세 :{' '}
+                   {t('admin_dashboard.products.gold_summary_price_per_gram')} :{' '}
                    <span className="text-slate-800 font-black">{formatProductGoldSummary(editProductFormData.weight, editProductFormData.price).perG}</span>
                  </p>
                </div>
 
                <div className="pt-2 border-t border-slate-100 space-y-4">
-                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">추가 · 옵션 및 미디어</p>
+                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('admin_dashboard.products.form_options_media')}</p>
                  <div className="space-y-2">
-                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">제품 옵션 (콤마로 구분)</label>
-                   <input type="text" placeholder="예: 골드, 실버, 로즈골드" value={editProductFormData.options} onChange={(e) => setEditProductFormData({ ...editProductFormData, options: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">{t('admin_dashboard.products.form_options_label')}</label>
+                   <input type="text" placeholder={t('admin_dashboard.products.form_options_label')} value={editProductFormData.options} onChange={(e) => setEditProductFormData({ ...editProductFormData, options: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 font-bold outline-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
                  </div>
                  <div className="space-y-2">
-                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">상세 설명</label>
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">{t('admin_dashboard.products.form_desc_label')}</label>
                    <textarea rows={2} value={editProductFormData.description} onChange={(e) => setEditProductFormData({ ...editProductFormData, description: e.target.value })} className="w-full p-4 bg-slate-100/50 rounded-xl font-bold outline-none resize-none border border-transparent focus:border-primary/50 focus:bg-white transition-all" />
                  </div>
                  <div className="space-y-2 bg-slate-50 p-4 rounded-xl border border-slate-100/80">
-                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">제품 이미지 교체 (자동 500x500 압축)</label>
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">{t('admin_dashboard.products.form_image_edit')}</label>
                    <div className="mt-2 flex flex-wrap items-center gap-3">
                      <label className="bg-white border border-slate-200 px-4 py-2.5 rounded-xl font-bold text-xs text-slate-600 hover:bg-slate-50 cursor-pointer flex items-center gap-2 shadow-sm">
-                       <FileText className="w-4 h-4" /> 이미지 파일 선택
+                       <FileText className="w-4 h-4" /> {t('admin_dashboard.common.form_file_select')}
                        <input type="file" accept="image/*" onChange={(e) => handleProductImageChange(e, 'edit')} className="hidden" />
                      </label>
-                     <span className="text-xs font-bold text-slate-400 line-clamp-1 flex-1 min-w-0">{editProductFormData.file_name || '파일을 변경하지 않으려면 비워 두세요.'}</span>
+                     <span className="text-xs font-bold text-slate-400 line-clamp-1 flex-1 min-w-0">{editProductFormData.file_name || t('admin_dashboard.products.form_image_desc')}</span>
                    </div>
                  </div>
                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                    <div className="space-y-2">
-                     <label className="text-xs font-black text-slate-400 tracking-widest pl-1">영상 URL</label>
+                     <label className="text-xs font-black text-slate-400 tracking-widest pl-1">{t('admin_dashboard.products.form_video')}</label>
                     <input type="text" inputMode="url" placeholder="https://..." value={editProductFormData.video_url} onChange={(e) => setEditProductFormData({ ...editProductFormData, video_url: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 outline-none text-sm font-bold border border-transparent focus:border-primary/50 focus:bg-white" />
                    </div>
                    <div className="space-y-2">
-                     <label className="text-xs font-black text-slate-400 tracking-widest pl-1">매뉴얼 URL</label>
+                     <label className="text-xs font-black text-slate-400 tracking-widest pl-1">{t('admin_dashboard.products.form_manual')}</label>
                     <input type="text" inputMode="url" placeholder="https://..." value={editProductFormData.manual_url} onChange={(e) => setEditProductFormData({ ...editProductFormData, manual_url: e.target.value })} className="w-full h-12 bg-slate-100/50 rounded-xl px-4 outline-none text-sm font-bold border border-transparent focus:border-primary/50 focus:bg-white" />
                    </div>
                  </div>
                </div>
 
                <button type="submit" disabled={submitting} className="w-full h-16 purple-btn text-lg font-black shadow-xl shadow-primary/30 mt-2 disabled:opacity-50">
-                 {submitting && <Loader2 className="w-5 h-5 animate-spin" />} 수정 완료
+                 {submitting && <Loader2 className="w-5 h-5 animate-spin" />} {t('admin_dashboard.products.submit_btn_edit')}
                </button>
             </form>
           </div>
@@ -4038,16 +4022,16 @@ export default function AdminDashboard() {
           <div className="relative w-full max-w-md bg-white rounded-t-[2rem] sm:rounded-3xl shadow-2xl p-6 sm:p-8 animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start gap-3 mb-4">
               <div>
-                <h3 className="text-lg font-black text-slate-900">판매 완료 제품 — NFC 인증</h3>
+                <h3 className="text-lg font-black text-slate-900">{t('admin_dashboard.products.unmap_sold_modal_title')}</h3>
                 <p className="text-xs font-bold text-slate-500 mt-1 leading-relaxed">
-                  아래 링크로 태그를 스캔(또는 열기)한 뒤, 15분 이내에 여기서 해제를 완료하세요.
+                  {t('admin_dashboard.products.unmap_sold_modal_desc')}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setUnmapSoldModalTag(null)}
                 className="p-2 rounded-xl text-slate-400 hover:bg-slate-50"
-                aria-label="닫기"
+                aria-label={t('admin_dashboard.common.modal_close')}
               >
                 <X className="w-5 h-5" />
               </button>
@@ -4061,13 +4045,13 @@ export default function AdminDashboard() {
                 onClick={() => copyUnmapScanUrl(unmapSoldModalTag.tag_uid)}
                 className="flex-1 h-11 rounded-xl border border-slate-200 bg-white text-slate-800 text-xs font-black hover:bg-slate-50"
               >
-                인증 URL 복사
+                {t('admin_dashboard.products.unmap_sold_modal_copy_btn')}
               </button>
               <a
                 href={`/t/${encodeURIComponent(unmapSoldModalTag.tag_uid)}?unmap=1`}
                 className="flex-1 h-11 rounded-xl bg-slate-900 text-white text-xs font-black flex items-center justify-center no-underline hover:bg-slate-800"
               >
-                이 기기에서 열기
+                {t('admin_dashboard.products.unmap_sold_modal_open_btn')}
               </a>
             </div>
             <button
@@ -4078,7 +4062,7 @@ export default function AdminDashboard() {
               }}
               className="w-full h-12 rounded-xl bg-rose-600 text-white text-sm font-black hover:bg-rose-700 transition-all"
             >
-              스캔 완료 — 매칭 해제 실행
+              {t('admin_dashboard.products.unmap_sold_modal_execute_btn')}
             </button>
           </div>
         </div>
@@ -4090,7 +4074,7 @@ export default function AdminDashboard() {
 
       <GuaranteeCertificatePreviewModal data={guaranteePreviewData} onClose={() => setGuaranteePreviewData(null)} />
 
-      {/* NFC 태그 관리 모달 (NFC 전용 도구) */}
+{/* NFC 태그 관리 모달 (NFC 전용 도구) */}
       {isNfcModalOpen && (
         <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 lg:p-4">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setIsNfcModalOpen(false)}></div>
@@ -4101,9 +4085,9 @@ export default function AdminDashboard() {
                    <Tag className="w-6 h-6" />
                  </div>
                  <div>
-                   <h3 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">NFC 태그 발행</h3>
+                   <h3 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">{t('admin_dashboard.nfc.modal_title')}</h3>
                    <p className="text-xs font-bold text-emerald-600/90 mt-0.5 leading-relaxed">
-                     자산으로 등록하거나, 출고와 함께 제품에 매핑합니다.
+                     {t('admin_dashboard.nfc.modal_desc')}
                    </p>
                  </div>
                </div>
@@ -4122,7 +4106,7 @@ export default function AdminDashboard() {
                    disabled={!!nfcExistingSnapshot?.hasProduct}
                    title={
                      nfcExistingSnapshot?.hasProduct
-                       ? '제품이 연결된 태그는 자산만 모드로 덮어쓸 수 없습니다'
+                       ? t('admin_dashboard.nfc.disabled_asset_title')
                        : undefined
                    }
                    onClick={() => setNfcRegisterMode('asset')}
@@ -4133,7 +4117,7 @@ export default function AdminDashboard() {
                    }`}
                  >
                    <Box className="w-4 h-4 shrink-0" />
-                   <span>빈 태그 자산 등록</span>
+                   <span>{t('admin_dashboard.nfc.mode_asset')}</span>
                  </button>
                  <button
                    type="button"
@@ -4145,7 +4129,7 @@ export default function AdminDashboard() {
                    }`}
                  >
                    <LinkIcon className="w-4 h-4 shrink-0" />
-                   <span>제품과 함께 매핑</span>
+                   <span>{t('admin_dashboard.nfc.mode_product')}</span>
                  </button>
                </div>
 
@@ -4153,7 +4137,7 @@ export default function AdminDashboard() {
                  <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4.5 space-y-3 shadow-sm select-none animate-in fade-in-50 duration-200">
                    <div className="flex items-center gap-1.5">
                      <span className="w-1.5 h-4 bg-blue-500 rounded-full"></span>
-                     <p className="text-[11px] font-black uppercase tracking-wider text-blue-800">현재 시스템 등록 정보</p>
+                     <p className="text-[11px] font-black uppercase tracking-wider text-blue-800">{t('admin_dashboard.nfc.snapshot_title')}</p>
                    </div>
                    <div className="space-y-1 pl-3 border-l-2 border-blue-200/60">
                      <p className="text-xs font-bold text-blue-950 break-all flex items-center gap-1.5 leading-snug">
@@ -4164,11 +4148,11 @@ export default function AdminDashboard() {
                      </p>
                      {nfcExistingSnapshot.hasProduct ? (
                        <p className="text-xs font-bold text-blue-900 leading-snug">
-                         연결 제품: <span className="font-black text-blue-950">{nfcExistingSnapshot.productName || '—'}</span>
+                         {t('admin_dashboard.nfc.snapshot_product')} <span className="font-black text-blue-950">{nfcExistingSnapshot.productName || '—'}</span>
                        </p>
                      ) : (
                        <p className="text-xs font-bold text-blue-900 leading-snug">
-                         상태: <span className="font-black text-blue-950">자산만 등록 (제품 미연결)</span>
+                         {t('admin_dashboard.nfc.snapshot_status')} <span className="font-black text-blue-950">{t('admin_dashboard.nfc.snapshot_status_asset_only')}</span>
                        </p>
                      )}
                      {nfcExistingSnapshot.createdAt && (
@@ -4188,7 +4172,7 @@ export default function AdminDashboard() {
                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">1단계: 태그 스캔</label>
                  <div className="flex gap-3">
                     <div className="flex-1 h-14 bg-slate-50 border border-slate-200/60 rounded-2xl flex items-center px-5 font-mono font-black text-base sm:text-lg text-emerald-800 shadow-inner select-none transition-all">
-                      {nfcFormData.tag_uid || <span className="text-slate-300 font-sans">UID 대기 중...</span>}
+                      {nfcFormData.tag_uid || <span className="text-slate-300 font-sans">{t('admin_dashboard.nfc.wait_uid')}</span>}
                     </div>
                     <button
                       type="button"
@@ -4207,7 +4191,7 @@ export default function AdminDashboard() {
                {/* 2. 제품 선택 — 제품 모드에서만 */}
                {nfcRegisterMode === 'product' ? (
                  <div className="space-y-3">
-                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">2단계: 제품 연결</label>
+                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">{t('admin_dashboard.nfc.step_connect')}</label>
                    <div className="relative">
                      <select 
                        required={nfcRegisterMode === 'product'}
@@ -4215,7 +4199,7 @@ export default function AdminDashboard() {
                        onChange={(e) => setNfcFormData({...nfcFormData, product_id: e.target.value})}
                        className="w-full h-14 bg-slate-50 border border-slate-200/60 hover:border-slate-300 rounded-2xl pl-5 pr-12 font-bold outline-none ring-slate-100/50 appearance-none transition-all duration-200 text-slate-800 cursor-pointer text-sm"
                      >
-                       <option value="">출고할 제품을 선택하세요</option>
+                       <option value="">{t('admin_dashboard.nfc.form_select_product')}</option>
                        {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                      </select>
                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
@@ -4225,9 +4209,9 @@ export default function AdminDashboard() {
                  </div>
                ) : (
                  <div className="rounded-2xl border border-amber-100/80 bg-amber-50/40 p-4.5 space-y-1.5 select-none animate-in fade-in-50 duration-200">
-                   <p className="text-xs font-black text-amber-900 uppercase tracking-wider">2단계: 제품 연결 없음</p>
+                   <p className="text-xs font-black text-amber-900 uppercase tracking-wider">{t('admin_dashboard.nfc.step_no_connect')}</p>
                    <p className="text-[11px] sm:text-xs font-bold text-amber-800/80 leading-relaxed">
-                     상품에 연결되지 않은 NFC만 자산으로 등록됩니다. 출고 시 「NFC 태그 관리」 목록에서 제품 연결(출고)을 진행할 수 있습니다.
+                     {t('admin_dashboard.nfc.step_no_connect_desc')}
                    </p>
                  </div>
                )}
@@ -4235,8 +4219,8 @@ export default function AdminDashboard() {
                {/* 3. 태그 쓰기 도구 */}
                <div className="bg-slate-50/50 p-5 rounded-3xl space-y-4 border border-slate-100 select-none">
                   <div className="flex flex-col gap-0.5">
-                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest">3단계: 태그에 URL 굽기 (기록)</p>
-                    <p className="text-[11px] font-bold text-slate-400 leading-relaxed">스캔 시 앱 메인으로 연동되도록 고유 URL 정보를 태그에 씁니다.</p>
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest">{t('admin_dashboard.nfc.step_write')}</p>
+                    <p className="text-[11px] font-bold text-slate-400 leading-relaxed">{t('admin_dashboard.nfc.step_write_desc')}</p>
                   </div>
                   <button
                     type="button"
@@ -4248,7 +4232,7 @@ export default function AdminDashboard() {
                     }`}
                   >
                     <PenTool className="w-4.5 h-4.5 shrink-0" />
-                    <span>{nfcWriting ? '태그 정보 기록 중...' : '태그에 정보 기록하기'}</span>
+                    <span>{nfcWriting ? t('admin_dashboard.nfc.write_btn_writing') : t('admin_dashboard.nfc.write_btn_ready')}</span>
                   </button>
                </div>
 
@@ -4258,7 +4242,7 @@ export default function AdminDashboard() {
                  className="w-full h-15 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-base sm:text-lg rounded-2xl shadow-xl shadow-emerald-500/25 hover:shadow-emerald-500/35 hover:shadow-2xl disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-300 select-none outline-none flex items-center justify-center gap-2 active:scale-[0.98]"
                >
                  {submitting && <Loader2 className="w-5 h-5 animate-spin" />}
-                 <span>{nfcRegisterMode === 'asset' ? '자산 등록 완료' : '태그 매핑 최종 확정'}</span>
+                 <span>{nfcRegisterMode === 'asset' ? t('admin_dashboard.nfc.submit_btn_asset') : t('admin_dashboard.nfc.submit_btn_product')}</span>
                </button>
             </form>
           </div>
@@ -4277,7 +4261,7 @@ export default function AdminDashboard() {
                   : 'bg-gradient-to-br from-amber-500 to-orange-500'
               }`}
             >
-              <h3 className="text-lg font-black text-white tracking-tight">URL 기록 다시 시도</h3>
+              <h3 className="text-lg font-black text-white tracking-tight">{t('admin_dashboard.nfc.retry_modal_title')}</h3>
               <p className="text-xs font-bold text-white/90 mt-2 leading-relaxed">
                 {nfcTagWritePrompt.kind === 'match' ? '제품 매칭' : 'UID 등록'}은 이미 완료되었습니다. 태그 칩에 주소만 다시
                 넣어 주세요.
@@ -4614,7 +4598,7 @@ export default function AdminDashboard() {
 
                 {/* 메모 */}
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">메모</label>
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">{t('admin_dashboard.products.form_memo')}</label>
                   <ImeTextInput
                     type="text"
                     placeholder="메모를 입력해 주세요"

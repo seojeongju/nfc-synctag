@@ -23,6 +23,8 @@ import {
 import { fetchUserWallet, linkTagToUserWallet } from '../lib/walletApi';
 import { canUseWalletFeatures, isConsumerLoggedIn, loginPathWithNext } from '../lib/sessionPolicy';
 import { useToast } from '../components/ToastProvider';
+import LanguageSwitcher from '../components/LanguageSwitcher';
+import { useTranslation } from 'react-i18next';
 
 /** Chrome BeforeInstallPromptEvent (lib.dom에 없을 수 있음) */
 type AnyBeforeInstallPrompt = {
@@ -48,8 +50,10 @@ function AuthHeaderLinks({
   onLogout: () => void;
   className?: string;
 }) {
+  const { t } = useTranslation();
   return (
     <div className={`flex items-center gap-1.5 shrink-0 ${className}`.trim()}>
+      <LanguageSwitcher />
       {currentUser ? (
         <>
           <span className="hidden sm:inline text-[10px] font-bold text-slate-500 max-w-[88px] truncate">
@@ -60,7 +64,7 @@ function AuthHeaderLinks({
             onClick={onLogout}
             className="text-[10px] sm:text-[11px] font-black text-slate-600 hover:text-rose-600 border border-slate-200/80 bg-white/90 rounded-xl px-2.5 py-1.5 transition-colors shadow-sm"
           >
-            로그아웃
+            {t('common.logout')}
           </button>
         </>
       ) : (
@@ -68,20 +72,21 @@ function AuthHeaderLinks({
           to={loginPathWithNext()}
           className="text-[10px] sm:text-[11px] font-black text-amber-700 hover:text-amber-800 border border-amber-200/80 bg-amber-50/90 rounded-xl px-2.5 py-1.5 no-underline transition-colors shadow-sm"
         >
-          로그인
+          {t('common.login')}
         </Link>
       )}
       <Link
         to="/login"
         className="text-[10px] sm:text-[11px] font-black text-slate-500 hover:text-purple-600 border border-slate-200/80 bg-white/90 rounded-xl px-2.5 py-1.5 no-underline transition-colors shadow-sm"
       >
-        관리자
+        {t('common.admin')}
       </Link>
     </div>
   );
 }
 
 export default function UserLanding() {
+  const { t } = useTranslation();
   const { tagId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -156,14 +161,13 @@ export default function UserLanding() {
 
   const promptLoginForWallet = useCallback(async () => {
     const ok = await showConfirm({
-      title: '로그인 안내',
-      message:
-        '내 지갑·전자앨범은 로그인 후 NFC 태그를 연결해야 이용할 수 있습니다.\n로그인 화면으로 이동할까요?',
-      confirmLabel: '로그인하기',
-      cancelLabel: '닫기',
+      title: t('user_landing.wallet.login_prompt_title'),
+      message: t('user_landing.wallet.login_prompt_message'),
+      confirmLabel: t('user_landing.wallet.login_prompt_confirm'),
+      cancelLabel: t('user_landing.wallet.login_prompt_cancel'),
     });
     if (ok) navigate(loginPathWithNext('wallet'));
-  }, [navigate, showConfirm]);
+  }, [navigate, showConfirm, t]);
 
   useEffect(() => {
     if (!tagId) return;
@@ -241,7 +245,7 @@ export default function UserLanding() {
       (w) => w.id === g.id || (w.serial_number && w.serial_number === g.serial_number)
     );
     if (!inWallet) {
-      showToast('info', 'NFC 태그를 스캔해 내 지갑에 연결한 뒤 전자앨범을 이용해 주세요.');
+      showToast('info', t('user_landing.wallet.no_tag_connected'));
       return;
     }
     setCurrentGoldbarForAlbum(g);
@@ -252,14 +256,14 @@ export default function UserLanding() {
   /** [신규] 소유권 해지 요청 */
   const handleReleaseRequest = async (goldbarId: number) => {
     if (!currentUser) {
-      showToast('info', '로그인이 필요한 서비스입니다.');
+      showToast('info', t('user_landing.wallet.login_required_desc'));
       return;
     }
     const okRelease = await showConfirm({
-      title: '소유권 해지',
-      message: '소유권을 해지 요청하시겠습니까? 관리자 승인 후 재판매 가능한 상태가 됩니다.',
-      confirmLabel: '요청하기',
-      cancelLabel: '취소',
+      title: t('user_landing.wallet.release_request'),
+      message: t('user_landing.wallet.release_request_msg'),
+      confirmLabel: t('user_landing.wallet.release_request_btn'),
+      cancelLabel: t('common.cancel'),
     });
     if (!okRelease) return;
 
@@ -270,19 +274,19 @@ export default function UserLanding() {
         body: JSON.stringify({
           userId: currentUser.id,
           goldbarId: goldbarId,
-          message: '재판매를 위한 소유권 해지 요청'
+          message: t('user_landing.wallet.ownership_release_btn')
         }),
       });
 
       if (res.ok) {
-        showToast('success', '소유권 해지 요청이 완료되었습니다. 관리자 승인 후 목록에서 삭제됩니다.');
+        showToast('success', t('user_landing.wallet.release_success'));
         await syncWalletForUser(currentUser.id);
       } else {
         const d = await res.json();
-        showToast('error', d.error || '요청 처리에 실패했습니다.');
+        showToast('error', d.error || t('user_landing.wallet.release_failed'));
       }
     } catch (err) {
-      showToast('error', '오류가 발생했습니다.');
+      showToast('error', t('common.error_occurred'));
     }
   };
 
@@ -291,12 +295,12 @@ export default function UserLanding() {
     const file = e.target.files?.[0];
     if (!file || !currentGoldbarForAlbum) return;
     if (!canUseWalletFeatures(currentUser)) {
-      showToast('info', '전자앨범 업로드는 로그인 후 이용할 수 있습니다.');
+      showToast('info', t('user_landing.wallet.login_required_desc'));
       return;
     }
 
     if (albumData.images.length >= 5) {
-      showToast('warning', '최대 5장까지만 등록 가능합니다.');
+      showToast('warning', t('user_landing.album.limit_notice'));
       return;
     }
 
@@ -319,10 +323,10 @@ export default function UserLanding() {
           fetchAlbum(currentGoldbarForAlbum.id || currentGoldbarForAlbum.serial_number);
         } else {
           const d = await res.json();
-          showToast('error', d.error || '업로드에 실패했습니다.');
+          showToast('error', d.error || t('user_landing.album.upload_failed'));
         }
       } catch (err: any) {
-        showToast('error', '업로드 요청 실패');
+        showToast('error', t('user_landing.album.upload_failed'));
       } finally {
         setUploadingImage(false);
       }
@@ -333,10 +337,10 @@ export default function UserLanding() {
   // 앨범 사진 삭제
   const handleDeleteAlbumImage = async (imageId: any) => {
     const okDelete = await showConfirm({
-      title: '사진 삭제',
-      message: '정말 이 사진을 삭제하시겠습니까?',
-      confirmLabel: '삭제',
-      cancelLabel: '취소',
+      title: t('user_landing.album.delete_confirm_title'),
+      message: t('user_landing.album.delete_confirm_msg'),
+      confirmLabel: t('user_landing.album.delete_btn'),
+      cancelLabel: t('common.cancel'),
       tone: 'danger',
     });
     if (!okDelete) return;
@@ -376,17 +380,17 @@ export default function UserLanding() {
 
   const handleInstallApp = useCallback(async () => {
     if (isStandalonePwa) {
-      showToast('info', '이미 앱(홈 화면 설치) 모드에서 실행 중입니다.');
+      showToast('info', 'PWA is already running in standalone app mode.');
       return;
     }
 
     if (isIosDevice) {
       showToast(
         'info',
-        'iPhone/iPad Safari에서는 다음 순서로 추가할 수 있습니다.\n\n' +
-          '1) 하단 공유 버튼(□↑) 을 누른 뒤\n' +
-          '2) 「홈 화면에 추가」를 선택해 주세요.\n\n' +
-          'Chrome 앱이 아닌 Safari로 열어 주시면 설치가 더 안정적입니다.',
+        'On iPhone/iPad Safari, you can install the app by:\n\n' +
+          '1) Tap the Share button (□↑) at the bottom.\n' +
+          '2) Select "Add to Home Screen".\n\n' +
+          'Please open this site in Safari instead of Chrome app for installation.',
         8000
       );
       return;
@@ -396,11 +400,11 @@ export default function UserLanding() {
     if (!p) {
       showToast(
         'info',
-        '이 환경에서는 자동 설치 창을 띄울 수 없습니다.\n\n' +
-          '【안드로이드 Chrome】\n' +
-          '1) 주소창 오른쪽의 ⊕ 설치 아이콘을 누르거나\n' +
-          '2) 우측 상단 ⋮ 메뉴 → 「앱 설치」 또는 「홈 화면에 추가」\n\n' +
-          '인스타/카카오 등 앱 안 웹뷰가 아닌, Chrome으로 사이트를 열어 주세요.',
+        'Automatic installation is not supported in this environment.\n\n' +
+          '【Android Chrome】\n' +
+          '1) Tap the install icon (⊕) in the address bar, or\n' +
+          '2) Tap menu (⋮) -> "Install App" or "Add to Home Screen".\n\n' +
+          'Please open the site directly in Chrome instead of standard in-app webviews.',
         8000
       );
       return;
@@ -413,7 +417,7 @@ export default function UserLanding() {
       console.error('[PWA] install prompt failed', err);
       showToast(
         'warning',
-        '설치 창을 열지 못했습니다. Chrome을 최신으로 유지한 뒤, 주소창의 설치(⊕) 아이콘 또는 ⋮ 메뉴의 「앱 설치」를 이용해 주세요.'
+        'Could not open installation dialog. Please update Chrome or use "Install App" in menu (⋮).'
       );
     } finally {
       installPromptRef.current = null;
@@ -528,7 +532,7 @@ export default function UserLanding() {
         try {
           const vr = await fetch(`/api/t/${encodeURIComponent(tagId)}?unmap_verify=1`);
           if (!vr.ok) {
-            setError('태그를 찾을 수 없거나 등록되지 않았습니다.');
+            setError(t('user_landing.error.desc'));
             setLoading(false);
             return;
           }
@@ -536,7 +540,7 @@ export default function UserLanding() {
           setLoading(false);
           return;
         } catch (e: any) {
-          setError(e?.message || '인증 기록에 실패했습니다.');
+          setError(e?.message || 'Verification record failed.');
           setLoading(false);
           return;
         }
@@ -571,14 +575,14 @@ export default function UserLanding() {
           return;
         }
 
-        throw new Error('등록된 정품 정보가 없습니다.');
+        throw new Error('No genuine record registered.');
       } catch (err: any) {
         setError(err.message);
         setLoading(false);
       }
     }
     fetchData();
-  }, [tagId, navigate, location.search]);
+  }, [tagId, navigate, location.search, t]);
 
   // 게스트: 태그 세션 중 현재 태그 1건만 프리뷰 (로그인 시 서버 지갑으로 전환)
   useEffect(() => {
@@ -623,7 +627,7 @@ export default function UserLanding() {
   const handlePurchaseSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!purchaseFormData.name || !purchaseFormData.phone) {
-      showToast('warning', '필수 정보를 입력해 주세요.');
+      showToast('warning', 'Please enter required fields.');
       return;
     }
     // 모의 구매 완료 처리
@@ -648,14 +652,13 @@ export default function UserLanding() {
         <div className="w-16 h-16 bg-emerald-100 border border-emerald-200 rounded-3xl flex items-center justify-center text-emerald-600 mb-4">
           <CheckCircle2 className="w-9 h-9" />
         </div>
-        <h3 className="text-xl font-black text-slate-800 tracking-tight">태그 인증이 기록되었습니다</h3>
+        <h3 className="text-xl font-black text-slate-800 tracking-tight">{t('user_landing.unmap.success_title')}</h3>
         <p className="text-xs font-bold text-slate-500 mt-2 max-w-sm leading-relaxed">
-          관리자 화면(태그 탭)에서 같은 태그의 <span className="text-emerald-700">「매칭 해제」</span>를 눌러
-          해제를 완료하세요. 이 화면은 15분 이내에 연결됩니다.
+          {t('user_landing.unmap.success_desc')}
         </p>
         <p className="text-[10px] font-mono font-bold text-slate-400 mt-4 break-all max-w-full">{tagId}</p>
         <Link to="/" className="mt-8 text-xs font-black text-emerald-700 hover:underline">
-          홈으로 이동
+          {t('user_landing.unmap.home_link')}
         </Link>
       </div>
     );
@@ -673,7 +676,7 @@ export default function UserLanding() {
         <header className="w-full max-w-md flex justify-between items-center h-16 px-1 mb-2 gap-2">
           <div className="flex items-center gap-2 select-none min-w-0">
             <img src="/gold_synctag_logo_v2.png" alt="Logo" className="w-7 h-7 object-contain rounded-lg shrink-0" />
-            <span className="text-lg sm:text-xl font-extrabold text-slate-800 tracking-tight truncate">Gold SyncTag</span>
+            <span className="text-lg sm:text-xl font-extrabold text-slate-800 tracking-tight truncate">{t('user_landing.header.logo_title')}</span>
           </div>
           <AuthHeaderLinks currentUser={currentUser} onLogout={handleConsumerLogout} />
         </header>
@@ -687,11 +690,7 @@ export default function UserLanding() {
         {readTagProof() && !canUseWalletFeatures(currentUser) && (
           <div className="w-full max-w-md mb-3 rounded-2xl border border-amber-200/90 bg-amber-50/95 px-4 py-3 shadow-sm">
             <p className="text-xs font-black text-amber-900 leading-relaxed">
-              NFC 태그로 정품 확인이 가능합니다.{' '}
-              <Link to={loginPathWithNext('wallet')} className="text-amber-700 underline underline-offset-2">
-                로그인
-              </Link>
-              하시면 내 지갑에 저장되어 나중에도 볼 수 있습니다.
+              {t('user_landing.header.nfc_proof_notice')}
             </p>
           </div>
         )}
@@ -701,12 +700,12 @@ export default function UserLanding() {
           <div className="w-full max-w-md bg-gradient-to-r from-amber-50 to-orange-50/50 border border-amber-200/50 rounded-2xl p-4 mb-4 flex items-center justify-between gap-3 shadow-sm animate-in fade-in duration-300">
             <div className="min-w-0 flex-1">
               <h5 className="font-black text-slate-800 text-xs flex items-center gap-1.5">
-                <span>📱</span> Gold SyncTag 전용 앱 설치
+                <span>📱</span> {t('user_landing.header.pwa_banner_title')}
               </h5>
               <p className="text-[10px] font-bold text-slate-500 mt-0.5">
                 {isIosDevice
-                  ? 'Safari에서 홈 화면에 추가하면 앱처럼 사용할 수 있습니다.'
-                  : '앱으로 설치하여 더욱 편리하게 정품인증을 이용해 보세요.'}
+                  ? t('user_landing.header.pwa_banner_desc_ios')
+                  : t('user_landing.header.pwa_banner_desc_android')}
               </p>
             </div>
             <button
@@ -714,27 +713,26 @@ export default function UserLanding() {
               onClick={handleInstallApp}
               className="shrink-0 px-3.5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-[11px] rounded-xl hover:from-amber-600 hover:to-orange-600 transition-all cursor-pointer shadow-md shadow-amber-500/10 whitespace-nowrap active:scale-[0.98]"
             >
-              {isIosDevice ? '설치 방법' : '앱 설치하기'}
+              {isIosDevice ? t('user_landing.header.pwa_install_btn_ios') : t('user_landing.header.pwa_install_btn_android')}
             </button>
           </div>
         )}
 
         {/* 상단 탭 전환 바 */}
-        {/* z-index: 모달(z-150)보다 낮게 — 전체 상품 상세 열릴 때 탭이 콘텐츠를 덮지 않음 */}
         <div className="w-full max-w-md bg-white p-1.5 rounded-2xl border border-slate-100/80 flex gap-1 mb-5 shadow-sm relative z-10">
           <button 
             onClick={() => goToUserTab('home')} 
             className={`flex-1 h-12 rounded-xl text-[11px] font-black transition-all flex items-center justify-center gap-1.5 ${activeTab === 'home' ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-md shadow-purple-500/20' : 'text-slate-400 hover:bg-slate-50'}`}
           >
             <Info className="w-4 h-4" />
-            홈
+            {t('user_landing.header.tab_home')}
           </button>
           <button 
             onClick={() => goToUserTab('products')} 
             className={`flex-1 h-12 rounded-xl text-[11px] font-black transition-all flex items-center justify-center gap-1.5 ${activeTab === 'products' ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-md shadow-purple-500/20' : 'text-slate-400 hover:bg-slate-50'}`}
           >
             <ShoppingCart className="w-4 h-4" />
-            전체 상품
+            {t('user_landing.header.tab_products')}
           </button>
         </div>
 
@@ -750,9 +748,9 @@ export default function UserLanding() {
 
                 {/* 하단 글래스모피즘 오버레이 팝업 */}
                 <div className="absolute bottom-3 left-3 right-3 bg-white/70 backdrop-blur-xl rounded-[1.8rem] p-5 border border-white/40 shadow-2xl flex flex-col items-center text-center">
-                  <h4 className="text-xl font-black text-slate-800 tracking-tight">Gold SyncTag 정품인증</h4>
+                  <h4 className="text-xl font-black text-slate-800 tracking-tight">{t('user_landing.home.hero_title')}</h4>
                   <p className="text-xs font-bold text-slate-600 mt-1 mb-1 leading-relaxed">
-                    NFC 태그를 스캔하여 실물 골드바의 정품 인증서와 나의 추억 앨범을 확인하세요.
+                    {t('user_landing.home.hero_desc')}
                   </p>
                 </div>
               </div>
@@ -775,8 +773,8 @@ export default function UserLanding() {
                   <Award className="w-5 h-5" />
                 </div>
                 <div>
-                  <h5 className="font-black text-slate-800 text-sm group-hover:text-amber-700 transition-colors">내 지갑</h5>
-                  <p className="text-[10px] font-bold text-slate-400 mt-0.5 leading-tight">매칭된 정품 골드바 확인</p>
+                  <h5 className="font-black text-slate-800 text-sm group-hover:text-amber-700 transition-colors">{t('user_landing.home.menu_wallet')}</h5>
+                  <p className="text-[10px] font-bold text-slate-400 mt-0.5 leading-tight">{t('user_landing.home.menu_wallet_desc')}</p>
                 </div>
               </div>
 
@@ -799,8 +797,8 @@ export default function UserLanding() {
                   <BookOpen className="w-5 h-5" />
                 </div>
                 <div>
-                  <h5 className="font-black text-slate-800 text-sm group-hover:text-emerald-700 transition-colors">전자앨범</h5>
-                  <p className="text-[10px] font-bold text-slate-400 mt-0.5 leading-tight">소중한 추억 감상 및 기록</p>
+                  <h5 className="font-black text-slate-800 text-sm group-hover:text-emerald-700 transition-colors">{t('user_landing.home.menu_album')}</h5>
+                  <p className="text-[10px] font-bold text-slate-400 mt-0.5 leading-tight">{t('user_landing.home.menu_album_desc')}</p>
                 </div>
               </div>
             </div>
@@ -812,8 +810,8 @@ export default function UserLanding() {
                   <BookOpen className="w-5 h-5" />
                 </div>
                 <div>
-                  <h5 className="font-black text-slate-800 text-sm group-hover:text-purple-700 transition-colors">프로그램 사용방법 가이드</h5>
-                  <p className="text-[11px] font-bold text-slate-400 mt-0.5">Gold SyncTag 이용방법 확인</p>
+                  <h5 className="font-black text-slate-800 text-sm group-hover:text-purple-700 transition-colors">{t('user_landing.home.guide_title')}</h5>
+                  <p className="text-[11px] font-bold text-slate-400 mt-0.5">{t('user_landing.home.guide_desc')}</p>
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-slate-300 group-hover:translate-x-1 transition-all" />
@@ -826,8 +824,8 @@ export default function UserLanding() {
           <div className="w-full max-w-md space-y-5 flex-1">
             <div className="flex items-end justify-between px-1">
               <div>
-                <h3 className="text-xl font-black tracking-tight text-slate-800">럭셔리 제품 목록</h3>
-                <p className="text-xs font-bold text-slate-400 mt-0.5">정품 인증이 완료된 제품 리스트입니다.</p>
+                <h3 className="text-xl font-black tracking-tight text-slate-800">{t('user_landing.products.list_title')}</h3>
+                <p className="text-xs font-bold text-slate-400 mt-0.5">{t('user_landing.products.list_desc')}</p>
               </div>
             </div>
 
@@ -840,7 +838,7 @@ export default function UserLanding() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4 className="font-black text-slate-800 text-sm sm:text-base break-words line-clamp-2">{p.name}</h4>
-                      <p className="text-xs font-bold text-slate-400 line-clamp-2 mt-0.5 break-words">{p.description || '상세 정보가 없습니다.'}</p>
+                      <p className="text-xs font-bold text-slate-400 line-clamp-2 mt-0.5 break-words">{p.description || t('user_landing.products.no_desc')}</p>
                       
                       {/* 옵션 표시 */}
                       {p.options && (
@@ -861,7 +859,7 @@ export default function UserLanding() {
               {allProducts.length === 0 && (
                 <div className="bg-white rounded-[2rem] border border-slate-100/80 p-12 flex flex-col items-center justify-center text-center shadow-sm">
                   <ShoppingCart className="w-12 h-12 text-slate-200 mb-4" />
-                  <p className="font-black text-slate-400">등록된 제품이 없습니다.</p>
+                  <p className="font-black text-slate-400">{t('user_landing.products.empty_list')}</p>
                 </div>
               )}
             </div>
@@ -874,25 +872,24 @@ export default function UserLanding() {
             {!canUseWalletFeatures(currentUser) ? (
               <div className="bg-white rounded-[2rem] border border-amber-200/70 p-8 flex flex-col items-center text-center shadow-sm">
                 <ShieldCheck className="w-14 h-14 text-amber-500 mb-4" />
-                <h3 className="text-lg font-black text-slate-800 tracking-tight">내 지갑 · 전자앨범</h3>
+                <h3 className="text-lg font-black text-slate-800 tracking-tight">{t('user_landing.wallet.login_required_title')}</h3>
                 <p className="text-xs font-bold text-slate-500 mt-3 leading-relaxed">
-                  로그인한 뒤 제품 NFC 태그를 스캔하면 정품 정보가 계정 지갑에 저장됩니다. 주소만 입력해 들어온 경우에는
-                  이용할 수 없습니다.
+                  {t('user_landing.wallet.login_required_desc')}
                 </p>
                 <Link
                   to={loginPathWithNext('wallet')}
                   className="mt-5 inline-flex h-12 items-center justify-center px-6 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-sm rounded-2xl shadow-lg"
                 >
-                  로그인 / 회원가입
+                  {t('user_landing.wallet.login_signup_btn')}
                 </Link>
               </div>
             ) : (
               <>
             <div className="flex items-end justify-between px-1">
               <div>
-                <h3 className="text-xl font-black tracking-tight text-slate-800">내 지갑</h3>
+                <h3 className="text-xl font-black tracking-tight text-slate-800">{t('user_landing.wallet.wallet_title')}</h3>
                 <p className="text-xs font-bold text-slate-400 mt-0.5">
-                  NFC 태그를 스캔해 연결한 정품이 표시됩니다. 다른 기기에서도 같은 계정으로 확인할 수 있습니다.
+                  {t('user_landing.wallet.wallet_desc')}
                 </p>
               </div>
               {walletLoading && <Loader2 className="w-5 h-5 text-amber-500 animate-spin shrink-0" />}
@@ -900,7 +897,7 @@ export default function UserLanding() {
 
             {!nfcTagSession && myGoldbars.length === 0 && (
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[11px] font-bold text-slate-600 leading-relaxed">
-                아직 연결된 태그가 없습니다. 제품에 동봉된 NFC 태그를 스캔하면 지갑에 자동으로 추가됩니다.
+                {t('user_landing.wallet.no_tag_connected')}
               </div>
             )}
 
@@ -922,7 +919,7 @@ export default function UserLanding() {
                       </div>
                       <div className="min-w-0">
                         <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">
-                          {isCatalog ? '등록 제품' : 'CERTIFIED GOLDBAR'}
+                          {isCatalog ? t('user_landing.wallet.registered_product') : 'CERTIFIED GOLDBAR'}
                         </span>
                         <h4 className="font-black text-slate-800 text-base mt-0.5 break-words">{g.serial_number}</h4>
                       </div>
@@ -933,10 +930,10 @@ export default function UserLanding() {
                         e.stopPropagation();
                         void (async () => {
                           const okRemove = await showConfirm({
-                            title: '지갑에서 제거',
-                            message: '정말 내 지갑에서 이 항목을 제거하시겠습니까?',
-                            confirmLabel: '제거',
-                            cancelLabel: '취소',
+                            title: t('user_landing.wallet.remove_confirm_title'),
+                            message: t('user_landing.wallet.remove_confirm_message'),
+                            confirmLabel: t('user_landing.wallet.remove_confirm_btn'),
+                            cancelLabel: t('common.cancel'),
                             tone: 'danger',
                           });
                           if (!okRemove) return;
@@ -954,14 +951,14 @@ export default function UserLanding() {
                   </div>
 
                   <div className="border-t border-slate-50 pt-3 flex flex-wrap gap-x-6 gap-y-2">
-                    <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400">중량</span><span className="text-xs font-black text-slate-700">{g.weight || '-'}</span></div>
-                    <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400">순도</span><span className="text-xs font-black text-slate-700">{g.purity || '-'}</span></div>
-                    <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400">{isCatalog ? '유형' : '제조일자'}</span><span className="text-xs font-black text-slate-700">{isCatalog ? '카탈로그 매칭' : g.minted_at || '-'}</span></div>
+                    <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400">{t('user_landing.wallet.weight')}</span><span className="text-xs font-black text-slate-700">{g.weight || '-'}</span></div>
+                    <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400">{t('user_landing.wallet.purity')}</span><span className="text-xs font-black text-slate-700">{g.purity || '-'}</span></div>
+                    <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400">{isCatalog ? t('user_landing.wallet.type_label') : t('user_landing.wallet.minted_date')}</span><span className="text-xs font-black text-slate-700">{isCatalog ? t('user_landing.wallet.catalog_matched') : g.minted_at || '-'}</span></div>
                     
                     {/* 관리자가 설정한 현재 시세 노출 */}
                     {Number(g.show_market_price) === 1 && calculateCurrentPrice(g.weight, g.market_price_per_gram) !== null && (
                       <div className="flex flex-col bg-amber-50/60 px-2 py-1 rounded-lg border border-amber-100/50">
-                        <span className="text-[9px] font-black text-amber-700 uppercase tracking-tighter">실시간 자산 가치</span>
+                        <span className="text-[9px] font-black text-amber-700 uppercase tracking-tighter">{t('user_landing.wallet.market_price_title')}</span>
                         <span className="text-xs font-black text-amber-900 tabular-nums">
                           {calculateCurrentPrice(g.weight, g.market_price_per_gram)?.toLocaleString()}원
                         </span>
@@ -978,7 +975,7 @@ export default function UserLanding() {
                       }}
                       className="h-10 rounded-xl border border-slate-200 bg-white text-slate-700 font-black text-[10px] sm:text-[11px] flex items-center justify-center gap-1 hover:bg-slate-50 transition-all shadow-sm"
                     >
-                      {isCatalog ? '상세' : '정보'}
+                      {isCatalog ? t('user_landing.wallet.detail_btn') : t('user_landing.wallet.info_btn')}
                     </button>
                     <button
                       type="button"
@@ -993,7 +990,7 @@ export default function UserLanding() {
                       className="h-10 rounded-xl border border-slate-200 bg-white text-slate-700 font-black text-[10px] sm:text-[11px] flex items-center justify-center gap-1 hover:bg-slate-50 transition-all shadow-sm"
                     >
                       <Eye className="w-3.5 h-3.5 shrink-0 text-amber-600" />
-                      미리보기
+                      {t('user_landing.wallet.preview_btn')}
                     </button>
                     <button
                       type="button"
@@ -1008,7 +1005,7 @@ export default function UserLanding() {
                       className="h-10 rounded-xl border border-amber-200/80 bg-amber-50 text-amber-900 font-black text-[10px] sm:text-[11px] flex items-center justify-center gap-1 hover:bg-amber-100 transition-all shadow-sm"
                     >
                       <Download className="w-3.5 h-3.5 shrink-0" />
-                      PDF
+                      {t('user_landing.wallet.pdf_btn')}
                     </button>
                   </div>
 
@@ -1021,7 +1018,7 @@ export default function UserLanding() {
                     }}
                     className="w-full h-11 bg-amber-50 border border-amber-200/40 hover:bg-amber-100 hover:border-amber-300 rounded-xl flex items-center justify-center text-xs font-black text-amber-700 transition-all gap-1.5 mt-2"
                   >
-                    📸 추억 전자 앨범 보기
+                    {t('user_landing.wallet.album_btn_open')}
                   </button>
                   )}
 
@@ -1031,23 +1028,23 @@ export default function UserLanding() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="text-base">💰</span>
-                          <span className="text-xs font-black text-amber-900">오늘의 금 매입 시세 및 자산 가치</span>
+                          <span className="text-xs font-black text-amber-900">{t('user_landing.wallet.market_price_title')}</span>
                         </div>
                         <span className="text-[10px] font-black bg-amber-100 text-amber-700 px-2 py-1 rounded-lg">LIVE</span>
                       </div>
                       <div className="border-t border-amber-200/30 pt-2 flex flex-col gap-1 text-sm">
                         <div className="flex justify-between items-center">
-                          <span className="text-xs font-bold text-slate-500">1g 당 매입 시세</span>
+                          <span className="text-xs font-bold text-slate-500">{t('user_landing.wallet.market_price_per_gram')}</span>
                           <span className="text-xs font-black text-slate-800">
                             {Number(g.market_price_per_gram || 110000).toLocaleString()}원
                           </span>
                         </div>
                         <div className="flex justify-between items-center">
-                          <span className="text-xs font-bold text-slate-500">나의 골드바 중량</span>
+                          <span className="text-xs font-bold text-slate-500">{t('user_landing.wallet.my_goldbar_weight')}</span>
                           <span className="text-xs font-black text-slate-800">{g.weight}</span>
                         </div>
                         <div className="flex justify-between items-center border-t border-amber-200/30 pt-1.5 mt-0.5">
-                          <span className="text-xs font-black text-amber-900">내 골드바 총 자산 가치</span>
+                          <span className="text-xs font-black text-amber-900">{t('user_landing.wallet.my_goldbar_total_value')}</span>
                           <span className="text-sm font-black text-amber-600">
                             {(() => {
                               // 중량에서 숫자만 추출 (예: '10g' -> 10)
@@ -1062,7 +1059,7 @@ export default function UserLanding() {
 
                   {g.cert_url && (
                     <a href={g.cert_url} target="_blank" rel="noreferrer" className="w-full h-11 bg-slate-50 border border-slate-100 hover:bg-amber-50 hover:border-amber-200/60 rounded-xl flex items-center justify-center text-xs font-black text-slate-600 hover:text-amber-700 transition-all gap-1.5 no-underline mt-1">
-                      <ShieldCheck className="w-4 h-4" /> 정품인증서 확인 (URL)
+                      <ShieldCheck className="w-4 h-4" /> {t('user_landing.wallet.cert_url_btn')}
                     </a>
                   )}
                 </div>
@@ -1072,9 +1069,9 @@ export default function UserLanding() {
               {myGoldbars.length === 0 && (
                 <div className="bg-white rounded-3xl border border-slate-100 p-12 flex flex-col items-center justify-center text-center shadow-sm">
                   <Award className="w-12 h-12 text-slate-200 mb-4" />
-                  <p className="font-black text-slate-400 text-sm">내 지갑에 표시할 골드바가 없습니다.</p>
+                  <p className="font-black text-slate-400 text-sm">{t('user_landing.wallet.no_items')}</p>
                   <p className="text-xs font-bold text-slate-400/80 mt-1 leading-relaxed">
-                    관리자에서 이 태그에 제품(또는 골드바 인증서)을 매칭하면 태그 접속 시 자동으로 표시됩니다. UID 표기(콜론 등)가 다를 경우에도 서버에서 맞춰 조회합니다.
+                    {t('user_landing.wallet.empty_wallet_desc')}
                   </p>
                 </div>
               )}
@@ -1090,7 +1087,7 @@ export default function UserLanding() {
             <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setSelectedProduct(null)}></div>
             <div className="relative w-full max-w-md bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh] min-h-0 overflow-hidden">
               <header className="shrink-0 p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/40">
-                <h4 className="text-lg font-black text-slate-800 tracking-tight">제품 상세 및 구매 신청</h4>
+                <h4 className="text-lg font-black text-slate-800 tracking-tight">{t('user_landing.products.detail_modal_title')}</h4>
                 <button onClick={() => setSelectedProduct(null)} className="p-2 bg-white rounded-xl text-slate-400 hover:text-rose-600 transition-colors shadow-sm">
                   <X className="w-5 h-5" />
                 </button>
@@ -1104,10 +1101,10 @@ export default function UserLanding() {
                       <img src={selectedProduct.image_url} alt={selectedProduct.name} className="w-full h-full object-cover" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <span className="text-[10px] font-black bg-purple-100 text-purple-700 px-2.5 py-1 rounded-xl uppercase tracking-wider">NEW ARRIVAL</span>
+                      <span className="text-[10px] font-black bg-purple-100 text-purple-700 px-2.5 py-1 rounded-xl uppercase tracking-wider">{t('user_landing.products.new_arrival')}</span>
                       <h5 className="font-black text-slate-800 text-lg mt-1 break-words">{selectedProduct.name}</h5>
                       <p className="text-xs font-bold text-slate-400 leading-relaxed mt-1 break-words">
-                        {selectedProduct.description || '상세 정보가 등록되지 않았습니다.'}
+                        {selectedProduct.description || t('user_landing.products.no_description')}
                       </p>
                     </div>
                   </div>
@@ -1133,7 +1130,7 @@ export default function UserLanding() {
                       }
                       className="h-12 rounded-2xl border border-slate-200 bg-white text-slate-700 font-black text-[11px] sm:text-xs flex items-center justify-center gap-1.5 hover:bg-slate-50 transition-all shadow-sm"
                     >
-                      <Eye className="w-4 h-4 shrink-0 text-amber-600" /> 미리보기
+                      <Eye className="w-4 h-4 shrink-0 text-amber-600" /> {t('user_landing.products.preview_btn')}
                     </button>
                     <button
                       type="button"
@@ -1142,7 +1139,7 @@ export default function UserLanding() {
                       }
                       className="h-12 rounded-2xl border border-amber-200/80 bg-amber-50 text-amber-900 font-black text-[11px] sm:text-xs flex items-center justify-center gap-1.5 hover:bg-amber-100 transition-all shadow-sm"
                     >
-                      <Download className="w-4 h-4 shrink-0" /> PDF 저장
+                      <Download className="w-4 h-4 shrink-0" /> {t('user_landing.products.pdf_save_btn')}
                     </button>
                   </div>
 
@@ -1150,11 +1147,11 @@ export default function UserLanding() {
                   <form onSubmit={handlePurchaseSubmit} className="bg-slate-50/80 p-5 rounded-[1.8rem] border border-slate-100/60 space-y-4">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-1 h-4 bg-purple-500 rounded-full"></div>
-                      <h6 className="text-xs font-black text-slate-700">구매 및 상담 정보 입력</h6>
+                      <h6 className="text-xs font-black text-slate-700">{t('user_landing.products.form_title')}</h6>
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">성함 / 업체명 *</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">{t('user_landing.products.form_name_label')}</label>
                       <input 
                         required type="text" value={purchaseFormData.name}
                         onChange={(e) => setPurchaseFormData({ ...purchaseFormData, name: e.target.value })}
@@ -1163,16 +1160,16 @@ export default function UserLanding() {
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">연락처 *</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">{t('user_landing.products.form_phone')}</label>
                       <input 
-                        required type="tel" placeholder="010-0000-0000" value={purchaseFormData.phone}
+                        required type="tel" placeholder={t('user_landing.products.form_phone_placeholder')} value={purchaseFormData.phone}
                         onChange={(e) => setPurchaseFormData({ ...purchaseFormData, phone: e.target.value })}
                         className="w-full h-12 bg-white border border-slate-100 rounded-xl px-4 text-xs font-bold focus:border-purple-500 focus:outline-none transition-all"
                       />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">문의 사항</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">{t('user_landing.products.form_memo')}</label>
                       <textarea 
                         rows={2} value={purchaseFormData.memo}
                         onChange={(e) => setPurchaseFormData({ ...purchaseFormData, memo: e.target.value })}
@@ -1181,7 +1178,7 @@ export default function UserLanding() {
                     </div>
 
                     <button type="submit" className="w-full h-14 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white font-black rounded-xl text-sm shadow-xl shadow-purple-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mt-4">
-                      <MessageSquare className="w-4.5 h-4.5" /> 구매 및 상담 신청 완료
+                      <MessageSquare className="w-4.5 h-4.5" /> {t('user_landing.products.form_submit_complete')}
                     </button>
                   </form>
                 </div>
@@ -1191,13 +1188,12 @@ export default function UserLanding() {
                   <div className="w-16 h-16 rounded-3xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 mb-2">
                     <CheckCircle2 className="w-8 h-8" />
                   </div>
-                  <h4 className="text-lg font-black text-slate-800">구매 및 상담 신청 접수 완료</h4>
-                  <p className="text-xs font-bold text-slate-400 leading-relaxed max-w-xs">
-                    남겨주신 연락처로 관리자가 신속하게 확인하여 연락드리겠습니다. <br />
-                    감사합니다.
+                  <h4 className="text-lg font-black text-slate-800">{t('user_landing.products.success_title')}</h4>
+                  <p className="text-xs font-bold text-slate-400 leading-relaxed max-w-xs whitespace-pre-line">
+                    {t('user_landing.products.success_desc')}
                   </p>
                   <button onClick={() => setSelectedProduct(null)} className="w-full h-12 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black rounded-xl text-xs mt-6 transition-all">
-                    닫기
+                    {t('user_landing.products.close_btn')}
                   </button>
                 </div>
               )}
@@ -1212,8 +1208,8 @@ export default function UserLanding() {
             <div className="relative w-full max-w-md bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh] overflow-hidden">
               <header className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/40">
                 <div>
-                  <h4 className="text-lg font-black text-slate-800 tracking-tight">📸 전자앨범</h4>
-                  <p className="text-[10px] font-bold text-slate-400 mt-0.5">제품과 함께한 소중한 기록을 담아보세요</p>
+                  <h4 className="text-lg font-black text-slate-800 tracking-tight">{t('user_landing.album.modal_title')}</h4>
+                  <p className="text-[10px] font-bold text-slate-400 mt-0.5">{t('user_landing.album.modal_subtitle')}</p>
                 </div>
                 <button onClick={() => setIsAlbumModalOpen(false)} className="p-2 bg-white rounded-xl text-slate-400 hover:text-rose-600 transition-colors shadow-sm">
                   <X className="w-5 h-5" />
@@ -1224,8 +1220,8 @@ export default function UserLanding() {
                 {/* 사진 개수 표시 및 설명 */}
                 <div className="bg-amber-50/50 border border-amber-100 rounded-2xl p-4 flex justify-between items-center">
                   <div>
-                    <h5 className="font-black text-amber-800 text-xs">앨범 이미지 ({albumData.images.length}/5)</h5>
-                    <p className="text-[10px] font-bold text-amber-600 mt-0.5">최대 5장까지의 소중한 순간을 등록 가능</p>
+                    <h5 className="font-black text-amber-800 text-xs">{t('user_landing.album.status_label', { count: albumData.images.length })}</h5>
+                    <p className="text-[10px] font-bold text-amber-600 mt-0.5">{t('user_landing.album.status_desc')}</p>
                   </div>
                   <span className="text-[10px] font-black bg-amber-100 text-amber-700 px-2 py-1 rounded-xl uppercase tracking-wider">Storage Status</span>
                 </div>
@@ -1250,7 +1246,7 @@ export default function UserLanding() {
                 ) : (
                   <div className="border-2 border-dashed border-slate-100 p-10 rounded-2xl flex flex-col items-center justify-center text-center">
                     <Award className="w-10 h-10 text-slate-200 mb-3" />
-                    <p className="text-xs font-black text-slate-400">등록된 추억 사진이 없습니다.</p>
+                    <p className="text-xs font-black text-slate-400">{t('user_landing.album.no_images')}</p>
                   </div>
                 )}
 
@@ -1258,7 +1254,7 @@ export default function UserLanding() {
                 {albumData.images.length < 5 && (
                   <div className="border-t border-slate-100/60 pt-5 space-y-3">
                     <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">추억 사진 추가</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">{t('user_landing.album.upload_label')}</label>
                       <input 
                         type="file" 
                         accept="image/*"
@@ -1268,13 +1264,13 @@ export default function UserLanding() {
                       />
                     </div>
                     {uploadingImage && (
-                      <p className="text-[10px] font-bold text-amber-600 animate-pulse">이미지 등록 중입니다...</p>
+                      <p className="text-[10px] font-bold text-amber-600 animate-pulse">{t('user_landing.album.uploading_msg')}</p>
                     )}
                   </div>
                 )}
 
                 <button onClick={() => setIsAlbumModalOpen(false)} className="w-full h-12 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black rounded-xl text-xs transition-all">
-                  닫기
+                  {t('user_landing.album.close_btn')}
                 </button>
               </div>
             </div>
@@ -1288,8 +1284,8 @@ export default function UserLanding() {
             <div className="relative w-full max-w-md bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh] overflow-hidden">
               <header className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/40">
                 <div>
-                  <h4 className="text-lg font-black text-slate-800 tracking-tight">📜 프로그램 사용방법 가이드</h4>
-                  <p className="text-[10px] font-bold text-slate-400 mt-0.5">Gold SyncTag의 쾌속 정품 인증을 경험해 보세요</p>
+                  <h4 className="text-lg font-black text-slate-800 tracking-tight">{t('user_landing.home.guide_modal_title')}</h4>
+                  <p className="text-[10px] font-bold text-slate-400 mt-0.5">{t('user_landing.home.guide_modal_subtitle')}</p>
                 </div>
                 <button onClick={() => setShowGuideModal(false)} className="p-2 bg-white rounded-xl text-slate-400 hover:text-rose-600 transition-colors shadow-sm">
                   <X className="w-5 h-5" />
@@ -1301,26 +1297,26 @@ export default function UserLanding() {
                   {[
                     {
                       step: '01',
-                      title: 'NFC 칩 가볍게 스캔',
-                      desc: '스마트폰의 NFC 기능을 켜고, 제품에 동봉된 Gold SyncTag 칩에 스마트폰 뒷면을 가볍게 터치(스캔)합니다.',
+                      title: t('user_landing.home.guide_step1_title'),
+                      desc: t('user_landing.home.guide_step1_desc'),
                       icon: Smartphone
                     },
                     {
                       step: '02',
-                      title: '정품 보증서 즉시 확인',
-                      desc: '화면에 자동으로 연결된 페이지에서 제품의 고유 일련번호, 순도, 중량 정보를 3초 안에 확인합니다.',
+                      title: t('user_landing.home.guide_step2_title'),
+                      desc: t('user_landing.home.guide_step2_desc'),
                       icon: ShieldCheck
                     },
                     {
                       step: '03',
-                      title: '로그인 후 내 지갑에 저장',
-                      desc: '로그인하고 NFC 태그를 스캔하면 정품 정보가 계정 지갑에 저장됩니다. 다른 날·다른 기기에서도 같은 계정으로 확인할 수 있습니다.',
+                      title: t('user_landing.home.guide_step3_title'),
+                      desc: t('user_landing.home.guide_step3_desc'),
                       icon: Bookmark
                     },
                     {
                       step: '04',
-                      title: '추억 전자 앨범에 기록',
-                      desc: '전자앨범은 로그인 후 지갑에 연결한 제품에서만 이용할 수 있습니다. 소중한 사진을 최대 5장까지 등록해 보세요.',
+                      title: t('user_landing.home.guide_step4_title'),
+                      desc: t('user_landing.home.guide_step4_desc'),
                       icon: Award
                     }
                   ].map((item, index) => (
@@ -1340,7 +1336,7 @@ export default function UserLanding() {
                 </div>
 
                 <button onClick={() => setShowGuideModal(false)} className="w-full h-14 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black rounded-xl text-sm shadow-xl shadow-amber-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2">
-                  가이드 확인 완료
+                  {t('user_landing.home.guide_confirm_btn')}
                 </button>
               </div>
             </div>
@@ -1354,7 +1350,7 @@ export default function UserLanding() {
             <div className="relative w-full max-w-md bg-white rounded-t-[2.5rem] sm:rounded-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[95vh] min-h-0 overflow-hidden">
               <header className="shrink-0 p-5 sm:p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/40 gap-2">
                 <h4 className="text-lg font-black text-slate-800 tracking-tight min-w-0">
-                  {walletDetailItem.wallet_source === 'catalog_product' ? '제품 상세' : '정품 골드바 정보'}
+                  {walletDetailItem.wallet_source === 'catalog_product' ? t('user_landing.products.detail_modal_title') : t('user_landing.wallet.cert_details')}
                 </h4>
                 <button
                   type="button"
@@ -1379,7 +1375,7 @@ export default function UserLanding() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <span className="text-[10px] font-black bg-amber-100 text-amber-800 px-2.5 py-1 rounded-xl uppercase tracking-wider">
-                          등록 제품
+                          {t('user_landing.wallet.registered_product')}
                         </span>
                         <h5 className="font-black text-slate-800 text-lg mt-1 break-words">
                           {walletDetailItem.name || walletDetailItem.serial_number}
@@ -1387,7 +1383,7 @@ export default function UserLanding() {
                         <p className="text-xs font-bold text-slate-500 leading-relaxed mt-1 break-words">
                           {walletDetailItem.description?.trim()
                             ? walletDetailItem.description
-                            : '등록된 설명이 없습니다.'}
+                            : t('user_landing.products.no_description')}
                         </p>
                       </div>
                     </div>
@@ -1408,19 +1404,19 @@ export default function UserLanding() {
                     <div className="space-y-2 text-xs">
                       {walletDetailItem.weight != null && String(walletDetailItem.weight).trim() !== '' && (
                         <div className="flex justify-between gap-2 border-b border-slate-100 pb-2">
-                          <span className="font-bold text-slate-400">중량</span>
+                          <span className="font-bold text-slate-400">{t('user_landing.wallet.weight')}</span>
                           <span className="font-black text-slate-800">{walletDetailItem.weight}</span>
                         </div>
                       )}
                       {walletDetailItem.purity != null && String(walletDetailItem.purity).trim() !== '' && (
                         <div className="flex justify-between gap-2 border-b border-slate-100 pb-2">
-                          <span className="font-bold text-slate-400">순도</span>
+                          <span className="font-bold text-slate-400">{t('user_landing.wallet.purity')}</span>
                           <span className="font-black text-slate-800">{walletDetailItem.purity}</span>
                         </div>
                       )}
                       {walletDetailItem.material != null && String(walletDetailItem.material).trim() !== '' && (
                         <div className="flex justify-between gap-2 border-b border-slate-100 pb-2">
-                          <span className="font-bold text-slate-400">재질</span>
+                          <span className="font-bold text-slate-400">{t('user_landing.wallet.material')}</span>
                           <span className="font-black text-slate-800">{walletDetailItem.material}</span>
                         </div>
                       )}
@@ -1433,11 +1429,11 @@ export default function UserLanding() {
                           rel="noreferrer"
                           className="w-full py-3.5 bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-black rounded-2xl flex items-center justify-center gap-2 shadow-lg text-sm no-underline"
                         >
-                          <Play className="w-4 h-4 fill-white" /> 사용 설명 영상
+                          <Play className="w-4 h-4 fill-white" /> {t('user_landing.product.video_btn')}
                         </a>
                       ) : (
                         <div className="w-full py-3.5 bg-slate-50 text-slate-400 font-bold rounded-2xl flex items-center justify-center gap-2 border border-dashed border-slate-200 text-sm">
-                          사용 설명 영상 데이터가 없습니다.
+                          {t('user_landing.product.no_video')}
                         </div>
                       )}
                       {walletDetailItem.manual_url ? (
@@ -1447,11 +1443,11 @@ export default function UserLanding() {
                           rel="noreferrer"
                           className="w-full py-3.5 bg-slate-100 text-slate-700 font-black rounded-2xl flex items-center justify-center gap-2 hover:bg-slate-200 text-sm no-underline"
                         >
-                          <Download className="w-4 h-4" /> 제품 설명서
+                          <Download className="w-4 h-4" /> {t('user_landing.product.manual_btn')}
                         </a>
                       ) : (
                         <div className="w-full py-3.5 bg-slate-50 text-slate-400 font-bold rounded-2xl flex items-center justify-center gap-2 border border-dashed border-slate-200 text-sm">
-                          제품 설명서 데이터가 없습니다.
+                          {t('user_landing.product.no_manual')}
                         </div>
                       )}
                     </div>
@@ -1460,21 +1456,21 @@ export default function UserLanding() {
                   <>
                     <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 text-sm space-y-2">
                       <div className="flex justify-between gap-2">
-                        <span className="text-slate-400 font-bold">일련번호</span>
+                        <span className="text-slate-400 font-bold">{t('user_landing.wallet.serial_number')}</span>
                         <span className="font-black font-mono text-slate-800 text-right break-all">
                           {String(walletDetailItem.serial_number ?? '—')}
                         </span>
                       </div>
                       <div className="flex justify-between gap-2">
-                        <span className="text-slate-400 font-bold">중량</span>
+                        <span className="text-slate-400 font-bold">{t('user_landing.wallet.weight')}</span>
                         <span className="font-black text-slate-800">{walletDetailItem.weight || '—'}</span>
                       </div>
                       <div className="flex justify-between gap-2">
-                        <span className="text-slate-400 font-bold">순도</span>
+                        <span className="text-slate-400 font-bold">{t('user_landing.wallet.purity')}</span>
                         <span className="font-black text-amber-600">{walletDetailItem.purity || '—'}</span>
                       </div>
                       <div className="flex justify-between gap-2">
-                        <span className="text-slate-400 font-bold">제조일자</span>
+                        <span className="text-slate-400 font-bold">{t('user_landing.wallet.minted_date')}</span>
                         <span className="font-black text-slate-800">{walletDetailItem.minted_at || '—'}</span>
                       </div>
                     </div>
@@ -1486,7 +1482,7 @@ export default function UserLanding() {
                           download
                           className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-black rounded-2xl flex items-center justify-center gap-2 shadow-lg text-sm no-underline"
                         >
-                          <Download className="w-5 h-5" /> 원본 보증서 PDF 받기
+                          <Download className="w-5 h-5" /> {t('user_landing.goldbar.download_pdf')}
                         </a>
                       )}
                     {walletDetailItem.cert_url && (
@@ -1496,7 +1492,7 @@ export default function UserLanding() {
                         rel="noreferrer"
                         className="w-full h-11 bg-slate-50 border border-slate-100 hover:bg-amber-50 rounded-xl flex items-center justify-center text-xs font-black text-slate-600 hover:text-amber-700 no-underline"
                       >
-                        <ShieldCheck className="w-4 h-4" /> 정품인증서 URL
+                        <ShieldCheck className="w-4 h-4" /> {t('user_landing.wallet.cert_url_btn')}
                       </a>
                     )}
 
@@ -1504,18 +1500,18 @@ export default function UserLanding() {
                     <div className="pt-2">
                       {walletDetailItem.release_status === 'PENDING' ? (
                         <div className="w-full py-3.5 bg-slate-100 text-slate-400 font-black rounded-2xl flex items-center justify-center gap-2 border border-slate-200 text-sm">
-                          ⏳ 소유권 해지 승인 대기 중
+                          {t('user_landing.wallet.ownership_release_pending')}
                         </div>
                       ) : (
                         <button
                           onClick={() => handleReleaseRequest(walletDetailItem.id || walletDetailItem.goldbar_id)}
                           className="w-full py-3.5 bg-rose-50 text-rose-600 font-black rounded-2xl flex items-center justify-center gap-2 hover:bg-rose-100 border border-rose-200 transition-all text-sm"
                         >
-                          📦 소유권 해지 요청 (재판매용)
+                          {t('user_landing.wallet.ownership_release_btn')}
                         </button>
                       )}
                       <p className="text-[10px] font-bold text-slate-400 text-center mt-2 px-4 leading-relaxed">
-                        재판매를 위해 소유권을 해지하려면 관리자 승인이 필요합니다. 승인 즉시 내 지갑과 앨범에서 삭제됩니다.
+                        {t('user_landing.wallet.ownership_release_tip')}
                       </p>
                     </div>
                   </>
@@ -1534,7 +1530,7 @@ export default function UserLanding() {
                     }
                     className="h-12 rounded-2xl border border-slate-200 bg-white text-slate-700 font-black text-[11px] sm:text-xs flex items-center justify-center gap-1.5 hover:bg-slate-50 shadow-sm"
                   >
-                    <Eye className="w-4 h-4 shrink-0 text-amber-600" /> 보증서 미리보기
+                    <Eye className="w-4 h-4 shrink-0 text-amber-600" /> {t('user_landing.wallet.preview_cert')}
                   </button>
                   <button
                     type="button"
@@ -1549,7 +1545,7 @@ export default function UserLanding() {
                     }
                     className="h-12 rounded-2xl border border-amber-200/80 bg-amber-50 text-amber-900 font-black text-[11px] sm:text-xs flex items-center justify-center gap-1.5 hover:bg-amber-100 shadow-sm"
                   >
-                    <Download className="w-4 h-4 shrink-0" /> 보증서 PDF 저장
+                    <Download className="w-4 h-4 shrink-0" /> {t('user_landing.wallet.pdf_save')}
                   </button>
                 </div>
               </div>
@@ -1568,9 +1564,8 @@ export default function UserLanding() {
 
         {/* 푸터 */}
         <footer className="w-full max-w-md text-center border-t border-slate-100/60 pt-5 mt-auto">
-          <p className="text-[10px] text-slate-400 font-bold leading-relaxed">
-            NFC 태그를 스캔하면 즉시 제품의 정품 정보로 이동합니다. <br />
-            © 2026 제이에로스 (J-Eros Inc.) All rights reserved.
+          <p className="text-[10px] text-slate-400 font-bold leading-relaxed whitespace-pre-line">
+            {t('user_landing.footer.tip')}
           </p>
         </footer>
       </div>
@@ -1589,12 +1584,12 @@ export default function UserLanding() {
         <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-3xl flex items-center justify-center text-rose-500 mb-4 animate-bounce">
           <Award className="w-8 h-8" />
         </div>
-        <h3 className="text-xl font-black text-slate-800 tracking-tight">정품인증 조회 실패</h3>
+        <h3 className="text-xl font-black text-slate-800 tracking-tight">{t('user_landing.error.title')}</h3>
         <p className="text-xs font-bold text-slate-400 mt-1 max-w-xs leading-relaxed">
-          해당 태그의 정품인증 정보를 조회할 수 없습니다. 올바른 NFC 태그인지 다시 확인해 주세요.
+          {t('user_landing.error.desc')}
         </p>
         <Link to="/" className="mt-8 text-xs font-black text-primary hover:underline">
-          홈으로 이동
+          {t('user_landing.error.home_link')}
         </Link>
       </div>
     );
@@ -1609,13 +1604,13 @@ export default function UserLanding() {
         <header className="w-full max-w-md flex flex-col gap-2 mb-8">
           <div className="flex justify-between items-center gap-2">
             <Link to="/" className="text-xs font-black text-amber-600 bg-amber-50 px-4 py-2 rounded-xl border border-amber-200/60 hover:bg-amber-100 transition-all no-underline shrink-0">
-              ← 홈으로
+              ← {t('user_landing.header.tab_home')}
             </Link>
             <AuthHeaderLinks currentUser={currentUser} onLogout={handleConsumerLogout} />
           </div>
           <div className="flex justify-end">
             <span className="text-xs font-black text-emerald-600 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl inline-flex items-center gap-1">
-              <ShieldCheck className="w-4 h-4" /> 정품인증 완료
+              <ShieldCheck className="w-4 h-4" /> {t('user_landing.unmap.success_title')}
             </span>
           </div>
         </header>
@@ -1628,16 +1623,16 @@ export default function UserLanding() {
           </div>
 
           <p className="text-xs font-black text-amber-600 tracking-wider uppercase">Genuine Goldbar Certificate</p>
-          <h2 className="text-2xl lg:text-3xl font-black text-slate-900 mb-3 mt-1">골드바 정품인증서</h2>
+          <h2 className="text-2xl lg:text-3xl font-black text-slate-900 mb-3 mt-1">{t('user_landing.goldbar.title')}</h2>
 
           <div className="w-full bg-slate-50 rounded-2xl p-5 text-sm space-y-3.5 border border-slate-100/60 text-left mt-4 mb-6">
-            <div className="flex justify-between items-center"><span className="text-slate-400 font-bold">일련번호</span><span className="font-black font-mono text-slate-800 text-base">{goldbar.serial_number}</span></div>
-            <div className="flex justify-between items-center"><span className="text-slate-400 font-bold">중량</span><span className="font-black text-slate-800">{goldbar.weight}</span></div>
-            <div className="flex justify-between items-center"><span className="text-slate-400 font-bold">순도</span><span className="font-black text-amber-600 text-base">{goldbar.purity}</span></div>
-            <div className="flex justify-between items-center"><span className="text-slate-400 font-bold">제조일자</span><span className="font-black text-slate-800">{goldbar.minted_at || '-'}</span></div>
+            <div className="flex justify-between items-center"><span className="text-slate-400 font-bold">{t('user_landing.wallet.serial_number')}</span><span className="font-black font-mono text-slate-800 text-base">{goldbar.serial_number}</span></div>
+            <div className="flex justify-between items-center"><span className="text-slate-400 font-bold">{t('user_landing.wallet.weight')}</span><span className="font-black text-slate-800">{goldbar.weight}</span></div>
+            <div className="flex justify-between items-center"><span className="text-slate-400 font-bold">{t('user_landing.wallet.purity')}</span><span className="font-black text-amber-600 text-base">{goldbar.purity}</span></div>
+            <div className="flex justify-between items-center"><span className="text-slate-400 font-bold">{t('user_landing.wallet.minted_date')}</span><span className="font-black text-slate-800">{goldbar.minted_at || '-'}</span></div>
             {Number(goldbar.show_market_price) === 1 && calculateCurrentPrice(goldbar.weight, goldbar.market_price_per_gram) !== null && (
               <div className="pt-3 border-t border-slate-200 flex justify-between items-center">
-                <span className="text-amber-700 font-black">실시간 자산 가치</span>
+                <span className="text-amber-700 font-black">{t('user_landing.wallet.market_price_title')}</span>
                 <span className="font-black text-amber-900 text-lg tabular-nums">
                   {calculateCurrentPrice(goldbar.weight, goldbar.market_price_per_gram)?.toLocaleString()}원
                 </span>
@@ -1650,12 +1645,12 @@ export default function UserLanding() {
             download 
             className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-amber-500/25 transition-all text-sm no-underline"
           >
-            <Download className="w-5 h-5" /> 원본 보증서 다운로드 (PDF)
+            <Download className="w-5 h-5" /> {t('user_landing.goldbar.download_pdf')}
           </a>
         </div>
 
         <p className="text-[11px] font-bold text-slate-400 text-center max-w-xs leading-relaxed">
-          본 제품은 Gold SyncTag 블록체인 및 Edge Runtime 시스템을 통해 안전하게 무결성 및 정품 확인이 완료되었습니다.
+          {t('user_landing.goldbar.tip')}
         </p>
       </div>
     );
@@ -1665,8 +1660,8 @@ export default function UserLanding() {
   // [Case D] 일반 제품 인증 성공 UI
   // ==========================================
   const displayData = product || {
-    name: '제이에로스 프리미엄 주얼리',
-    description: 'NFC 태그를 스캔하면 실제 제품 정보를 확인할 수 있습니다.',
+    name: 'J-Eros Premium Jewelry',
+    description: 'Scan the NFC tag to check genuine product information.',
     video_url: '',
     manual_url: '',
     image_url: '/jewelry.png',
@@ -1678,13 +1673,13 @@ export default function UserLanding() {
       <header className="w-full max-w-md flex flex-col gap-2 mb-8">
         <div className="flex justify-between items-center gap-2">
           <Link to="/" className="text-xs font-black text-purple-600 bg-purple-50 px-4 py-2 rounded-xl border border-purple-200/60 hover:bg-purple-100 transition-all no-underline shrink-0">
-            ← 홈으로
+            ← {t('user_landing.header.tab_home')}
           </Link>
           <AuthHeaderLinks currentUser={currentUser} onLogout={handleConsumerLogout} />
         </div>
         <div className="flex justify-end">
           <span className="text-xs font-black text-emerald-600 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl inline-flex items-center gap-1">
-            <ShieldCheck className="w-4 h-4" /> 정품인증 완료
+            <ShieldCheck className="w-4 h-4" /> {t('user_landing.unmap.success_title')}
           </span>
         </div>
       </header>
@@ -1711,20 +1706,20 @@ export default function UserLanding() {
         <div className="w-full space-y-3">
           {displayData.video_url ? (
             <a href={displayData.video_url} target="_blank" rel="noreferrer" className="w-full py-3.5 bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-black rounded-2xl flex items-center justify-center gap-3 shadow-lg shadow-purple-500/20 hover:from-purple-600 hover:to-indigo-600 transition-all text-sm no-underline">
-              <Play className="w-4.5 h-4.5 fill-white" /> 사용 설명 영상 보기
+              <Play className="w-4.5 h-4.5 fill-white" /> {t('user_landing.product.video_btn')}
             </a>
           ) : (
             <div className="w-full py-3.5 bg-slate-50 text-slate-400 font-bold rounded-2xl flex items-center justify-center gap-2 border border-dashed border-slate-200 text-sm">
-              사용 설명 영상 데이터가 없습니다.
+              {t('user_landing.product.no_video')}
             </div>
           )}
           {displayData.manual_url ? (
             <a href={displayData.manual_url} target="_blank" rel="noreferrer" className="w-full py-3.5 bg-slate-100 text-slate-700 font-black rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-200 transition-all text-sm no-underline">
-              <Download className="w-4.5 h-4.5" /> 제품 설명서 확인
+              <Download className="w-4.5 h-4.5" /> {t('user_landing.product.manual_btn')}
             </a>
           ) : (
             <div className="w-full py-3.5 bg-slate-50 text-slate-400 font-bold rounded-2xl flex items-center justify-center gap-2 border border-dashed border-slate-200 text-sm">
-              제품 설명서 데이터가 없습니다.
+              {t('user_landing.product.no_manual')}
             </div>
           )}
         </div>

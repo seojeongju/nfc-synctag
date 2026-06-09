@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Award,
   ChevronRight,
@@ -39,10 +40,10 @@ type UserDetail = {
   pending_release_requests: { goldbar_id: number; status: string; requested_at?: string }[];
 };
 
-function formatTagUid(uid: string) {
+function formatTagUid(uid: string, t: any) {
   const raw = String(uid || '').trim();
   if (!raw) return '—';
-  if (raw.startsWith('__PENDING')) return 'NFC 미연결';
+  if (raw.startsWith('__PENDING')) return t('admin_dashboard.users.nfc_unconnected');
   return raw;
 }
 
@@ -61,10 +62,10 @@ function formatDate(iso?: string | null) {
   }
 }
 
-function matchStatusLabel(s: TagLinkRow['match_status']) {
-  if (s === 'product_linked') return { text: '제품 매칭', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
-  if (s === 'asset_only') return { text: '출고 전 자산', className: 'bg-amber-50 text-amber-800 border-amber-200' };
-  return { text: '태그 미등록', className: 'bg-slate-100 text-slate-600 border-slate-200' };
+function matchStatusLabel(s: TagLinkRow['match_status'], t: any) {
+  if (s === 'product_linked') return { text: t('admin_dashboard.users.match_status_linked'), className: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+  if (s === 'asset_only') return { text: t('admin_dashboard.users.match_status_asset'), className: 'bg-amber-50 text-amber-800 border-amber-200' };
+  return { text: t('admin_dashboard.users.match_status_unregistered'), className: 'bg-slate-100 text-slate-600 border-slate-200' };
 }
 
 export function AdminUsersPanel({
@@ -74,6 +75,7 @@ export function AdminUsersPanel({
   getAuthHeaders: () => HeadersInit;
   onGoToNfc?: () => void;
 }) {
+  const { t } = useTranslation();
   const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [search, setSearch] = useState('');
@@ -111,18 +113,18 @@ export function AdminUsersPanel({
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
           setDetail(null);
-          setDetailError(typeof data.error === 'string' ? data.error : '상세 조회에 실패했습니다.');
+          setDetailError(typeof data.error === 'string' ? data.error : t('admin_dashboard.users.error_detail_fetch'));
           return;
         }
         setDetail(data as UserDetail);
       } catch {
         setDetail(null);
-        setDetailError('네트워크 오류가 발생했습니다.');
+        setDetailError(t('admin_dashboard.users.error_network'));
       } finally {
         setLoadingDetail(false);
       }
     },
-    [getAuthHeaders]
+    [getAuthHeaders, t]
   );
 
   useEffect(() => {
@@ -157,9 +159,9 @@ export function AdminUsersPanel({
     <div className="space-y-6">
       <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
         <div>
-          <h2 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">사용자 관리</h2>
+          <h2 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">{t('admin_dashboard.users.title')}</h2>
           <p className="text-xs font-bold text-slate-400 mt-1 leading-relaxed">
-            소비자 회원 목록과 NFC 태그 연결·제품 매칭·지갑에 담긴 정품 정보를 확인합니다.
+            {t('admin_dashboard.users.desc')}
           </p>
         </div>
         <button
@@ -168,7 +170,7 @@ export function AdminUsersPanel({
           className="px-4 py-2.5 bg-white border border-slate-200 text-slate-600 font-black text-xs rounded-xl hover:bg-slate-50 transition-all shadow-sm flex items-center gap-1.5"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loadingList ? 'animate-spin' : ''}`} />
-          새로고침
+          {t('admin_dashboard.users.refresh_btn')}
         </button>
       </div>
 
@@ -182,12 +184,12 @@ export function AdminUsersPanel({
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="이메일·이름 검색"
+                placeholder={t('admin_dashboard.users.search_placeholder')}
                 className="w-full h-11 pl-10 pr-4 bg-slate-50 rounded-xl text-sm font-bold outline-none border border-transparent focus:border-violet-300 focus:bg-white"
               />
             </div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-              총 {filtered.length}명
+              {t('admin_dashboard.users.total_count', { count: filtered.length })}
             </p>
           </div>
 
@@ -199,7 +201,7 @@ export function AdminUsersPanel({
             ) : filtered.length === 0 ? (
               <div className="py-16 px-6 text-center">
                 <User className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                <p className="text-sm font-black text-slate-400">등록된 사용자가 없습니다.</p>
+                <p className="text-sm font-black text-slate-400">{t('admin_dashboard.users.no_users')}</p>
               </div>
             ) : (
               filtered.map((u) => {
@@ -223,14 +225,14 @@ export function AdminUsersPanel({
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-black text-slate-800 truncate">{u.email}</p>
                       <p className="text-[11px] font-bold text-slate-500 truncate">
-                        {u.name?.trim() || '이름 없음'}
+                        {u.name?.trim() || t('admin_dashboard.users.name_empty')}
                       </p>
                       <div className="flex flex-wrap gap-1.5 mt-1.5">
                         <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-100">
-                          태그 {u.tag_link_count ?? 0}
+                          {t('admin_dashboard.users.tag_count', { count: u.tag_link_count ?? 0 })}
                         </span>
                         <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600">
-                          골드바 {u.goldbar_link_count ?? 0}
+                          {t('admin_dashboard.users.goldbar_count', { count: u.goldbar_link_count ?? 0 })}
                         </span>
                       </div>
                     </div>
@@ -249,7 +251,7 @@ export function AdminUsersPanel({
           {!selectedId ? (
             <div className="py-24 px-8 text-center">
               <User className="w-12 h-12 text-slate-200 mx-auto mb-4" />
-              <p className="font-black text-slate-500 text-sm">왼쪽에서 사용자를 선택하세요.</p>
+              <p className="font-black text-slate-500 text-sm">{t('admin_dashboard.users.select_user_prompt')}</p>
             </div>
           ) : loadingDetail ? (
             <div className="py-24 flex justify-center">
@@ -263,7 +265,7 @@ export function AdminUsersPanel({
                 onClick={() => selectedId && void fetchDetail(selectedId)}
                 className="mt-4 text-xs font-black text-violet-600 underline"
               >
-                다시 시도
+                {t('admin_dashboard.users.retry_btn')}
               </button>
             </div>
           ) : detail && selectedUser ? (
@@ -272,11 +274,11 @@ export function AdminUsersPanel({
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[10px] font-black text-violet-600 uppercase tracking-widest mb-1">
-                      회원 정보
+                      {t('admin_dashboard.users.user_info_title')}
                     </p>
                     <h3 className="text-lg font-black text-slate-900 break-all">{detail.user.email}</h3>
                     <p className="text-sm font-bold text-slate-600 mt-0.5">
-                      {detail.user.name?.trim() || '이름 없음'}
+                      {detail.user.name?.trim() || t('admin_dashboard.users.name_empty')}
                     </p>
                     <p className="text-[10px] font-mono font-bold text-slate-400 mt-2 break-all">
                       {detail.user.id}
@@ -296,7 +298,7 @@ export function AdminUsersPanel({
                 </div>
                 <div className="flex flex-wrap gap-2 mt-4">
                   <span className="text-[10px] font-black px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-600">
-                    가입 {formatDate(detail.user.created_at)}
+                    {t('admin_dashboard.users.registered_date', { date: formatDate(detail.user.created_at) })}
                   </span>
                   <span
                     className={`text-[10px] font-black px-2 py-1 rounded-lg border ${
@@ -305,11 +307,11 @@ export function AdminUsersPanel({
                         : 'bg-slate-100 text-slate-500 border-slate-200'
                     }`}
                   >
-                    {detail.user.has_password ? '비밀번호 설정됨' : '비밀번호 미설정'}
+                    {detail.user.has_password ? t('admin_dashboard.users.password_set') : t('admin_dashboard.users.password_not_set')}
                   </span>
                   {detail.pending_release_requests.length > 0 && (
                     <span className="text-[10px] font-black px-2 py-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-200">
-                      해지 요청 {detail.pending_release_requests.length}건
+                      {t('admin_dashboard.users.pending_releases', { count: detail.pending_release_requests.length })}
                     </span>
                   )}
                 </div>
@@ -320,7 +322,7 @@ export function AdminUsersPanel({
                 <div className="flex items-center justify-between gap-2 mb-4">
                   <h4 className="text-sm font-black text-slate-800 flex items-center gap-2">
                     <Tag className="w-4 h-4 text-amber-600" />
-                    연결된 NFC 태그
+                    {t('admin_dashboard.users.connected_nfc_title')}
                     <span className="text-slate-400 font-bold">({detail.tag_links.length})</span>
                   </h4>
                   {onGoToNfc && (
@@ -329,18 +331,18 @@ export function AdminUsersPanel({
                       onClick={onGoToNfc}
                       className="text-[10px] font-black text-violet-600 hover:underline"
                     >
-                      태그 관리 →
+                      {t('admin_dashboard.users.manage_tags_btn')}
                     </button>
                   )}
                 </div>
                 {detail.tag_links.length === 0 ? (
                   <p className="text-xs font-bold text-slate-400 bg-slate-50 rounded-xl px-4 py-6 text-center">
-                    아직 계정에 연결된 NFC 태그가 없습니다.
+                    {t('admin_dashboard.users.no_connected_nfc')}
                   </p>
                 ) : (
                   <div className="space-y-3">
                     {detail.tag_links.map((link) => {
-                      const badge = matchStatusLabel(link.match_status);
+                      const badge = matchStatusLabel(link.match_status, t);
                       return (
                         <div
                           key={link.tag_uid}
@@ -348,7 +350,7 @@ export function AdminUsersPanel({
                         >
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <p className="text-xs font-mono font-black text-slate-800 break-all">
-                              {formatTagUid(link.tag_uid)}
+                              {formatTagUid(link.tag_uid, t)}
                             </p>
                             <span
                               className={`text-[9px] font-black px-2 py-0.5 rounded-md border ${badge.className}`}
@@ -358,24 +360,24 @@ export function AdminUsersPanel({
                           </div>
                           {link.match_status === 'product_linked' ? (
                             <p className="text-sm font-black text-slate-800">
-                              제품: {link.product_name || `(ID ${link.product_id})`}
+                              {t('admin_dashboard.users.product_name_label', { name: link.product_name || `(ID ${link.product_id})` })}
                               {link.product_sold_at ? (
-                                <span className="text-[10px] font-bold text-rose-600 ml-2">판매완료</span>
+                                <span className="text-[10px] font-bold text-rose-600 ml-2">{t('admin_dashboard.users.product_sold')}</span>
                               ) : null}
                             </p>
                           ) : link.match_status === 'asset_only' ? (
                             <p className="text-xs font-bold text-amber-800">
-                              태그는 등록됐으나 아직 출고 제품과 매칭되지 않았습니다.
+                              {t('admin_dashboard.users.product_not_matched')}
                             </p>
                           ) : (
                             <p className="text-xs font-bold text-slate-500">
-                              관리자 태그 DB에 없는 UID입니다. (스캔만 한 경우)
+                              {t('admin_dashboard.users.uid_not_in_db')}
                             </p>
                           )}
                           <p className="text-[10px] font-bold text-slate-400">
-                            계정 연결: {formatDate(link.linked_at)}
+                            {t('admin_dashboard.users.linked_at_label', { date: formatDate(link.linked_at) })}
                             {link.tag_registered_at
-                              ? ` · 태그 등록: ${formatDate(link.tag_registered_at)}`
+                              ? ` · ${t('admin_dashboard.users.tag_registered_at_label', { date: formatDate(link.tag_registered_at) })}`
                               : ''}
                           </p>
                         </div>
@@ -389,32 +391,32 @@ export function AdminUsersPanel({
               <section className="p-5 sm:p-6 bg-slate-50/40">
                 <h4 className="text-sm font-black text-slate-800 flex items-center gap-2 mb-4">
                   <Award className="w-4 h-4 text-amber-600" />
-                  지갑에 표시되는 항목
+                  {t('admin_dashboard.users.wallet_items_title')}
                   <span className="text-slate-400 font-bold">({detail.wallet_items.length})</span>
                 </h4>
                 {detail.wallet_items.length === 0 ? (
                   <p className="text-xs font-bold text-slate-400 bg-white rounded-xl px-4 py-6 text-center border border-slate-100">
-                    지갑 항목이 없습니다. NFC 태그 스캔 후 로그인·연결이 필요합니다.
+                    {t('admin_dashboard.users.no_wallet_items')}
                   </p>
                 ) : (
                   <div className="grid gap-3 sm:grid-cols-2">
                     {detail.wallet_items.map((item, idx) => {
                       const isCatalog = item.wallet_source === 'catalog_product';
                       const title = isCatalog
-                        ? String(item.name || item.serial_number || '제품')
-                        : String(item.serial_number || item.display_name || '골드바');
+                        ? String(item.name || item.serial_number || t('admin_dashboard.users.wallet_source_catalog'))
+                        : String(item.serial_number || item.display_name || t('admin_dashboard.users.wallet_source_goldbar'));
                       return (
                         <div
                           key={`${String(item.id)}-${idx}`}
                           className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm"
                         >
                           <span className="text-[9px] font-black uppercase tracking-widest text-amber-600">
-                            {isCatalog ? '카탈로그 제품' : '골드바 인증'}
+                            {isCatalog ? t('admin_dashboard.users.wallet_source_catalog') : t('admin_dashboard.users.wallet_source_goldbar')}
                           </span>
                           <p className="text-sm font-black text-slate-800 mt-1 break-words">{title}</p>
                           {item.tag_uid || item.linked_tag_uid ? (
                             <p className="text-[10px] font-mono font-bold text-slate-500 mt-1 break-all">
-                              {formatTagUid(String(item.tag_uid || item.linked_tag_uid))}
+                              {formatTagUid(String(item.tag_uid || item.linked_tag_uid), t)}
                             </p>
                           ) : null}
                           {!isCatalog && item.weight ? (
@@ -434,7 +436,7 @@ export function AdminUsersPanel({
                 <section className="p-5 sm:p-6 border-t border-slate-100">
                   <h4 className="text-sm font-black text-slate-800 flex items-center gap-2 mb-3">
                     <Hash className="w-4 h-4 text-slate-500" />
-                    골드바 계정 연결 (user_goldbars)
+                    {t('admin_dashboard.users.direct_links_title')}
                   </h4>
                   <div className="space-y-2">
                     {detail.goldbar_links.map((g) => (
@@ -444,7 +446,7 @@ export function AdminUsersPanel({
                       >
                         <span className="font-black text-slate-800">{String(g.serial_number)}</span>
                         {g.tag_uid ? (
-                          <span className="font-mono">{formatTagUid(String(g.tag_uid))}</span>
+                          <span className="font-mono">{formatTagUid(String(g.tag_uid), t)}</span>
                         ) : null}
                         <span className="text-slate-400">{formatDate(g.added_at as string)}</span>
                       </div>
@@ -459,3 +461,4 @@ export function AdminUsersPanel({
     </div>
   );
 }
+
