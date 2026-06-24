@@ -41,7 +41,7 @@
     "kakao_login_failed": "Failed to process Kakao login.",
     "kakao_callback_processing": "Processing Kakao login...",
     "oauth_env_error": "{{kind}} login will be enabled once OAuth Client ID is set in wrangler environment variables.\n\nPlease use email login for now.",
-    "kakao_env_error": "Kakao login requires KAKAO_JAVASCRIPT_KEY (required) and KAKAO_REST_API_KEY in Cloudflare Pages environment variables, then a redeploy.\n\nPlease use email login for now.",
+    "kakao_env_error": "Kakao login requires KAKAO_REST_API_KEY in Cloudflare Pages environment variables, then a redeploy.\n\nPlease use email login for now.",
     "oauth_redirect_info": "OAuth redirect integration will be set up with callback URL after client registration.",
     "login_info": "Both regular members and administrators log in with their email on this screen. Administrators, please enter {{adminEmail}} and the admin password."
   },

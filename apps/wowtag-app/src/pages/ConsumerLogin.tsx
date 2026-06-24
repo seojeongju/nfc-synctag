@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { setAdminSession } from '../lib/adminSession';
 import { requestGoogleAccessToken, waitForGoogleScript } from '../lib/googleAuth';
-import { loadKakaoScript, startKakaoLogin } from '../lib/kakaoAuth';
+import { startKakaoLogin } from '../lib/kakaoAuth';
 import { useToast } from '../components/ToastProvider';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 
@@ -84,11 +84,6 @@ export default function ConsumerLogin() {
       cancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    if (!providers.kakao) return;
-    void loadKakaoScript();
-  }, [providers.kakao]);
 
   useEffect(() => {
     setError('');
@@ -224,14 +219,8 @@ export default function ConsumerLogin() {
     }
   };
 
-  const handleKakaoLogin = async () => {
+  const handleKakaoLogin = () => {
     if (!providers.kakao) return;
-
-    const ready = await loadKakaoScript();
-    if (!ready) {
-      showToast('error', t('login.kakao_lib_loading'));
-      return;
-    }
 
     try {
       const next = searchParams.get('next') || undefined;
