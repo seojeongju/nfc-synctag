@@ -1,3 +1,6 @@
 # 로컬 Pages Functions 개발용 (wrangler pages dev)
 # 이 파일을 .dev.vars 로 복사한 뒤 값을 채우세요.
 GOOGLE_OAUTH_CLIENT_ID=your-client-id.apps.googleusercontent.com
+KAKAO_JAVASCRIPT_KEY=your-kakao-javascript-key
+KAKAO_REST_API_KEY=your-kakao-rest-api-key
+# KAKAO_CLIENT_SECRET=your-kakao-client-secret

@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { setAdminSession } from '../lib/adminSession';
 import { requestGoogleAccessToken, waitForGoogleScript } from '../lib/googleAuth';
+import { startKakaoLogin, waitForKakaoScript } from '../lib/kakaoAuth';
 import { useToast } from '../components/ToastProvider';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 
@@ -54,9 +55,9 @@ export default function ConsumerLogin() {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [providers, setProviders] = useState<{ google: string | null; kakao: boolean }>({
+  const [providers, setProviders] = useState<{ google: string | null; kakao: string | null }>({
     google: null,
-    kakao: false
+    kakao: null
   });
 
   useEffect(() => {
@@ -73,7 +74,7 @@ export default function ConsumerLogin() {
         const res = await fetch('/api/auth/providers');
         if (res.ok && !cancelled) {
           const d = await res.json();
-          setProviders({ google: d.google || null, kakao: !!d.kakao });
+          setProviders({ google: d.google || null, kakao: d.kakao || null });
         }
       } catch {
         /* ignore */
@@ -218,8 +219,26 @@ export default function ConsumerLogin() {
     }
   };
 
+  const handleKakaoLogin = async () => {
+    if (!providers.kakao) return;
+
+    const ready = await waitForKakaoScript();
+    if (!ready) {
+      showToast('error', t('login.kakao_lib_loading'));
+      return;
+    }
+
+    try {
+      const next = searchParams.get('next') || undefined;
+      startKakaoLogin(providers.kakao, { next });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : t('common.error_occurred');
+      showToast('error', t('login.kakao_init_failed', { message }));
+    }
+  };
+
   const handleSocial = (kind: 'google' | 'kakao') => {
-    const enabled = kind === 'google' ? !!providers.google : providers.kakao;
+    const enabled = kind === 'google' ? !!providers.google : !!providers.kakao;
     if (!enabled) {
       showToast(
         'info',
@@ -234,7 +253,10 @@ export default function ConsumerLogin() {
       return;
     }
 
-    showToast('info', t('login.oauth_redirect_info'));
+    if (kind === 'kakao') {
+      void handleKakaoLogin();
+      return;
+    }
   };
 
   return (

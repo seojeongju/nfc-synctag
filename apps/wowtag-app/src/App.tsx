@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import UserLanding from './pages/UserLanding';
 import AdminDashboard from './pages/AdminDashboard';
 import ConsumerLogin from './pages/ConsumerLogin';
+import KakaoLoginCallback from './pages/KakaoLoginCallback';
 import { ToastProvider } from './components/ToastProvider';
 import { isAdminSessionValid } from './lib/adminSession';
 
@@ -19,6 +20,7 @@ function App() {
 
       {/* 통합 로그인 (일반·관리자) */}
       <Route path="/login" element={<ConsumerLogin />} />
+      <Route path="/login/kakao/callback" element={<KakaoLoginCallback />} />
       <Route path="/admin/login" element={<Navigate to="/login" replace />} />
 
       {/* 관리자 콘솔 */}

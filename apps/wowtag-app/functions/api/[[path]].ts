@@ -7,6 +7,8 @@ type Bindings = {
   ADMIN_PASSWORD?: string;
   GOOGLE_OAUTH_CLIENT_ID?: string;
   KAKAO_REST_API_KEY?: string;
+  KAKAO_JAVASCRIPT_KEY?: string;
+  KAKAO_CLIENT_SECRET?: string;
 };
 
 async function ensureUsersPasswordColumn(db: D1Database) {
@@ -47,6 +49,90 @@ async function ensureUsersOAuthColumns(db: D1Database) {
   try {
     await db.prepare('ALTER TABLE users ADD COLUMN google_sub TEXT').run();
   } catch (_) {}
+  try {
+    await db.prepare('ALTER TABLE users ADD COLUMN kakao_sub TEXT').run();
+  } catch (_) {}
+}
+
+async function ensureUserGoldbarsTable(db: D1Database) {
+  try {
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS user_goldbars (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        goldbar_id INTEGER NOT NULL REFERENCES goldbars(id) ON DELETE CASCADE,
+        added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, goldbar_id)
+      )
+    `).run();
+  } catch (_) {}
+}
+
+type OAuthUpsertProfile = {
+  email: string;
+  name: string;
+  provider: 'google' | 'kakao';
+  googleSub?: string;
+  kakaoSub?: string;
+};
+
+async function upsertOAuthUser(db: D1Database, profile: OAuthUpsertProfile): Promise<Record<string, unknown>> {
+  await ensureUsersOAuthColumns(db);
+  await ensureUserGoldbarsTable(db);
+
+  const em = profile.email.trim().toLowerCase();
+  let user = (await db.prepare('SELECT * FROM users WHERE email = ?').bind(em).first()) as Record<
+    string,
+    unknown
+  > | null;
+
+  if (!user && profile.kakaoSub) {
+    user = (await db.prepare('SELECT * FROM users WHERE kakao_sub = ?').bind(profile.kakaoSub).first()) as Record<
+      string,
+      unknown
+    > | null;
+  }
+  if (!user && profile.googleSub) {
+    user = (await db.prepare('SELECT * FROM users WHERE google_sub = ?').bind(profile.googleSub).first()) as Record<
+      string,
+      unknown
+    > | null;
+  }
+
+  if (!user) {
+    const userId = `user_${Date.now()}`;
+    await db.prepare(
+      'INSERT INTO users (id, email, name, auth_provider, google_sub, kakao_sub) VALUES (?, ?, ?, ?, ?, ?)'
+    )
+      .bind(
+        userId,
+        em,
+        profile.name,
+        profile.provider,
+        profile.googleSub || null,
+        profile.kakaoSub || null
+      )
+      .run();
+    user = (await db.prepare('SELECT * FROM users WHERE email = ?').bind(em).first()) as Record<string, unknown>;
+    return user;
+  }
+
+  const existingName = typeof user.name === 'string' ? user.name.trim() : '';
+  const nextName = existingName || profile.name;
+  const userId = String(user.id);
+  await db.prepare(
+    `UPDATE users
+     SET email = ?,
+         name = ?,
+         auth_provider = COALESCE(auth_provider, ?),
+         google_sub = COALESCE(google_sub, ?),
+         kakao_sub = COALESCE(kakao_sub, ?)
+     WHERE id = ?`
+  )
+    .bind(em, nextName, profile.provider, profile.googleSub || null, profile.kakaoSub || null, userId)
+    .run();
+
+  return (await db.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first()) as Record<string, unknown>;
 }
 
 type GoogleTokenInfo = {
@@ -83,6 +169,70 @@ async function verifyGoogleAccessToken(
   } catch (_) {}
 
   return { email: info.email.trim().toLowerCase(), sub: info.sub, name };
+}
+
+type KakaoTokenResponse = {
+  access_token?: string;
+  error?: string;
+  error_description?: string;
+};
+
+type KakaoUserResponse = {
+  id?: number;
+  kakao_account?: {
+    email?: string;
+    profile?: { nickname?: string };
+  };
+  properties?: { nickname?: string };
+};
+
+async function exchangeKakaoAuthorizationCode(
+  code: string,
+  redirectUri: string,
+  restApiKey: string,
+  clientSecret?: string
+): Promise<string | null> {
+  const body = new URLSearchParams({
+    grant_type: 'authorization_code',
+    client_id: restApiKey,
+    redirect_uri: redirectUri,
+    code
+  });
+  if (clientSecret) {
+    body.set('client_secret', clientSecret);
+  }
+
+  const tokenRes = await fetch('https://kauth.kakao.com/oauth/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8' },
+    body: body.toString()
+  });
+  if (!tokenRes.ok) return null;
+
+  const tokenData = (await tokenRes.json()) as KakaoTokenResponse;
+  return typeof tokenData.access_token === 'string' ? tokenData.access_token : null;
+}
+
+async function fetchKakaoProfile(
+  accessToken: string
+): Promise<{ email: string; name: string; sub: string } | null> {
+  const profileRes = await fetch('https://kapi.kakao.com/v2/user/me', {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8'
+    }
+  });
+  if (!profileRes.ok) return null;
+
+  const profile = (await profileRes.json()) as KakaoUserResponse;
+  if (typeof profile.id !== 'number') return null;
+
+  const sub = String(profile.id);
+  const rawEmail = profile.kakao_account?.email?.trim().toLowerCase();
+  const name = (profile.kakao_account?.profile?.nickname || profile.properties?.nickname || '').trim();
+  const email = rawEmail || `kakao_${sub}@users.wowtag.local`;
+
+  return { email, name, sub };
 }
 
 const ADMIN_CONSUMER_EMAIL = 'admin@wowtag.com';
@@ -2104,51 +2254,59 @@ app.post('/user/auth/google', async (c) => {
       return c.json({ error: '관리자 계정은 Google 로그인을 사용할 수 없습니다.' }, 403);
     }
 
-    await ensureUsersOAuthColumns(c.env.DB);
-    try {
-      await c.env.DB.prepare(`
-        CREATE TABLE IF NOT EXISTS user_goldbars (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          goldbar_id INTEGER NOT NULL REFERENCES goldbars(id) ON DELETE CASCADE,
-          added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          UNIQUE(user_id, goldbar_id)
-        )
-      `).run();
-    } catch (_) {}
+    const user = await upsertOAuthUser(c.env.DB, {
+      email: profile.email,
+      name: profile.name,
+      provider: 'google',
+      googleSub: profile.sub
+    });
 
-    const em = profile.email;
-    let user = (await c.env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(em).first()) as Record<
-      string,
-      unknown
-    > | null;
+    return c.json({ success: true, user: sanitizeUserRow(user) });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
 
-    if (!user) {
-      const userId = `user_${Date.now()}`;
-      await c.env.DB.prepare(
-        'INSERT INTO users (id, email, name, auth_provider, google_sub) VALUES (?, ?, ?, ?, ?)'
-      )
-        .bind(userId, em, profile.name, 'google', profile.sub)
-        .run();
-      user = (await c.env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(em).first()) as Record<
-        string,
-        unknown
-      >;
-    } else {
-      const existingName = typeof user.name === 'string' ? user.name.trim() : '';
-      const nextName = existingName || profile.name;
-      await c.env.DB.prepare(
-        `UPDATE users
-         SET google_sub = ?, name = ?, auth_provider = COALESCE(auth_provider, 'google')
-         WHERE email = ?`
-      )
-        .bind(profile.sub, nextName, em)
-        .run();
-      user = (await c.env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(em).first()) as Record<
-        string,
-        unknown
-      >;
+// Kakao OAuth 인가 코드 교환 후 회원가입·로그인
+app.post('/user/auth/kakao', async (c) => {
+  try {
+    const restApiKey = c.env.KAKAO_REST_API_KEY;
+    if (!restApiKey) {
+      return c.json({ error: '카카오 로그인이 설정되지 않았습니다.' }, 503);
     }
+
+    const body = await c.req.json();
+    const code = typeof body.code === 'string' ? body.code.trim() : '';
+    const redirectUri = typeof body.redirect_uri === 'string' ? body.redirect_uri.trim() : '';
+    if (!code || !redirectUri) {
+      return c.json({ error: '인가 코드와 redirect_uri가 필요합니다.' }, 400);
+    }
+
+    const accessToken = await exchangeKakaoAuthorizationCode(
+      code,
+      redirectUri,
+      restApiKey,
+      c.env.KAKAO_CLIENT_SECRET
+    );
+    if (!accessToken) {
+      return c.json({ error: '카카오 인증에 실패했습니다. 다시 시도해 주세요.' }, 401);
+    }
+
+    const profile = await fetchKakaoProfile(accessToken);
+    if (!profile) {
+      return c.json({ error: '카카오 사용자 정보를 가져오지 못했습니다.' }, 401);
+    }
+
+    if (profile.email === ADMIN_CONSUMER_EMAIL) {
+      return c.json({ error: '관리자 계정은 카카오 로그인을 사용할 수 없습니다.' }, 403);
+    }
+
+    const user = await upsertOAuthUser(c.env.DB, {
+      email: profile.email,
+      name: profile.name,
+      provider: 'kakao',
+      kakaoSub: profile.sub
+    });
 
     return c.json({ success: true, user: sanitizeUserRow(user) });
   } catch (err: any) {
@@ -2159,7 +2317,7 @@ app.post('/user/auth/google', async (c) => {
 // 소셜 로그인 연동 가능 여부 (클라이언트에서 버튼 활성화 및 클라이언트 ID 전달용)
 app.get('/auth/providers', async (c) => {
   const google = (c.env as Bindings).GOOGLE_OAUTH_CLIENT_ID || null;
-  const kakao = !!(c.env as Bindings).KAKAO_REST_API_KEY;
+  const kakao = (c.env as Bindings).KAKAO_JAVASCRIPT_KEY || null;
   return c.json({ google, kakao });
 });
 

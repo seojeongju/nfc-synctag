@@ -36,6 +36,10 @@
     "google_login_success": "Google 로그인에 성공했습니다.",
     "google_login_failed": "Google 로그인 처리에 실패했습니다.",
     "google_init_failed": "Google 로그인 초기화 실패: {{message}}",
+    "kakao_lib_loading": "카카오 로그인 라이브러리를 로드하는 중입니다. 잠시 후 다시 시도해 주세요.",
+    "kakao_init_failed": "카카오 로그인 초기화 실패: {{message}}",
+    "kakao_login_failed": "카카오 로그인 처리에 실패했습니다.",
+    "kakao_callback_processing": "카카오 로그인을 처리하는 중입니다...",
     "oauth_env_error": "{{kind}} 로그인은 OAuth 클라이언트 ID를 워커 환경 변수에 설정하면 활성화됩니다.\n\n지금은 이메일 로그인을 이용해 주세요.",
     "oauth_redirect_info": "OAuth 리다이렉트 연동은 클라이언트 등록 후 콜백 URL과 함께 설정합니다.",
     "login_info": "일반 회원·관리자 모두 이 화면에서 이메일로 로그인합니다. 관리자는 {{adminEmail}} 과 관리자 비밀번호를 입력하세요."

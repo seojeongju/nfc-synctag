@@ -16,5 +16,8 @@ bucket_name = "wowtag-contents"
 ADMIN_PASSWORD = "wowtag2026!"
 # Google OAuth (Web application) — Cloudflare Pages 대시보드 Variables 또는 .dev.vars
 # GOOGLE_OAUTH_CLIENT_ID = "xxxx.apps.googleusercontent.com"
+# Kakao Login — JavaScript 키(프론트), REST API 키·Client Secret(서버)
+# KAKAO_JAVASCRIPT_KEY = ""
 # KAKAO_REST_API_KEY = ""
+# KAKAO_CLIENT_SECRET = ""
 
