@@ -242,7 +242,7 @@ export default function ConsumerLogin() {
     if (!enabled) {
       showToast(
         'info',
-        t('login.oauth_env_error', { kind: kind === 'google' ? 'Google' : 'Kakao' }),
+        kind === 'kakao' ? t('login.kakao_env_error') : t('login.oauth_env_error', { kind: 'Google' }),
         7000
       );
       return;
