@@ -118,7 +118,11 @@ async function upsertOAuthUser(db: D1Database, profile: OAuthUpsertProfile): Pro
   }
 
   const existingName = typeof user.name === 'string' ? user.name.trim() : '';
-  const nextName = existingName || profile.name;
+  const incomingName = profile.name.trim();
+  const nextName =
+    existingName && !existingName.startsWith('kakao_') && !existingName.startsWith('카카오회원')
+      ? existingName
+      : incomingName || existingName;
   const userId = String(user.id);
   await db.prepare(
     `UPDATE users
@@ -216,7 +220,8 @@ async function exchangeKakaoAuthorizationCode(
 async function fetchKakaoProfile(
   accessToken: string
 ): Promise<{ email: string; name: string; sub: string } | null> {
-  const profileRes = await fetch('https://kapi.kakao.com/v2/user/me', {
+  const propertyKeys = encodeURIComponent(JSON.stringify(['kakao_account.profile', 'properties']));
+  const profileRes = await fetch(`https://kapi.kakao.com/v2/user/me?property_keys=${propertyKeys}`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8'
@@ -232,7 +237,7 @@ async function fetchKakaoProfile(
   const name = (profile.kakao_account?.profile?.nickname || profile.properties?.nickname || '').trim();
   const email = rawEmail || `kakao_${sub}@users.wowtag.local`;
 
-  return { email, name, sub };
+  return { email, name: name || `카카오회원${sub.slice(-4)}`, sub };
 }
 
 const ADMIN_CONSUMER_EMAIL = 'admin@wowtag.com';

@@ -24,6 +24,7 @@ import { fetchUserWallet, linkTagToUserWallet } from '../lib/walletApi';
 import { canUseWalletFeatures, isConsumerLoggedIn, loginPathWithNext } from '../lib/sessionPolicy';
 import { useToast } from '../components/ToastProvider';
 import LanguageSwitcher from '../components/LanguageSwitcher';
+import { getConsumerDisplayName } from '../lib/consumerDisplay';
 import { useTranslation } from 'react-i18next';
 
 /** Chrome BeforeInstallPromptEvent (lib.dom에 없을 수 있음) */
@@ -46,7 +47,7 @@ function AuthHeaderLinks({
   onLogout,
   className = '',
 }: {
-  currentUser: { email?: string } | null;
+  currentUser: { name?: string; email?: string } | null;
   onLogout: () => void;
   className?: string;
 }) {
@@ -57,7 +58,7 @@ function AuthHeaderLinks({
       {currentUser ? (
         <>
           <span className="hidden sm:inline text-[10px] font-bold text-slate-500 max-w-[88px] truncate">
-            {currentUser.email}
+            {getConsumerDisplayName(currentUser, t('common.member'))}
           </span>
           <button
             type="button"
