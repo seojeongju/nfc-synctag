@@ -788,24 +788,26 @@ export default function AdminDashboard() {
     showToast('error', 'NFC 기록을 취소했습니다.');
   }, [showToast]);
 
-  const nfcProductTags = useMemo(() => allTags.filter((t: any) => t.target_type === 'product'), [allTags]);
+  const nfcProductTags = useMemo(() => allTags.filter((tagRow: any) => tagRow.target_type === 'product'), [allTags]);
   const nfcUnlinkedList = useMemo(
-    () => nfcProductTags.filter((t: any) => t.target_id == null || t.target_id === ''),
+    () => nfcProductTags.filter((tagRow: any) => tagRow.target_id == null || tagRow.target_id === ''),
     [nfcProductTags]
   );
   const nfcLinkedList = useMemo(() => {
-    let list = nfcProductTags.filter((t: any) => t.target_id != null && t.target_id !== '');
-    
+    let list = nfcProductTags.filter((tagRow: any) => tagRow.target_id != null && tagRow.target_id !== '');
+
     if (nfcFilterProductId) {
-      list = list.filter((t: any) => String(t.target_id) === nfcFilterProductId);
+      list = list.filter((tagRow: any) => String(tagRow.target_id) === nfcFilterProductId);
     }
     if (nfcFilterCertSerial) {
-      list = list.filter((t: any) => t.goldbar_serial_number?.toLowerCase().includes(nfcFilterCertSerial.toLowerCase()));
+      list = list.filter((tagRow: any) =>
+        tagRow.goldbar_serial_number?.toLowerCase().includes(nfcFilterCertSerial.toLowerCase())
+      );
     }
     if (nfcSearchUid) {
-      list = list.filter((t: any) => t.tag_uid?.toLowerCase().includes(nfcSearchUid.toLowerCase()));
+      list = list.filter((tagRow: any) => tagRow.tag_uid?.toLowerCase().includes(nfcSearchUid.toLowerCase()));
     }
-    
+
     return list;
   }, [nfcProductTags, nfcFilterProductId, nfcFilterCertSerial, nfcSearchUid]);
 
@@ -813,7 +815,7 @@ export default function AdminDashboard() {
   const nfcProductMatchRate = useMemo<number | null>(() => {
     const total = nfcProductTags.length;
     if (total === 0) return null;
-    const linked = nfcProductTags.filter((t: any) => t.target_id != null && t.target_id !== '').length;
+    const linked = nfcProductTags.filter((tagRow: any) => tagRow.target_id != null && tagRow.target_id !== '').length;
     return Math.round((linked / total) * 100);
   }, [nfcProductTags]);
 
