@@ -14,7 +14,7 @@ bucket_name = "wowtag-contents"
 
 [vars]
 ADMIN_PASSWORD = "wowtag2026!"
-# 소셜 로그인 연동 시 Pages 프로젝트에 설정 (선택)
-# GOOGLE_OAUTH_CLIENT_ID = ""
+# Google OAuth (Web application) — Cloudflare Pages 대시보드 Variables 또는 .dev.vars
+# GOOGLE_OAUTH_CLIENT_ID = "xxxx.apps.googleusercontent.com"
 # KAKAO_REST_API_KEY = ""
 

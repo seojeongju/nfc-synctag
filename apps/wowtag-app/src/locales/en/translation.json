@@ -35,6 +35,7 @@
     "google_lib_loading": "Loading Google Login library. Please try again in a moment.",
     "google_login_success": "Successfully logged in with Google.",
     "google_login_failed": "Failed to process Google login.",
+    "google_init_failed": "Failed to initialize Google login: {{message}}",
     "oauth_env_error": "{{kind}} login will be enabled once OAuth Client ID is set in wrangler environment variables.\n\nPlease use email login for now.",
     "oauth_redirect_info": "OAuth redirect integration will be set up with callback URL after client registration.",
     "login_info": "Both regular members and administrators log in with their email on this screen. Administrators, please enter {{adminEmail}} and the admin password."

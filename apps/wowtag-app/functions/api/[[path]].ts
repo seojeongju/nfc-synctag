@@ -39,6 +39,54 @@ function sanitizeUserRow(u: Record<string, unknown> | null | undefined) {
   return rest;
 }
 
+async function ensureUsersOAuthColumns(db: D1Database) {
+  await ensureUsersPasswordColumn(db);
+  try {
+    await db.prepare('ALTER TABLE users ADD COLUMN auth_provider TEXT').run();
+  } catch (_) {}
+  try {
+    await db.prepare('ALTER TABLE users ADD COLUMN google_sub TEXT').run();
+  } catch (_) {}
+}
+
+type GoogleTokenInfo = {
+  aud?: string;
+  sub?: string;
+  email?: string;
+  email_verified?: string | boolean;
+};
+
+async function verifyGoogleAccessToken(
+  accessToken: string,
+  clientId: string
+): Promise<{ email: string; sub: string; name: string } | null> {
+  const tokenRes = await fetch(
+    `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`
+  );
+  if (!tokenRes.ok) return null;
+
+  const info = (await tokenRes.json()) as GoogleTokenInfo;
+  if (!info.email || info.aud !== clientId || !info.sub) return null;
+
+  const verified = info.email_verified === true || info.email_verified === 'true';
+  if (!verified) return null;
+
+  let name = '';
+  try {
+    const profileRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    if (profileRes.ok) {
+      const profile = (await profileRes.json()) as { name?: string; given_name?: string };
+      name = (profile.name || profile.given_name || '').trim();
+    }
+  } catch (_) {}
+
+  return { email: info.email.trim().toLowerCase(), sub: info.sub, name };
+}
+
+const ADMIN_CONSUMER_EMAIL = 'admin@wowtag.com';
+
 /** NFC 미연결 시에도 제품–보증서 연결을 위해 사용하는 예약 tag_uid (certificate 행 id 유지) */
 function pendingCertificateTagUid(goldbarId: number): string {
   return `__PENDING_GB_${goldbarId}__`;
@@ -1939,17 +1987,19 @@ app.post('/user/auth', async (c) => {
       `).run();
     } catch (_) {}
 
+    const em = String(email).trim().toLowerCase();
+
     // 유저 존재 여부 확인
-    let user = await c.env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(email).first();
+    let user = await c.env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(em).first();
     if (!user) {
       const userId = `user_${Date.now()}`;
       await c.env.DB.prepare('INSERT INTO users (id, email, name) VALUES (?, ?, ?)')
-        .bind(userId, email, name || '')
+        .bind(userId, em, name || '')
         .run();
-      user = await c.env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(email).first();
+      user = await c.env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(em).first();
     }
 
-    return c.json({ success: true, user });
+    return c.json({ success: true, user: sanitizeUserRow(user as Record<string, unknown>) });
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
   }
@@ -2023,6 +2073,81 @@ app.post('/user/login', async (c) => {
     const hash = await hashUserPassword(em, password);
     if (hash !== user.password_hash) {
       return c.json({ error: '이메일 또는 비밀번호가 올바르지 않습니다.' }, 401);
+    }
+
+    return c.json({ success: true, user: sanitizeUserRow(user) });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// Google OAuth 액세스 토큰 검증 후 회원가입·로그인
+app.post('/user/auth/google', async (c) => {
+  try {
+    const clientId = c.env.GOOGLE_OAUTH_CLIENT_ID;
+    if (!clientId) {
+      return c.json({ error: 'Google 로그인이 설정되지 않았습니다.' }, 503);
+    }
+
+    const body = await c.req.json();
+    const accessToken = typeof body.access_token === 'string' ? body.access_token.trim() : '';
+    if (!accessToken) {
+      return c.json({ error: '액세스 토큰이 필요합니다.' }, 400);
+    }
+
+    const profile = await verifyGoogleAccessToken(accessToken, clientId);
+    if (!profile) {
+      return c.json({ error: 'Google 인증에 실패했습니다. 다시 시도해 주세요.' }, 401);
+    }
+
+    if (profile.email === ADMIN_CONSUMER_EMAIL) {
+      return c.json({ error: '관리자 계정은 Google 로그인을 사용할 수 없습니다.' }, 403);
+    }
+
+    await ensureUsersOAuthColumns(c.env.DB);
+    try {
+      await c.env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS user_goldbars (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          goldbar_id INTEGER NOT NULL REFERENCES goldbars(id) ON DELETE CASCADE,
+          added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(user_id, goldbar_id)
+        )
+      `).run();
+    } catch (_) {}
+
+    const em = profile.email;
+    let user = (await c.env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(em).first()) as Record<
+      string,
+      unknown
+    > | null;
+
+    if (!user) {
+      const userId = `user_${Date.now()}`;
+      await c.env.DB.prepare(
+        'INSERT INTO users (id, email, name, auth_provider, google_sub) VALUES (?, ?, ?, ?, ?)'
+      )
+        .bind(userId, em, profile.name, 'google', profile.sub)
+        .run();
+      user = (await c.env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(em).first()) as Record<
+        string,
+        unknown
+      >;
+    } else {
+      const existingName = typeof user.name === 'string' ? user.name.trim() : '';
+      const nextName = existingName || profile.name;
+      await c.env.DB.prepare(
+        `UPDATE users
+         SET google_sub = ?, name = ?, auth_provider = COALESCE(auth_provider, 'google')
+         WHERE email = ?`
+      )
+        .bind(profile.sub, nextName, em)
+        .run();
+      user = (await c.env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(em).first()) as Record<
+        string,
+        unknown
+      >;
     }
 
     return c.json({ success: true, user: sanitizeUserRow(user) });

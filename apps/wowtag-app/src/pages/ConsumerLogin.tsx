@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { setAdminSession } from '../lib/adminSession';
+import { requestGoogleAccessToken, waitForGoogleScript } from '../lib/googleAuth';
 import { useToast } from '../components/ToastProvider';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 
@@ -174,61 +175,46 @@ export default function ConsumerLogin() {
     }
   };
 
-  const handleGoogleLogin = () => {
+  const handleGoogleLogin = async () => {
     if (!providers.google) return;
 
-    if (typeof window === 'undefined' || !(window as any).google) {
+    const ready = await waitForGoogleScript();
+    if (!ready) {
       showToast('error', t('login.google_lib_loading'));
       return;
     }
 
     try {
-      const client = (window as any).google.accounts.oauth2.initTokenClient({
-        client_id: providers.google,
-        scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
-        callback: async (tokenResponse: any) => {
-          if (tokenResponse.error_subtype === 'access_denied') {
-            return;
-          }
-          if (tokenResponse.access_token) {
-            setLoading(true);
-            setError('');
-            try {
-              const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                headers: { Authorization: `Bearer ${tokenResponse.access_token}` }
-              });
-              if (!userInfoRes.ok) {
-                throw new Error('Google 사용자 정보를 가져오지 못했습니다.');
-              }
-              const userInfo = await userInfoRes.json();
-              
-              const res = await fetch('/api/user/auth', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  email: userInfo.email,
-                  name: userInfo.name || userInfo.given_name || ''
-                })
-              });
-              const data = await res.json().catch(() => ({}));
-              if (res.ok && data.user) {
-                persistUser(data.user);
-                afterConsumerAuth();
-                showToast('success', t('login.google_login_success'));
-              } else {
-                setError(data.error || t('login.google_login_failed'));
-              }
-            } catch (err: any) {
-              setError(err.message || t('common.error_occurred'));
-            } finally {
-              setLoading(false);
+      requestGoogleAccessToken(
+        providers.google,
+        async (accessToken) => {
+          setLoading(true);
+          setError('');
+          try {
+            const res = await fetch('/api/user/auth/google', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ access_token: accessToken })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.user) {
+              persistUser(data.user);
+              afterConsumerAuth();
+              showToast('success', t('login.google_login_success'));
+              return;
             }
+            setError(typeof data.error === 'string' ? data.error : t('login.google_login_failed'));
+          } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : t('common.error_occurred');
+            setError(message);
+          } finally {
+            setLoading(false);
           }
         }
-      });
-      client.requestAccessToken();
-    } catch (err: any) {
-      showToast('error', `Google 로그인 초기화 실패: ${err.message}`);
+      );
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : t('common.error_occurred');
+      showToast('error', t('login.google_init_failed', { message }));
     }
   };
 
@@ -244,7 +230,7 @@ export default function ConsumerLogin() {
     }
 
     if (kind === 'google') {
-      handleGoogleLogin();
+      void handleGoogleLogin();
       return;
     }
 
