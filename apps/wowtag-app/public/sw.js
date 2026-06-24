@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gold-synctag-v5';
+const CACHE_NAME = 'gold-synctag-v6';
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();

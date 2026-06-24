@@ -25,9 +25,9 @@ export function startKakaoLogin(restApiKey: string, options?: { next?: string })
   const params = new URLSearchParams({
     client_id: restApiKey,
     redirect_uri: getKakaoRedirectUri(),
-    response_type: 'code',
-    scope: 'account_email profile_nickname'
+    response_type: 'code'
   });
+  // scope 미지정: 앱에 설정된 필수 동의항목만 요청 (미설정 scope → KOE205)
   const state = encodeKakaoOAuthState(options?.next);
   if (state) params.set('state', state);
   window.location.assign(`${KAKAO_AUTHORIZE_URL}?${params.toString()}`);
