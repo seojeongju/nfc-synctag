@@ -158,7 +158,19 @@
       "status_desc": "최대 5장까지의 소중한 순간을 등록 가능",
       "upload_label": "추억 사진 추가",
       "uploading_msg": "이미지 등록 중입니다...",
-      "close_btn": "닫기"
+      "close_btn": "닫기",
+      "caption_label": "사진 메모 (선택)",
+      "caption_placeholder": "이 순간을 기억할 짧은 메모를 남겨보세요",
+      "drag_drop_hint": "사진을 끌어다 놓거나 아래 버튼을 눌러주세요",
+      "format_hint": "JPG·PNG·WebP · 최대 12MB · 자동 압축",
+      "gallery_btn": "앨범에서 선택",
+      "camera_btn": "카메라 촬영",
+      "invalid_type": "지원하지 않는 이미지 형식입니다. (JPG, PNG, WebP, GIF)",
+      "file_too_large": "파일이 너무 큽니다. 12MB 이하 이미지를 선택해 주세요.",
+      "upload_success": "{{count}}장의 사진이 등록되었습니다.",
+      "upload_progress": "업로드 중… ({{current}}/{{total}})",
+      "compressing_msg": "이미지 최적화 중…",
+      "remaining_slots": "남은 {{count}}장만 등록됩니다."
     },
     "products": {
       "search_placeholder": "제품 이름 검색...",

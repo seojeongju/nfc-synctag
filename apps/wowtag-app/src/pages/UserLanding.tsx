@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
-import { Download, Play, ChevronRight, Bookmark, Loader2, Award, ShieldCheck, ShoppingCart, Info, CheckCircle2, MessageSquare, X, BookOpen, Smartphone, Eye } from 'lucide-react';
+import { Download, Play, ChevronRight, Bookmark, Loader2, Award, ShieldCheck, ShoppingCart, Info, CheckCircle2, MessageSquare, X, BookOpen, Smartphone, Eye, Camera, ImagePlus, Upload } from 'lucide-react';
 import { GuaranteePdfHost } from '../components/ProductGuaranteeCertificate';
 import { GuaranteeCertificatePreviewModal } from '../components/GuaranteeCertificatePreviewModal';
 import {
@@ -25,6 +25,7 @@ import { canUseWalletFeatures, isConsumerLoggedIn, loginPathWithNext } from '../
 import { useToast } from '../components/ToastProvider';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { getConsumerDisplayName } from '../lib/consumerDisplay';
+import { prepareAlbumImage } from '../lib/albumImageUpload';
 import { useTranslation } from 'react-i18next';
 
 /** Chrome BeforeInstallPromptEvent (lib.dom에 없을 수 있음) */
@@ -128,6 +129,11 @@ export default function UserLanding() {
   const [albumData, setAlbumData] = useState<{ album: any; images: any[] }>({ album: null, images: [] });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [albumCaption, setAlbumCaption] = useState('');
+  const [albumUploadProgress, setAlbumUploadProgress] = useState<{ current: number; total: number } | null>(null);
+  const [albumDragActive, setAlbumDragActive] = useState(false);
+  const [albumLightboxUrl, setAlbumLightboxUrl] = useState<string | null>(null);
+  const albumFileInputRef = useRef<HTMLInputElement>(null);
+  const albumCameraInputRef = useRef<HTMLInputElement>(null);
 
   // 일반 사용자 인증 (로그인 UI는 /login)
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -214,6 +220,7 @@ export default function UserLanding() {
     setShowGuideModal(false);
     setIsAlbumModalOpen(false);
     setCurrentGoldbarForAlbum(null);
+    setAlbumLightboxUrl(null);
     setWalletDetailItem(null);
   }, []);
 
@@ -291,48 +298,101 @@ export default function UserLanding() {
     }
   };
 
-  // 앨범 사진 파일 선택 & 업로드
-  const handleAlbumImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !currentGoldbarForAlbum) return;
+  // 앨범 사진 업로드 (다중·압축·드래그앤드롭)
+  const uploadPreparedAlbumImage = async (prepared: Awaited<ReturnType<typeof prepareAlbumImage>>) => {
+    if (!currentGoldbarForAlbum) return false;
+    const goldbarId = currentGoldbarForAlbum.id || currentGoldbarForAlbum.serial_number;
+    const res = await fetch(`/api/albums/${goldbarId}/images`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image_file_base64: prepared.base64,
+        file_name: prepared.fileName,
+        caption: albumCaption.trim(),
+      }),
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      throw new Error(d.error || t('user_landing.album.upload_failed'));
+    }
+    return true;
+  };
+
+  const processAlbumFiles = async (fileList: FileList | File[]) => {
+    if (!currentGoldbarForAlbum) return;
     if (!canUseWalletFeatures(currentUser)) {
       showToast('info', t('user_landing.wallet.login_required_desc'));
       return;
     }
 
-    if (albumData.images.length >= 5) {
+    const files = Array.from(fileList).filter((f) => f.type.startsWith('image/'));
+    if (files.length === 0) {
+      showToast('warning', t('user_landing.album.invalid_type'));
+      return;
+    }
+
+    const remaining = 5 - albumData.images.length;
+    if (remaining <= 0) {
       showToast('warning', t('user_landing.album.limit_notice'));
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      const base64 = ev.target?.result as string;
-      setUploadingImage(true);
-      try {
-        const res = await fetch(`/api/albums/${currentGoldbarForAlbum.id || currentGoldbarForAlbum.serial_number}/images`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            image_file_base64: base64,
-            file_name: file.name,
-            caption: albumCaption
-          })
-        });
-        if (res.ok) {
-          setAlbumCaption('');
-          fetchAlbum(currentGoldbarForAlbum.id || currentGoldbarForAlbum.serial_number);
-        } else {
-          const d = await res.json();
-          showToast('error', d.error || t('user_landing.album.upload_failed'));
+    const batch = files.slice(0, remaining);
+    if (files.length > remaining) {
+      showToast('info', t('user_landing.album.remaining_slots', { count: remaining }));
+    }
+
+    setUploadingImage(true);
+    setAlbumUploadProgress({ current: 0, total: batch.length });
+    let successCount = 0;
+
+    try {
+      for (let i = 0; i < batch.length; i++) {
+        const file = batch[i];
+        setAlbumUploadProgress({ current: i + 1, total: batch.length });
+        try {
+          const prepared = await prepareAlbumImage(file);
+          await uploadPreparedAlbumImage(prepared);
+          successCount += 1;
+        } catch (err: unknown) {
+          const code = err instanceof Error ? err.message : '';
+          if (code === 'invalid_type') {
+            showToast('warning', t('user_landing.album.invalid_type'));
+          } else if (code === 'too_large') {
+            showToast('warning', t('user_landing.album.file_too_large'));
+          } else if (err instanceof Error && err.message) {
+            showToast('error', err.message);
+          } else {
+            showToast('error', t('user_landing.album.upload_failed'));
+          }
         }
-      } catch (err: any) {
-        showToast('error', t('user_landing.album.upload_failed'));
-      } finally {
-        setUploadingImage(false);
       }
-    };
-    reader.readAsDataURL(file);
+
+      if (successCount > 0) {
+        setAlbumCaption('');
+        await fetchAlbum(currentGoldbarForAlbum.id || currentGoldbarForAlbum.serial_number);
+        showToast('success', t('user_landing.album.upload_success', { count: successCount }));
+      }
+    } finally {
+      setUploadingImage(false);
+      setAlbumUploadProgress(null);
+      if (albumFileInputRef.current) albumFileInputRef.current.value = '';
+      if (albumCameraInputRef.current) albumCameraInputRef.current.value = '';
+    }
+  };
+
+  const handleAlbumImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length) return;
+    void processAlbumFiles(files);
+  };
+
+  const handleAlbumDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setAlbumDragActive(false);
+    if (uploadingImage) return;
+    const files = e.dataTransfer.files;
+    if (files?.length) void processAlbumFiles(files);
   };
 
   // 앨범 사진 삭제
@@ -1230,13 +1290,26 @@ export default function UserLanding() {
                 {/* 앨범 이미지 리스트 */}
                 {albumData.images && albumData.images.length > 0 ? (
                   <div className="grid grid-cols-2 gap-3">
-                    {albumData.images.map((img: any, idx: number) => (
-                      <div key={idx} className="relative group bg-slate-50 border border-slate-100/60 rounded-2xl overflow-hidden aspect-square flex flex-col shadow-sm">
-                        <img src={img.image_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-all" />
-                        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-2">
-                          <button 
+                    {albumData.images.map((img: any) => (
+                      <div key={img.id} className="relative group bg-slate-50 border border-slate-100/60 rounded-2xl overflow-hidden flex flex-col shadow-sm">
+                        <button
+                          type="button"
+                          onClick={() => setAlbumLightboxUrl(img.image_url)}
+                          className="aspect-square w-full overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                        >
+                          <img src={img.image_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-all" />
+                        </button>
+                        {img.caption ? (
+                          <p className="px-2.5 py-2 text-[10px] font-bold text-slate-600 line-clamp-2 bg-white border-t border-slate-100/80">
+                            {img.caption}
+                          </p>
+                        ) : null}
+                        <div className="absolute top-2 right-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all">
+                          <button
+                            type="button"
                             onClick={() => handleDeleteAlbumImage(img.id)}
-                            className="p-2.5 bg-white/90 hover:bg-rose-50 rounded-xl text-rose-500 transition-all hover:scale-110 shadow-lg"
+                            className="p-2 bg-white/90 hover:bg-rose-50 rounded-xl text-rose-500 transition-all hover:scale-110 shadow-lg"
+                            aria-label={t('user_landing.album.delete_btn')}
                           >
                             <X className="w-4 h-4" />
                           </button>
@@ -1253,19 +1326,107 @@ export default function UserLanding() {
 
                 {/* 사진 업로드 폼 */}
                 {albumData.images.length < 5 && (
-                  <div className="border-t border-slate-100/60 pt-5 space-y-3">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">{t('user_landing.album.upload_label')}</label>
-                      <input 
-                        type="file" 
-                        accept="image/*"
+                  <div className="border-t border-slate-100/60 pt-5 space-y-4">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
+                        {t('user_landing.album.caption_label')}
+                      </label>
+                      <textarea
+                        value={albumCaption}
+                        onChange={(e) => setAlbumCaption(e.target.value)}
+                        placeholder={t('user_landing.album.caption_placeholder')}
+                        maxLength={120}
+                        rows={2}
+                        disabled={uploadingImage}
+                        className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold resize-none focus:border-amber-400 focus:outline-none transition-all disabled:opacity-60"
+                      />
+                      <p className="text-[9px] font-bold text-slate-400 text-right pr-1">{albumCaption.length}/120</p>
+                    </div>
+
+                    <div
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        if (!uploadingImage) setAlbumDragActive(true);
+                      }}
+                      onDragLeave={() => setAlbumDragActive(false)}
+                      onDrop={handleAlbumDrop}
+                      className={`rounded-2xl border-2 border-dashed p-6 flex flex-col items-center gap-3 transition-colors ${
+                        albumDragActive
+                          ? 'border-amber-400 bg-amber-50/80'
+                          : 'border-slate-200 bg-slate-50/50 hover:border-amber-200 hover:bg-amber-50/30'
+                      } ${uploadingImage ? 'opacity-60 pointer-events-none' : ''}`}
+                    >
+                      <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-600">
+                        <Upload className="w-6 h-6" />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs font-black text-slate-700">{t('user_landing.album.drag_drop_hint')}</p>
+                        <p className="text-[10px] font-bold text-slate-400 mt-1">{t('user_landing.album.format_hint')}</p>
+                      </div>
+
+                      <input
+                        ref={albumFileInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        multiple
                         onChange={handleAlbumImageUpload}
                         disabled={uploadingImage}
-                        className="text-xs text-slate-500 font-bold file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100 file:cursor-pointer cursor-pointer"
+                        className="sr-only"
                       />
+                      <input
+                        ref={albumCameraInputRef}
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handleAlbumImageUpload}
+                        disabled={uploadingImage}
+                        className="sr-only"
+                      />
+
+                      <div className="flex flex-wrap gap-2 justify-center w-full">
+                        <button
+                          type="button"
+                          onClick={() => albumFileInputRef.current?.click()}
+                          disabled={uploadingImage}
+                          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black bg-amber-500 text-white hover:bg-amber-600 transition-colors shadow-sm disabled:opacity-50"
+                        >
+                          <ImagePlus className="w-4 h-4" />
+                          {t('user_landing.album.gallery_btn')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => albumCameraInputRef.current?.click()}
+                          disabled={uploadingImage}
+                          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black bg-white border border-amber-200 text-amber-700 hover:bg-amber-50 transition-colors disabled:opacity-50"
+                        >
+                          <Camera className="w-4 h-4" />
+                          {t('user_landing.album.camera_btn')}
+                        </button>
+                      </div>
                     </div>
+
                     {uploadingImage && (
-                      <p className="text-[10px] font-bold text-amber-600 animate-pulse">{t('user_landing.album.uploading_msg')}</p>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-amber-700">
+                          <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                          <p className="text-[10px] font-bold">
+                            {albumUploadProgress
+                              ? t('user_landing.album.upload_progress', {
+                                  current: albumUploadProgress.current,
+                                  total: albumUploadProgress.total,
+                                })
+                              : t('user_landing.album.compressing_msg')}
+                          </p>
+                        </div>
+                        {albumUploadProgress && albumUploadProgress.total > 1 ? (
+                          <div className="h-1.5 bg-amber-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-amber-500 transition-all duration-300"
+                              style={{ width: `${(albumUploadProgress.current / albumUploadProgress.total) * 100}%` }}
+                            />
+                          </div>
+                        ) : null}
+                      </div>
                     )}
                   </div>
                 )}
@@ -1275,6 +1436,31 @@ export default function UserLanding() {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* 앨범 사진 확대 보기 */}
+        {albumLightboxUrl && (
+          <div
+            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/85"
+            onClick={() => setAlbumLightboxUrl(null)}
+            role="dialog"
+            aria-modal="true"
+          >
+            <button
+              type="button"
+              onClick={() => setAlbumLightboxUrl(null)}
+              className="absolute top-4 right-4 p-2 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-colors"
+              aria-label={t('user_landing.album.close_btn')}
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <img
+              src={albumLightboxUrl}
+              alt=""
+              className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
           </div>
         )}
 

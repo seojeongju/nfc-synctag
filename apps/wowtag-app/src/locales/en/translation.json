@@ -158,7 +158,19 @@
       "status_desc": "Register up to 5 photos of precious moments",
       "upload_label": "Add Photo",
       "uploading_msg": "Uploading image...",
-      "close_btn": "Close"
+      "close_btn": "Close",
+      "caption_label": "Photo note (optional)",
+      "caption_placeholder": "Add a short note about this moment",
+      "drag_drop_hint": "Drag photos here or use the buttons below",
+      "format_hint": "JPG · PNG · WebP · max 12MB · auto-compressed",
+      "gallery_btn": "Choose from gallery",
+      "camera_btn": "Take photo",
+      "invalid_type": "Unsupported image format. (JPG, PNG, WebP, GIF)",
+      "file_too_large": "File is too large. Please choose an image under 12MB.",
+      "upload_success": "{{count}} photo(s) uploaded.",
+      "upload_progress": "Uploading… ({{current}}/{{total}})",
+      "compressing_msg": "Optimizing image…",
+      "remaining_slots": "Only {{count}} more slot(s) available."
     },
     "products": {
       "search_placeholder": "Search product name...",

@@ -2037,6 +2037,12 @@ app.post('/albums/:goldbarId/images', async (c) => {
       return c.json({ error: 'Image file is required' }, 400);
     }
 
+    const base64Data = image_file_base64.split(',')[1] || image_file_base64;
+    const approxBytes = Math.floor((base64Data.length * 3) / 4);
+    if (approxBytes > 5 * 1024 * 1024) {
+      return c.json({ error: '이미지 용량이 너무 큽니다. 더 작은 사진을 선택해 주세요.' }, 400);
+    }
+
     let album = await c.env.DB.prepare('SELECT * FROM digital_albums WHERE goldbar_id = ?').bind(goldbarId).first();
     if (!album) {
       await c.env.DB.prepare('INSERT INTO digital_albums (goldbar_id, title) VALUES (?, ?)')
@@ -2053,8 +2059,11 @@ app.post('/albums/:goldbarId/images', async (c) => {
       return c.json({ error: '최대 5장까지만 등록 가능합니다.' }, 400);
     }
 
-    // Base64 데이터를 ArrayBuffer로 변환 후 R2에 저장
-    const base64Data = image_file_base64.split(',')[1] || image_file_base64;
+    if (caption && String(caption).length > 120) {
+      return c.json({ error: '메모는 120자까지 입력 가능합니다.' }, 400);
+    }
+
+    // Base64 → ArrayBuffer 후 R2 저장
     const binaryString = atob(base64Data);
     const len = binaryString.length;
     const bytes = new Uint8Array(len);
@@ -2062,10 +2071,13 @@ app.post('/albums/:goldbarId/images', async (c) => {
       bytes[i] = binaryString.charCodeAt(i);
     }
 
-    const ext = file_name ? file_name.split('.').pop() : 'png';
-    const r2Path = `albums/images/${Date.now()}.${ext}`;
+    const ext = file_name ? file_name.split('.').pop()?.toLowerCase() : 'jpg';
+    const safeExt = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext || '') ? ext : 'jpg';
+    const r2Path = `albums/images/${Date.now()}.${safeExt === 'jpeg' ? 'jpg' : safeExt}`;
+    const contentType =
+      safeExt === 'png' ? 'image/png' : safeExt === 'webp' ? 'image/webp' : safeExt === 'gif' ? 'image/gif' : 'image/jpeg';
     await c.env.BUCKET.put(r2Path, bytes.buffer, {
-      httpMetadata: { contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}` },
+      httpMetadata: { contentType },
     });
 
     const savedImageUrl = `/api/albums/image/${r2Path}`;
