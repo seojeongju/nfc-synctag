@@ -2983,9 +2983,9 @@ export default function AdminDashboard() {
                 <div className="space-y-4">
                   {nfcUnlinkedList
                     .slice((currentPageNfcAsset - 1) * ITEMS_PER_PAGE, currentPageNfcAsset * ITEMS_PER_PAGE)
-                    .map((t: any) => (
+                    .map((tag: any) => (
                       <div
-                        key={`un-${t.id}-${t.tag_uid}`}
+                        key={`un-${tag.id}-${tag.tag_uid}`}
                         className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-4 px-4 sm:px-6 rounded-2xl border min-w-0 max-w-full bg-slate-50/40 border-slate-100 hover:border-slate-200 hover:bg-slate-50/80 transition-all"
                       >
                         <div className="flex items-start gap-3.5 min-w-0 flex-1">
@@ -2994,13 +2994,13 @@ export default function AdminDashboard() {
                           </div>
                           <div className="flex-1 min-w-0 pt-0.5">
                             <p className="font-black text-slate-800 text-sm sm:text-base break-all leading-snug font-mono">
-                              {t.tag_uid}
+                              {tag.tag_uid}
                             </p>
                             <p className="text-[11px] font-bold text-slate-400 mt-1">
                               {t('admin_dashboard.nfc.modal_nfc_snapshot_date')}{' '}
                               <span className="font-mono bg-white px-1.5 py-0.5 border border-slate-100 rounded text-slate-500 text-[10px]">
-                                {t.created_at
-                                  ? new Date(t.created_at).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' })
+                                {tag.created_at
+                                  ? new Date(tag.created_at).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' })
                                   : '-'}
                               </span>
                             </p>
@@ -3008,7 +3008,7 @@ export default function AdminDashboard() {
                         </div>
                         <button
                           type="button"
-                          onClick={() => openMatchWorkbench(t.tag_uid)}
+                          onClick={() => openMatchWorkbench(tag.tag_uid)}
                           className="shrink-0 h-10 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-black hover:from-emerald-700 hover:to-teal-700 transition-all flex items-center justify-center gap-1.5 shadow-md active:scale-[0.98]"
                         >
                           <LinkIcon className="w-4 h-4" /> {t('admin_dashboard.nfc.browse_unlinked_btn_match')}
@@ -3122,9 +3122,9 @@ export default function AdminDashboard() {
                 <div className="space-y-4">
                   {nfcLinkedList
                     .slice((currentPageNfcLinked - 1) * ITEMS_PER_PAGE, currentPageNfcLinked * ITEMS_PER_PAGE)
-                    .map((t: any) => (
+                    .map((tag: any) => (
                       <div
-                        key={`lk-${t.id}-${t.tag_uid}`}
+                        key={`lk-${tag.id}-${tag.tag_uid}`}
                         className="flex flex-col lg:flex-row lg:items-center gap-4 py-4 px-4 sm:px-6 bg-slate-50/40 hover:bg-white hover:border-emerald-200 border border-slate-100/80 rounded-2xl transition-all duration-300 hover:shadow-lg hover:shadow-emerald-50/20"
                       >
                         <div className="flex items-start gap-3.5 flex-1 min-w-0 select-none">
@@ -3132,16 +3132,16 @@ export default function AdminDashboard() {
                             <LinkIcon className="w-5 h-5" />
                           </div>
                           <div className="flex-1 min-w-0 pt-0.5">
-                            <p className="font-black text-slate-800 text-sm sm:text-base break-all leading-snug">{t.tag_uid}</p>
+                            <p className="font-black text-slate-800 text-sm sm:text-base break-all leading-snug">{tag.tag_uid}</p>
                             <div className="flex flex-wrap items-center gap-2 mt-1">
                               <span className="text-[10px] font-black tracking-wider uppercase bg-emerald-50 border border-emerald-100 text-emerald-800 px-2.5 py-1 rounded-xl">
-                                {t.target_name || t('admin_dashboard.users.name_empty')}
+                                {tag.target_name || t('admin_dashboard.users.name_empty')}
                               </span>
                               <span className="text-[10px] font-bold bg-white text-slate-500 border border-slate-100 px-2 py-0.5 rounded-xl flex items-center gap-1">
                                 <span>{t('admin_dashboard.nfc.modal_nfc_snapshot_date')}</span>
-                                {t.created_at ? new Date(t.created_at).toLocaleDateString() : '-'}
+                                {tag.created_at ? new Date(tag.created_at).toLocaleDateString() : '-'}
                               </span>
-                              {t.product_sold_at ? (
+                              {tag.product_sold_at ? (
                                 <span className="text-[10px] font-black uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-100 px-2 py-0.5 rounded-xl flex items-center gap-1 animate-pulse">
                                   {t('admin_dashboard.products.sold_tag')}
                                 </span>
@@ -3153,7 +3153,7 @@ export default function AdminDashboard() {
                         <div className="flex flex-row sm:items-center gap-2 shrink-0 self-start lg:self-center w-full lg:w-auto">
                           <button
                             type="button"
-                            onClick={() => openMatchWorkbench(t.tag_uid)}
+                            onClick={() => openMatchWorkbench(tag.tag_uid)}
                             className="h-10 flex-1 lg:flex-initial lg:px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-black shadow-md hover:from-emerald-700 hover:to-teal-700 transition-all duration-200 flex items-center justify-center gap-1.5 active:scale-[0.98] select-none"
                           >
                             <LinkIcon className="w-4 h-4" />
@@ -3161,7 +3161,7 @@ export default function AdminDashboard() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleUnmapTagClick(t)}
+                            onClick={() => handleUnmapTagClick(tag)}
                             className="h-10 flex-1 lg:flex-initial lg:px-4 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs font-black hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 flex items-center justify-center gap-1.5 active:scale-[0.98] shadow-sm select-none"
                           >
                             <Link2Off className="w-4 h-4" />
