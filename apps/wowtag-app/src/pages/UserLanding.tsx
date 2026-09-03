@@ -1164,20 +1164,105 @@ export default function UserLanding() {
                     <div className="min-w-0 flex-1">
                       <span className="text-[10px] font-black bg-purple-100 text-purple-700 px-2.5 py-1 rounded-xl uppercase tracking-wider">{t('user_landing.products.new_arrival')}</span>
                       <h5 className="font-black text-slate-800 text-lg mt-1 break-words">{selectedProduct.name}</h5>
-                      <p className="text-xs font-bold text-slate-400 leading-relaxed mt-1 break-words">
-                        {selectedProduct.description || t('user_landing.products.no_description')}
-                      </p>
+                      {selectedProduct.price != null && String(selectedProduct.price).trim() !== '' ? (
+                        <p className="text-sm font-black text-amber-700 mt-1.5">
+                          {t('user_landing.products.price_value', {
+                            price: Number(selectedProduct.price).toLocaleString('ko-KR'),
+                          })}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
 
-                  {/* 옵션 뱃지 리스트 */}
-                  {selectedProduct.options && (
-                    <div className="border-t border-slate-50 pt-3 flex flex-wrap gap-1.5">
-                      {selectedProduct.options.split(',').map((opt: string, i: number) => (
-                        <span key={i} className="text-[10px] font-black tracking-wider bg-slate-100 text-slate-600 px-2.5 py-1 rounded-xl">
-                          {opt.trim()}
-                        </span>
-                      ))}
+                  {/* 제품 상세 내역 */}
+                  <div className="bg-slate-50/90 border border-slate-100 rounded-2xl p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1 h-4 bg-amber-500 rounded-full" />
+                      <h6 className="text-xs font-black text-slate-700">{t('user_landing.products.specs_title')}</h6>
+                    </div>
+
+                    {selectedProduct.description != null && String(selectedProduct.description).trim() !== '' ? (
+                      <p className="text-xs font-bold text-slate-600 leading-relaxed break-words whitespace-pre-line">
+                        {selectedProduct.description}
+                      </p>
+                    ) : (
+                      <p className="text-xs font-bold text-slate-400">{t('user_landing.products.no_description')}</p>
+                    )}
+
+                    <div className="space-y-2 text-xs pt-1">
+                      {[
+                        { key: 'material', label: t('user_landing.products.material_label'), value: selectedProduct.material },
+                        { key: 'purity', label: t('user_landing.products.purity_label'), value: selectedProduct.purity },
+                        { key: 'weight', label: t('user_landing.products.weight_label'), value: selectedProduct.weight },
+                        {
+                          key: 'size',
+                          label: t('user_landing.products.size_label'),
+                          value:
+                            selectedProduct.width_mm || selectedProduct.height_mm
+                              ? [selectedProduct.width_mm, selectedProduct.height_mm]
+                                  .filter((v) => v != null && String(v).trim() !== '')
+                                  .map((v) => `${v}mm`)
+                                  .join(' × ')
+                              : '',
+                        },
+                        {
+                          key: 'price',
+                          label: t('user_landing.products.price_label'),
+                          value:
+                            selectedProduct.price != null && String(selectedProduct.price).trim() !== ''
+                              ? `${Number(selectedProduct.price).toLocaleString('ko-KR')}${t('user_landing.products.currency_won')}`
+                              : '',
+                        },
+                      ]
+                        .filter((row) => row.value != null && String(row.value).trim() !== '')
+                        .map((row) => (
+                          <div key={row.key} className="flex justify-between gap-3 border-b border-slate-200/70 pb-2 last:border-0 last:pb-0">
+                            <span className="font-bold text-slate-400 shrink-0">{row.label}</span>
+                            <span className="font-black text-slate-800 text-right break-words">{row.value}</span>
+                          </div>
+                        ))}
+                    </div>
+
+                    {selectedProduct.options && String(selectedProduct.options).trim() !== '' ? (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {String(selectedProduct.options)
+                          .split(',')
+                          .map((opt: string, i: number) =>
+                            opt.trim() ? (
+                              <span
+                                key={i}
+                                className="text-[10px] font-black tracking-wider bg-white border border-slate-200 text-slate-600 px-2.5 py-1 rounded-xl"
+                              >
+                                {opt.trim()}
+                              </span>
+                            ) : null
+                          )}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {(selectedProduct.video_url || selectedProduct.manual_url) && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {selectedProduct.video_url ? (
+                        <a
+                          href={selectedProduct.video_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="h-11 rounded-xl bg-purple-50 border border-purple-100 text-purple-700 font-black text-[11px] flex items-center justify-center gap-1.5 no-underline hover:bg-purple-100"
+                        >
+                          <Play className="w-3.5 h-3.5 fill-purple-600" /> {t('user_landing.product.video_btn')}
+                        </a>
+                      ) : null}
+                      {selectedProduct.manual_url ? (
+                        <a
+                          href={selectedProduct.manual_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="h-11 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 font-black text-[11px] flex items-center justify-center gap-1.5 no-underline hover:bg-slate-100"
+                        >
+                          <BookOpen className="w-3.5 h-3.5" /> {t('user_landing.product.manual_btn')}
+                        </a>
+                      ) : null}
                     </div>
                   )}
 

@@ -20,8 +20,8 @@ export const GUARANTEE_PAGE_H = 1123;
 const gold = '#b8860b';
 const border = 'rgba(201, 162, 39, 0.28)';
 
-/** 제품 사진 — A4 1장에 맞게 살짝 축소된 크기 */
-const PRODUCT_IMAGE_H = 260;
+/** 제품 사진 — A4 1장 유지하면서 충분히 크게 (기존 260px의 2배) */
+const PRODUCT_IMAGE_H = 520;
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -29,9 +29,9 @@ function Row({ label, value }: { label: string; value: string }) {
       <td
         style={{
           border: `1px solid ${border}`,
-          padding: '8px 12px',
+          padding: '6px 10px',
           backgroundColor: 'rgba(255, 250, 242, 0.95)',
-          fontSize: '11px',
+          fontSize: '10px',
           fontWeight: 700,
           color: '#64748b',
           width: '28%',
@@ -43,12 +43,12 @@ function Row({ label, value }: { label: string; value: string }) {
       <td
         style={{
           border: `1px solid ${border}`,
-          padding: '8px 12px',
-          fontSize: '12px',
+          padding: '6px 10px',
+          fontSize: '11px',
           fontWeight: 700,
           color: '#0f172a',
           verticalAlign: 'middle',
-          lineHeight: 1.4,
+          lineHeight: 1.35,
           backgroundColor: 'rgba(255, 255, 255, 0.75)',
         }}
       >
@@ -125,9 +125,9 @@ export function ProductGuaranteeCertificate({
         style={{
           position: 'relative',
           zIndex: 1,
-          margin: '18px',
-          padding: data.imageUrl ? '18px 28px 20px' : '24px 32px 24px',
-          height: 'calc(100% - 36px)',
+          margin: '14px',
+          padding: data.imageUrl ? '12px 22px 14px' : '20px 28px 18px',
+          height: 'calc(100% - 28px)',
           boxSizing: 'border-box',
           backgroundColor: 'rgba(255, 253, 248, 0.97)',
           borderRadius: '12px',
@@ -143,14 +143,14 @@ export function ProductGuaranteeCertificate({
             style={{
               display: 'flex',
               justifyContent: 'center',
-              margin: '0 0 12px',
+              margin: '0 0 8px',
               flexShrink: 0,
             }}
           >
             <div
               style={{
                 width: '100%',
-                maxWidth: '420px',
+                maxWidth: '100%',
                 height: `${PRODUCT_IMAGE_H}px`,
                 borderRadius: '10px',
                 border: `1px solid ${border}`,
@@ -182,9 +182,9 @@ export function ProductGuaranteeCertificate({
           style={{
             textAlign: 'center',
             color: gold,
-            fontSize: '18px',
+            fontSize: '16px',
             fontWeight: 800,
-            margin: '0 0 4px',
+            margin: '0 0 2px',
             letterSpacing: '-0.02em',
             textShadow: '0 1px 0 rgba(255, 255, 255, 0.8)',
             flexShrink: 0,
@@ -195,33 +195,33 @@ export function ProductGuaranteeCertificate({
         <p
           style={{
             textAlign: 'center',
-            fontSize: '10px',
+            fontSize: '9px',
             color: '#78716c',
             fontWeight: 700,
-            margin: '0 0 12px',
+            margin: '0 0 8px',
             flexShrink: 0,
           }}
         >
           본 문서는 정품 제품에 대해 발행된 보증서입니다.
         </p>
 
-        <div style={{ marginBottom: '6px', flexShrink: 0 }}>
+        <div style={{ marginBottom: '4px', flexShrink: 0 }}>
           <span
             style={{
               display: 'inline-block',
-              fontSize: '11px',
+              fontSize: '10px',
               fontWeight: 800,
               color: gold,
               letterSpacing: '0.06em',
               borderBottom: `2px solid ${gold}`,
-              paddingBottom: '3px',
+              paddingBottom: '2px',
             }}
           >
             제품 상세 정보
           </span>
         </div>
 
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '12px', flexShrink: 0 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '8px', flexShrink: 0 }}>
           <tbody>
             <Row label="품명 (Product)" value={data.productName} />
             <Row label="중량 (Weight)" value={data.weightLine} />
@@ -232,16 +232,16 @@ export function ProductGuaranteeCertificate({
           </tbody>
         </table>
 
-        <div style={{ marginBottom: '6px', flexShrink: 0 }}>
+        <div style={{ marginBottom: '4px', flexShrink: 0 }}>
           <span
             style={{
               display: 'inline-block',
-              fontSize: '11px',
+              fontSize: '10px',
               fontWeight: 800,
               color: gold,
               letterSpacing: '0.06em',
               borderBottom: `2px solid ${gold}`,
-              paddingBottom: '3px',
+              paddingBottom: '2px',
             }}
           >
             보증 조건 (Terms)
@@ -250,14 +250,14 @@ export function ProductGuaranteeCertificate({
         <div
           style={{
             border: `1px solid ${border}`,
-            borderRadius: '10px',
-            padding: '10px 14px',
+            borderRadius: '8px',
+            padding: '8px 12px',
             backgroundColor: 'rgba(255, 251, 242, 0.92)',
-            fontSize: '10px',
+            fontSize: '9px',
             fontWeight: 600,
             color: '#475569',
-            lineHeight: 1.55,
-            marginBottom: '12px',
+            lineHeight: 1.45,
+            marginBottom: '8px',
             flexShrink: 0,
           }}
         >
@@ -277,18 +277,18 @@ export function ProductGuaranteeCertificate({
           }}
         >
           <div>
-            <p style={{ fontSize: '10px', fontWeight: 700, color: '#78716c', margin: '0 0 4px' }}>보증인 (Guarantor)</p>
-            <p style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a', margin: 0 }}>{issuerName}</p>
+            <p style={{ fontSize: '9px', fontWeight: 700, color: '#78716c', margin: '0 0 3px' }}>보증인 (Guarantor)</p>
+            <p style={{ fontSize: '12px', fontWeight: 800, color: '#0f172a', margin: 0 }}>{issuerName}</p>
             {issuerPlace ? (
               <>
-                <p style={{ fontSize: '10px', fontWeight: 700, color: '#78716c', margin: '8px 0 2px' }}>발행처 (Issuer)</p>
-                <p style={{ fontSize: '12px', fontWeight: 800, color: '#0f172a', margin: 0 }}>{issuerPlace}</p>
+                <p style={{ fontSize: '9px', fontWeight: 700, color: '#78716c', margin: '6px 0 2px' }}>발행처 (Issuer)</p>
+                <p style={{ fontSize: '11px', fontWeight: 800, color: '#0f172a', margin: 0 }}>{issuerPlace}</p>
               </>
             ) : null}
             {contact ? (
               <>
-                <p style={{ fontSize: '10px', fontWeight: 700, color: '#78716c', margin: '8px 0 2px' }}>연락처 (Contact)</p>
-                <p style={{ fontSize: '12px', fontWeight: 800, color: '#0f172a', margin: 0 }}>{contact}</p>
+                <p style={{ fontSize: '9px', fontWeight: 700, color: '#78716c', margin: '6px 0 2px' }}>연락처 (Contact)</p>
+                <p style={{ fontSize: '11px', fontWeight: 800, color: '#0f172a', margin: 0 }}>{contact}</p>
               </>
             ) : null}
           </div>
