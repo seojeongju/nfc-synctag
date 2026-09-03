@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect, Fragment } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Tag, Package, Plus, Bell, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Link2Off, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut, Eye, ChevronDown, ChevronUp, RefreshCw, Download, Box, User, Activity, ScanLine, Bookmark, CheckCircle2 } from 'lucide-react';
+import { LayoutDashboard, Tag, Package, Plus, Bell, Loader2, X, Smartphone, PenTool, Hash, Link as LinkIcon, Link2Off, Award, FileText, Calendar, Search, Filter, Edit3, Trash2, LogOut, Eye, ChevronDown, ChevronUp, RefreshCw, Download, Box, User, Activity, ScanLine, Bookmark, CheckCircle2, Stamp } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { ImeTextInput } from '../components/ImeTextInput';
@@ -12,8 +12,9 @@ import type { GuaranteeCertificateData } from '../lib/guaranteeCertificateData';
 import { clearAdminSession } from '../lib/adminSession';
 import { useToast } from '../components/ToastProvider';
 import { AdminUsersPanel } from '../components/admin/AdminUsersPanel';
+import { AdminGuaranteeIssuerPanel } from '../components/admin/AdminGuaranteeIssuerPanel';
 
-const ADMIN_TAB_IDS = ['dashboard', 'products', 'nfc', 'goldbars', 'assetMarket', 'users', 'releaseRequests'] as const;
+const ADMIN_TAB_IDS = ['dashboard', 'products', 'nfc', 'goldbars', 'assetMarket', 'users', 'releaseRequests', 'guaranteeIssuer'] as const;
 type AdminTabId = (typeof ADMIN_TAB_IDS)[number];
 
 /** NFC 탭 내부: 제품 매칭 / UID 등록 / 목록 조회 */
@@ -2019,6 +2020,7 @@ export default function AdminDashboard() {
             { id: 'products', icon: Package, label: t('admin.menu_products') },
             { id: 'nfc', icon: Tag, label: t('admin.menu_nfc') },
             { id: 'goldbars', icon: Award, label: t('admin.menu_goldbars') },
+            { id: 'guaranteeIssuer', icon: Stamp, label: t('admin.menu_guarantee_issuer') },
             { id: 'assetMarket', icon: Hash, label: t('admin.menu_asset_market') },
             { id: 'users', icon: User, label: t('admin.menu_users') },
             { id: 'releaseRequests', icon: Bookmark, label: t('admin.menu_release_requests') },
@@ -3655,6 +3657,10 @@ export default function AdminDashboard() {
             <AdminUsersPanel getAuthHeaders={adminAuthHeaders} onGoToNfc={() => goToTab('nfc')} />
           )}
 
+          {currentTab === 'guaranteeIssuer' && (
+            <AdminGuaranteeIssuerPanel getAuthHeaders={adminAuthHeaders} />
+          )}
+
           {/* 6. 소유권 해지 요청 관리 탭 */}
           {currentTab === 'releaseRequests' && (
             <>
@@ -4816,10 +4822,11 @@ export default function AdminDashboard() {
            { id: 'nfc', icon: Tag, label: '태그' },
            { id: 'users', icon: User, label: '회원' },
            { id: 'goldbars', icon: Award, label: '보증서' },
+           { id: 'guaranteeIssuer', icon: Stamp, label: '발행처' },
          ].map((nav) => (
            <button 
              key={nav.id} onClick={() => { goToTab(nav.id as AdminTabId); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-             className={`flex flex-col items-center justify-center w-14 h-12 rounded-xl transition-all cursor-pointer ${currentTab === nav.id ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/25 scale-105 font-black' : 'text-slate-400 hover:text-slate-600'}`}
+             className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-all cursor-pointer ${currentTab === nav.id ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/25 scale-105 font-black' : 'text-slate-400 hover:text-slate-600'}`}
            >
              <nav.icon className="w-5 h-5" />
              <span className="text-[9px] font-bold mt-1 tracking-tighter whitespace-nowrap">{nav.label}</span>

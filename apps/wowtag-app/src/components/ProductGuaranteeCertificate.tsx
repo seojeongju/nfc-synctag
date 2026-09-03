@@ -1,9 +1,14 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { useToast } from './ToastProvider';
 import { createPortal } from 'react-dom';
 
 import { downloadProductGuaranteePdf } from '../lib/exportGuaranteePdf';
 import type { GuaranteeCertificateData } from '../lib/guaranteeCertificateData';
+import {
+  DEFAULT_GUARANTEE_ISSUER_PROFILE,
+  loadGuaranteeIssuer,
+  type GuaranteeIssuerProfile,
+} from '../lib/guaranteeIssuer';
 
 /** public/ — PDF·html2canvas 동일 출처 */
 export const GUARANTEE_LUXURY_BG = '/guarantee-luxury-bg.svg';
@@ -46,7 +51,35 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function ProductGuaranteeCertificate({ data }: { data: GuaranteeCertificateData }) {
+export function ProductGuaranteeCertificate({
+  data,
+  issuer,
+}: {
+  data: GuaranteeCertificateData;
+  issuer?: GuaranteeIssuerProfile;
+}) {
+  const [loadedIssuer, setLoadedIssuer] = useState<GuaranteeIssuerProfile>(
+    issuer ?? DEFAULT_GUARANTEE_ISSUER_PROFILE
+  );
+
+  useLayoutEffect(() => {
+    if (issuer) {
+      setLoadedIssuer(issuer);
+      return;
+    }
+    let cancelled = false;
+    void loadGuaranteeIssuer().then((profile) => {
+      if (!cancelled) setLoadedIssuer(profile);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [issuer]);
+
+  const issuerName = loadedIssuer.issuerName || data.issuerName;
+  const issuerPlace = loadedIssuer.issuerPlace;
+  const contact = loadedIssuer.contact;
+  const stampUrl = loadedIssuer.stampUrl;
   return (
     <div
       data-guarantee-pdf-root="1"
@@ -106,8 +139,8 @@ export function ProductGuaranteeCertificate({ data }: { data: GuaranteeCertifica
             <div
               style={{
                 width: '100%',
-                maxWidth: '360px',
-                height: '220px',
+                maxWidth: '100%',
+                height: '440px',
                 borderRadius: '12px',
                 border: `1px solid ${border}`,
                 backgroundColor: 'rgba(255, 255, 255, 0.92)',
@@ -123,7 +156,7 @@ export function ProductGuaranteeCertificate({ data }: { data: GuaranteeCertifica
                 alt=""
                 style={{
                   maxWidth: '100%',
-                  maxHeight: '220px',
+                  maxHeight: '440px',
                   width: 'auto',
                   height: 'auto',
                   objectFit: 'contain',
@@ -228,8 +261,20 @@ export function ProductGuaranteeCertificate({ data }: { data: GuaranteeCertifica
           }}
         >
           <div>
-            <p style={{ fontSize: '11px', fontWeight: 700, color: '#78716c', margin: '0 0 6px' }}>발행처 (Issuer)</p>
-            <p style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a', margin: 0 }}>{data.issuerName}</p>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: '#78716c', margin: '0 0 6px' }}>보증인 (Guarantor)</p>
+            <p style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a', margin: 0 }}>{issuerName}</p>
+            {issuerPlace ? (
+              <>
+                <p style={{ fontSize: '11px', fontWeight: 700, color: '#78716c', margin: '12px 0 4px' }}>발행처 (Issuer)</p>
+                <p style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a', margin: 0 }}>{issuerPlace}</p>
+              </>
+            ) : null}
+            {contact ? (
+              <>
+                <p style={{ fontSize: '11px', fontWeight: 700, color: '#78716c', margin: '12px 0 4px' }}>연락처 (Contact)</p>
+                <p style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a', margin: 0 }}>{contact}</p>
+              </>
+            ) : null}
           </div>
           <div style={{ textAlign: 'right' }}>
             <p style={{ fontSize: '11px', fontWeight: 700, color: '#78716c', margin: '0 0 8px' }}>서명 / 도장 (Signature)</p>
@@ -241,6 +286,21 @@ export function ProductGuaranteeCertificate({ data }: { data: GuaranteeCertifica
                   height: '1px',
                 }}
               />
+              {stampUrl ? (
+                <img
+                  src={stampUrl}
+                  alt=""
+                  style={{
+                    width: '72px',
+                    height: '72px',
+                    objectFit: 'contain',
+                    flexShrink: 0,
+                    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+                    borderRadius: '8px',
+                    border: `1px solid ${border}`,
+                  }}
+                />
+              ) : (
               <div
                 style={{
                   width: '56px',
@@ -259,6 +319,7 @@ export function ProductGuaranteeCertificate({ data }: { data: GuaranteeCertifica
               >
                 印
               </div>
+              )}
             </div>
           </div>
         </div>
@@ -281,8 +342,20 @@ export function GuaranteePdfHost({
   const ref = useRef<HTMLDivElement>(null);
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
+  const [issuer, setIssuer] = useState<GuaranteeIssuerProfile | null>(null);
 
   useLayoutEffect(() => {
+    let cancelled = false;
+    void loadGuaranteeIssuer().then((profile) => {
+      if (!cancelled) setIssuer(profile);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!issuer) return;
     const el = ref.current;
     if (!el) {
       onDoneRef.current();
@@ -294,7 +367,7 @@ export function GuaranteePdfHost({
       await new Promise<void>((resolve) => {
         requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
       });
-      /** 모바일 WebView: 레이아웃·웹폰트 안정화 */
+      /** 모바일 WebView: 레이아웃·웹폰트·도장 이미지 안정화 */
       await new Promise<void>((r) => setTimeout(r, 150));
       if (cancelled) return;
       try {
@@ -315,7 +388,7 @@ export function GuaranteePdfHost({
     return () => {
       cancelled = true;
     };
-  }, [data, showToast]);
+  }, [issuer, data, showToast]);
 
   /**
    * 모바일 Chrome/WebView는 z-index 음수·화면 멀리 떨어진 노드를 레이어에서 생략해
@@ -336,7 +409,7 @@ export function GuaranteePdfHost({
       aria-hidden
     >
       <div ref={ref} style={{ width: 794 }}>
-        <ProductGuaranteeCertificate data={data} />
+        {issuer ? <ProductGuaranteeCertificate data={data} issuer={issuer} /> : null}
       </div>
     </div>,
     document.body

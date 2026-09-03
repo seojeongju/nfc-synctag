@@ -112,3 +112,10 @@ CREATE TABLE IF NOT EXISTS user_goldbars (
     added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, goldbar_id)
 );
+
+-- 앱 전역 설정 (제품 보증서 보증인·발행처 등)
+CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);

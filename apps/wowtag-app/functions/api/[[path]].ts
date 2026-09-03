@@ -928,6 +928,48 @@ function verifyAdminToken(c: { req: { header: (name: string) => string | undefin
   }
 }
 
+const GUARANTEE_ISSUER_SETTING_KEY = 'guarantee_issuer';
+const DEFAULT_GUARANTEE_ISSUER_NAME = '제이에로스';
+
+async function ensureAppSettingsTable(db: D1Database) {
+  await db
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS app_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`
+    )
+    .run();
+}
+
+function parseGuaranteeIssuerValue(raw: string | null | undefined) {
+  let parsed: Record<string, unknown> = {};
+  if (raw) {
+    try {
+      parsed = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      parsed = {};
+    }
+  }
+  const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+  return {
+    issuerName: str(parsed.issuerName) || DEFAULT_GUARANTEE_ISSUER_NAME,
+    issuerPlace: str(parsed.issuerPlace),
+    contact: str(parsed.contact),
+    stampUrl: str(parsed.stampUrl),
+  };
+}
+
+async function readGuaranteeIssuer(db: D1Database) {
+  await ensureAppSettingsTable(db);
+  const row = await db
+    .prepare('SELECT value FROM app_settings WHERE key = ?')
+    .bind(GUARANTEE_ISSUER_SETTING_KEY)
+    .first<{ value: string }>();
+  return parseGuaranteeIssuerValue(row?.value);
+}
+
 const UNMAP_PROOF_MAX_AGE_MIN = 15;
 
 // 제품 등록
@@ -1979,6 +2021,99 @@ app.get('/admin/assets', async (c) => {
     return c.json({ error: err.message }, 500);
   }
 });
+// --- 제품 보증서 발행처/보증인 ---
+
+app.get('/guarantee/issuer', async (c) => {
+  try {
+    const profile = await readGuaranteeIssuer(c.env.DB);
+    return c.json(profile);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+app.get('/guarantee/stamp/:filename', async (c) => {
+  try {
+    const filename = c.req.param('filename');
+    if (!filename || filename.includes('..') || filename.includes('/')) {
+      return c.json({ error: 'Invalid filename' }, 400);
+    }
+    const path = `guarantee/stamp/${filename}`;
+    const object = await c.env.BUCKET.get(path);
+    if (object === null) {
+      return c.json({ error: 'Stamp not found' }, 404);
+    }
+    const headers = new Headers();
+    object.writeHttpMetadata(headers);
+    headers.set('etag', object.httpEtag);
+    if (!headers.get('Content-Type')) {
+      headers.set('Content-Type', 'image/png');
+    }
+    return new Response(object.body, { headers });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+app.put('/admin/guarantee/issuer', async (c) => {
+  try {
+    if (!verifyAdminToken(c)) {
+      return c.json({ error: '관리자 권한이 필요합니다.' }, 401);
+    }
+
+    const body = await c.req.json();
+    const current = await readGuaranteeIssuer(c.env.DB);
+    const issuerName =
+      typeof body.issuerName === 'string' && body.issuerName.trim()
+        ? body.issuerName.trim().slice(0, 80)
+        : current.issuerName;
+    const issuerPlace = typeof body.issuerPlace === 'string' ? body.issuerPlace.trim().slice(0, 120) : current.issuerPlace;
+    const contact = typeof body.contact === 'string' ? body.contact.trim().slice(0, 80) : current.contact;
+
+    let stampUrl = current.stampUrl;
+    if (body.clearStamp === true) {
+      stampUrl = '';
+    }
+
+    const image_file_base64 = typeof body.stamp_file_base64 === 'string' ? body.stamp_file_base64 : '';
+    if (image_file_base64) {
+      const base64Data = image_file_base64.split(',')[1] || image_file_base64;
+      const approxBytes = Math.floor((base64Data.length * 3) / 4);
+      if (approxBytes > 3 * 1024 * 1024) {
+        return c.json({ error: '도장 이미지 용량이 너무 큽니다.' }, 400);
+      }
+      const binaryString = atob(base64Data);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const fileName = typeof body.stamp_file_name === 'string' ? body.stamp_file_name : 'stamp.png';
+      const ext = fileName.split('.').pop()?.toLowerCase();
+      const safeExt = ext === 'jpg' || ext === 'jpeg' || ext === 'webp' || ext === 'gif' ? (ext === 'jpeg' ? 'jpg' : ext) : 'png';
+      const r2Name = `${Date.now()}.${safeExt}`;
+      const r2Path = `guarantee/stamp/${r2Name}`;
+      const contentType =
+        safeExt === 'jpg' ? 'image/jpeg' : safeExt === 'webp' ? 'image/webp' : safeExt === 'gif' ? 'image/gif' : 'image/png';
+      await c.env.BUCKET.put(r2Path, bytes.buffer, {
+        httpMetadata: { contentType },
+      });
+      stampUrl = `/api/guarantee/stamp/${r2Name}`;
+    }
+
+    const value = JSON.stringify({ issuerName, issuerPlace, contact, stampUrl });
+    await c.env.DB.prepare(
+      `INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES (?, ?, datetime('now'))`
+    )
+      .bind(GUARANTEE_ISSUER_SETTING_KEY, value)
+      .run();
+
+    return c.json({ issuerName, issuerPlace, contact, stampUrl });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 // --- 전자 앨범 API ---
 
 // 1. 특정 골드바의 전자 앨범 조회 및 자동 생성
