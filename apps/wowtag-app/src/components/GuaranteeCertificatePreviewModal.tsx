@@ -1,18 +1,19 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Download, Loader2 } from 'lucide-react';
 
-import { ProductGuaranteeCertificate } from './ProductGuaranteeCertificate';
+import {
+  ProductGuaranteeCertificate,
+  GUARANTEE_PAGE_W,
+  GUARANTEE_PAGE_H,
+} from './ProductGuaranteeCertificate';
 import { downloadProductGuaranteePdf } from '../lib/exportGuaranteePdf';
 import type { GuaranteeCertificateData } from '../lib/guaranteeCertificateData';
 import { useToast } from './ToastProvider';
 
-const CERT_W = 794;
-const CERT_H_MIN = 1123;
-
 /**
  * 제품 보증서 미리보기 + PDF 저장
- * 내용이 A4보다 길어지면 실제 높이를 측정해 스크롤로 전체를 볼 수 있게 함
+ * A4 1장 고정 — 화면 너비·높이에 맞춰 살짝 축소해 한 장 전체가 보이게 함
  */
 export function GuaranteeCertificatePreviewModal({
   data,
@@ -26,58 +27,32 @@ export function GuaranteeCertificatePreviewModal({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [viewportW, setViewportW] = useState(360);
-  const [certH, setCertH] = useState(CERT_H_MIN);
-  /** 40~100: 화면 맞춤 비율 기준 추가 조절 */
+  const [viewportH, setViewportH] = useState(480);
+  /** 70~100: 화면 맞춤 기준에서 추가 조절 (기본 100 = 한 장 맞춤) */
   const [sizePercent, setSizePercent] = useState(100);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || !data) return;
-    const ro = new ResizeObserver(() => setViewportW(el.clientWidth));
-    ro.observe(el);
-    setViewportW(el.clientWidth);
-    return () => ro.disconnect();
-  }, [data]);
-
-  useLayoutEffect(() => {
-    if (!data) return;
-    const wrap = wrapRef.current;
-    if (!wrap) return;
-
     const measure = () => {
-      const root = wrap.querySelector('[data-guarantee-pdf-root="1"]') as HTMLElement | null;
-      if (!root) return;
-      const h = Math.ceil(Math.max(CERT_H_MIN, root.scrollHeight, root.offsetHeight));
-      setCertH(h);
+      setViewportW(el.clientWidth);
+      setViewportH(el.clientHeight);
     };
-
     measure();
     const ro = new ResizeObserver(measure);
-    const root = wrap.querySelector('[data-guarantee-pdf-root="1"]');
-    if (root) ro.observe(root);
-
-    const imgs = wrap.querySelectorAll('img');
-    imgs.forEach((img) => {
-      img.addEventListener('load', measure);
-      img.addEventListener('error', measure);
-    });
-
-    const t = window.setTimeout(measure, 300);
-    return () => {
-      ro.disconnect();
-      window.clearTimeout(t);
-      imgs.forEach((img) => {
-        img.removeEventListener('load', measure);
-        img.removeEventListener('error', measure);
-      });
-    };
+    ro.observe(el);
+    return () => ro.disconnect();
   }, [data]);
 
   if (!data) return null;
 
-  const pad = 28;
-  const maxFit = Math.min(1, Math.max(0.22, (viewportW - pad) / CERT_W));
-  const scale = maxFit * (sizePercent / 100);
+  const padX = 24;
+  const padY = 16;
+  const fitW = Math.min(1, Math.max(0.2, (viewportW - padX) / GUARANTEE_PAGE_W));
+  const fitH = Math.min(1, Math.max(0.2, (viewportH - padY) / GUARANTEE_PAGE_H));
+  /** 가로·세로 모두 들어가도록 살짝 축소 */
+  const fitScale = Math.min(fitW, fitH);
+  const scale = fitScale * (sizePercent / 100);
 
   const handleDownloadPdf = async () => {
     const root = wrapRef.current?.querySelector('[data-guarantee-pdf-root="1"]') as HTMLElement | null;
@@ -135,7 +110,7 @@ export function GuaranteeCertificatePreviewModal({
           <span className="text-[10px] font-black text-slate-600 shrink-0">화면 맞춤 크기</span>
           <input
             type="range"
-            min={40}
+            min={70}
             max={100}
             step={1}
             value={sizePercent}
@@ -149,31 +124,31 @@ export function GuaranteeCertificatePreviewModal({
             onClick={() => setSizePercent(100)}
             className="text-[10px] font-black text-amber-900 bg-amber-100 hover:bg-amber-200 rounded-lg px-2.5 py-1.5 transition-colors"
           >
-            맞춤 100%
+            1장 맞춤
           </button>
         </div>
         <p className="px-3 sm:px-6 text-[10px] font-bold text-slate-400 pb-2">
-          아래로 스크롤하면 보증서 전체를 볼 수 있습니다. 슬라이더로 크기를 줄이면 한 화면에 더 많이 보입니다.
+          보증서는 A4 1장 기준입니다. 화면에 맞게 자동으로 살짝 축소되어 전체가 한 번에 보입니다.
         </p>
 
         <div
           ref={scrollRef}
           className="flex-1 min-h-0 overflow-auto overscroll-contain bg-gradient-to-b from-slate-200/50 to-slate-300/30 px-2 sm:px-4 pb-4"
         >
-          <div className="flex justify-center py-2">
+          <div className="flex justify-center items-start py-2 min-h-full">
             <div
               className="rounded-[10px] shadow-xl ring-1 ring-black/10 overflow-hidden bg-neutral-900/5"
               style={{
-                width: CERT_W * scale,
-                height: certH * scale,
+                width: GUARANTEE_PAGE_W * scale,
+                height: GUARANTEE_PAGE_H * scale,
                 maxWidth: '100%',
               }}
             >
               <div
                 ref={wrapRef}
                 style={{
-                  width: CERT_W,
-                  height: certH,
+                  width: GUARANTEE_PAGE_W,
+                  height: GUARANTEE_PAGE_H,
                   transform: `scale(${scale})`,
                   transformOrigin: 'top left',
                 }}

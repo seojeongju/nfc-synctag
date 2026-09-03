@@ -124,20 +124,14 @@ export async function downloadProductGuaranteePdf(element: HTMLElement, fileTitl
 
   const imgWidthMm = pageW;
   const imgHeightMm = (canvas.height * pageW) / canvas.width;
-  if (imgHeightMm <= pageH) {
+  if (imgHeightMm <= pageH + 0.01) {
     pdf.addImage(imgData, 'PNG', 0, 0, imgWidthMm, imgHeightMm);
   } else {
-    /** 내용이 A4보다 길면 여러 페이지로 이어 붙임 */
-    let heightLeft = imgHeightMm;
-    let position = 0;
-    pdf.addImage(imgData, 'PNG', 0, position, imgWidthMm, imgHeightMm);
-    heightLeft -= pageH;
-    while (heightLeft > 0.5) {
-      position = heightLeft - imgHeightMm;
-      pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidthMm, imgHeightMm);
-      heightLeft -= pageH;
-    }
+    /** A4 1장에 맞게 살짝 축소 */
+    const fit = pageH / imgHeightMm;
+    const w = imgWidthMm * fit;
+    const h = pageH;
+    pdf.addImage(imgData, 'PNG', (pageW - w) / 2, 0, w, h);
   }
 
   const base = sanitizeGuaranteeFileBase(fileTitle);
