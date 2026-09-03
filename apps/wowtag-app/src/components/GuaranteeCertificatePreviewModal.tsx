@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Download, Loader2 } from 'lucide-react';
 
@@ -8,11 +8,11 @@ import type { GuaranteeCertificateData } from '../lib/guaranteeCertificateData';
 import { useToast } from './ToastProvider';
 
 const CERT_W = 794;
-const CERT_H = 1123;
+const CERT_H_MIN = 1123;
 
 /**
- * 제품 보증서 A4 미리보기 + 같은 화면에서 PDF 저장
- * 화면 너비에 맞춰 축소 후, 슬라이더로 추가 조절 (뷰포트 밖으로 넘치지 않음)
+ * 제품 보증서 미리보기 + PDF 저장
+ * 내용이 A4보다 길어지면 실제 높이를 측정해 스크롤로 전체를 볼 수 있게 함
  */
 export function GuaranteeCertificatePreviewModal({
   data,
@@ -26,6 +26,7 @@ export function GuaranteeCertificatePreviewModal({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [viewportW, setViewportW] = useState(360);
+  const [certH, setCertH] = useState(CERT_H_MIN);
   /** 40~100: 화면 맞춤 비율 기준 추가 조절 */
   const [sizePercent, setSizePercent] = useState(100);
 
@@ -36,6 +37,40 @@ export function GuaranteeCertificatePreviewModal({
     ro.observe(el);
     setViewportW(el.clientWidth);
     return () => ro.disconnect();
+  }, [data]);
+
+  useLayoutEffect(() => {
+    if (!data) return;
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+
+    const measure = () => {
+      const root = wrap.querySelector('[data-guarantee-pdf-root="1"]') as HTMLElement | null;
+      if (!root) return;
+      const h = Math.ceil(Math.max(CERT_H_MIN, root.scrollHeight, root.offsetHeight));
+      setCertH(h);
+    };
+
+    measure();
+    const ro = new ResizeObserver(measure);
+    const root = wrap.querySelector('[data-guarantee-pdf-root="1"]');
+    if (root) ro.observe(root);
+
+    const imgs = wrap.querySelectorAll('img');
+    imgs.forEach((img) => {
+      img.addEventListener('load', measure);
+      img.addEventListener('error', measure);
+    });
+
+    const t = window.setTimeout(measure, 300);
+    return () => {
+      ro.disconnect();
+      window.clearTimeout(t);
+      imgs.forEach((img) => {
+        img.removeEventListener('load', measure);
+        img.removeEventListener('error', measure);
+      });
+    };
   }, [data]);
 
   if (!data) return null;
@@ -118,7 +153,7 @@ export function GuaranteeCertificatePreviewModal({
           </button>
         </div>
         <p className="px-3 sm:px-6 text-[10px] font-bold text-slate-400 pb-2">
-          슬라이더로 크기를 줄이면 한 화면에 더 많이 보입니다. 넓은 화면에서는 자동으로 최대 맞춤됩니다.
+          아래로 스크롤하면 보증서 전체를 볼 수 있습니다. 슬라이더로 크기를 줄이면 한 화면에 더 많이 보입니다.
         </p>
 
         <div
@@ -130,7 +165,7 @@ export function GuaranteeCertificatePreviewModal({
               className="rounded-[10px] shadow-xl ring-1 ring-black/10 overflow-hidden bg-neutral-900/5"
               style={{
                 width: CERT_W * scale,
-                height: CERT_H * scale,
+                height: certH * scale,
                 maxWidth: '100%',
               }}
             >
@@ -138,7 +173,7 @@ export function GuaranteeCertificatePreviewModal({
                 ref={wrapRef}
                 style={{
                   width: CERT_W,
-                  height: CERT_H,
+                  height: certH,
                   transform: `scale(${scale})`,
                   transformOrigin: 'top left',
                 }}

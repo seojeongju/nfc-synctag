@@ -127,8 +127,17 @@ export async function downloadProductGuaranteePdf(element: HTMLElement, fileTitl
   if (imgHeightMm <= pageH) {
     pdf.addImage(imgData, 'PNG', 0, 0, imgWidthMm, imgHeightMm);
   } else {
-    const wFit = (canvas.width * pageH) / canvas.height;
-    pdf.addImage(imgData, 'PNG', (pageW - wFit) / 2, 0, wFit, pageH);
+    /** 내용이 A4보다 길면 여러 페이지로 이어 붙임 */
+    let heightLeft = imgHeightMm;
+    let position = 0;
+    pdf.addImage(imgData, 'PNG', 0, position, imgWidthMm, imgHeightMm);
+    heightLeft -= pageH;
+    while (heightLeft > 0.5) {
+      position = heightLeft - imgHeightMm;
+      pdf.addPage();
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidthMm, imgHeightMm);
+      heightLeft -= pageH;
+    }
   }
 
   const base = sanitizeGuaranteeFileBase(fileTitle);

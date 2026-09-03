@@ -87,8 +87,9 @@ export function ProductGuaranteeCertificate({
         position: 'relative',
         width: '794px',
         minHeight: '1123px',
+        height: 'auto',
         boxSizing: 'border-box',
-        overflow: 'hidden',
+        overflow: 'visible',
         borderRadius: '8px',
         fontFamily: '"Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif',
         color: '#0f172a',
@@ -120,12 +121,15 @@ export function ProductGuaranteeCertificate({
           margin: '26px',
           padding: data.imageUrl ? '28px 42px 32px' : '38px 42px 42px',
           minHeight: 'calc(1123px - 52px)',
+          height: 'auto',
           boxSizing: 'border-box',
           backgroundColor: 'rgba(255, 253, 248, 0.97)',
           borderRadius: '14px',
           border: '1px solid rgba(201, 162, 39, 0.38)',
           boxShadow:
             '0 12px 40px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.85), inset 0 0 0 1px rgba(212, 175, 55, 0.12)',
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
         {data.imageUrl ? (
