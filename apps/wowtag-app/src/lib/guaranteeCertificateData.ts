@@ -16,6 +16,8 @@ export type GuaranteeCertificateData = {
   optionsLine?: string;
   /** 발행처 */
   issuerName: string;
+  /** 제품 사진 — 미리보기·PDF 공통 */
+  imageUrl?: string;
 };
 
 function parseGrams(weightRaw: unknown): number | null {
@@ -49,6 +51,13 @@ function formatIssueDate(): string {
   return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
 }
 
+function pickProductImageUrl(record: Record<string, unknown>): string | undefined {
+  const raw = record.image_url ?? record.imageUrl;
+  if (typeof raw !== 'string') return undefined;
+  const s = raw.trim();
+  return s.length > 0 ? s : undefined;
+}
+
 export function mapProductToGuaranteeData(p: Record<string, unknown>): GuaranteeCertificateData {
   const name = String(p.name ?? '제품').trim() || '제품';
   const serial =
@@ -64,6 +73,7 @@ export function mapProductToGuaranteeData(p: Record<string, unknown>): Guarantee
     optionsLine:
       p.options != null && String(p.options).trim() !== '' ? String(p.options).trim() : undefined,
     issuerName: DEFAULT_GUARANTEE_ISSUER,
+    imageUrl: pickProductImageUrl(p),
   };
 }
 
@@ -79,6 +89,7 @@ export function mapGoldbarWalletToGuaranteeData(g: Record<string, unknown>): Gua
     serialNo: serial,
     issueDateLine: formatIssueDate(),
     issuerName: DEFAULT_GUARANTEE_ISSUER,
+    imageUrl: pickProductImageUrl(g),
   };
 }
 

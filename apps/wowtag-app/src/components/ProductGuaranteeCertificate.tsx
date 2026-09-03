@@ -85,7 +85,7 @@ export function ProductGuaranteeCertificate({ data }: { data: GuaranteeCertifica
           position: 'relative',
           zIndex: 1,
           margin: '26px',
-          padding: '38px 42px 42px',
+          padding: data.imageUrl ? '28px 42px 32px' : '38px 42px 42px',
           minHeight: 'calc(1123px - 52px)',
           boxSizing: 'border-box',
           backgroundColor: 'rgba(255, 253, 248, 0.97)',
@@ -95,6 +95,44 @@ export function ProductGuaranteeCertificate({ data }: { data: GuaranteeCertifica
             '0 12px 40px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.85), inset 0 0 0 1px rgba(212, 175, 55, 0.12)',
         }}
       >
+        {data.imageUrl ? (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              margin: '0 0 20px',
+            }}
+          >
+            <div
+              style={{
+                width: '100%',
+                maxWidth: '360px',
+                height: '220px',
+                borderRadius: '12px',
+                border: `1px solid ${border}`,
+                backgroundColor: 'rgba(255, 255, 255, 0.92)',
+                overflow: 'hidden',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: 'inset 0 0 0 1px rgba(212, 175, 55, 0.08)',
+              }}
+            >
+              <img
+                src={data.imageUrl}
+                alt=""
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '220px',
+                  width: 'auto',
+                  height: 'auto',
+                  objectFit: 'contain',
+                  display: 'block',
+                }}
+              />
+            </div>
+          </div>
+        ) : null}
         <h1
           style={{
             textAlign: 'center',
@@ -114,7 +152,7 @@ export function ProductGuaranteeCertificate({ data }: { data: GuaranteeCertifica
             fontSize: '11px',
             color: '#78716c',
             fontWeight: 700,
-            margin: '0 0 28px',
+            margin: data.imageUrl ? '0 0 16px' : '0 0 28px',
           }}
         >
           본 문서는 정품 제품에 대해 발행된 보증서입니다.
@@ -136,7 +174,7 @@ export function ProductGuaranteeCertificate({ data }: { data: GuaranteeCertifica
           </span>
         </div>
 
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '28px' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: data.imageUrl ? '20px' : '28px' }}>
           <tbody>
             <Row label="품명 (Product)" value={data.productName} />
             <Row label="중량 (Weight)" value={data.weightLine} />
@@ -172,7 +210,7 @@ export function ProductGuaranteeCertificate({ data }: { data: GuaranteeCertifica
             fontWeight: 600,
             color: '#475569',
             lineHeight: 1.75,
-            marginBottom: '36px',
+            marginBottom: data.imageUrl ? '24px' : '36px',
           }}
         >
           본 제품은 표기된 순도 및 중량을 준수한 정품이며, 제조·유통 과정에서 발생한 명백한 하자에 대해서는 발행처 정책에 따라

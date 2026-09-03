@@ -44,6 +44,29 @@ function sanitizeCloneForHtml2Canvas(clonedDoc: Document, clonedElement: HTMLEle
   /** 보증서 루트는 컴포넌트 인라인 스타일(배경 이미지 등) 유지 — 여기서 덮어쓰지 않음 */
 }
 
+async function waitForImages(el: HTMLElement) {
+  const imgs = Array.from(el.querySelectorAll('img'));
+  await Promise.all(
+    imgs.map(
+      (img) =>
+        new Promise<void>((resolve) => {
+          if (img.complete) {
+            resolve();
+            return;
+          }
+          const done = () => {
+            img.removeEventListener('load', done);
+            img.removeEventListener('error', done);
+            resolve();
+          };
+          img.addEventListener('load', done);
+          img.addEventListener('error', done);
+          window.setTimeout(done, 4000);
+        })
+    )
+  );
+}
+
 async function renderToCanvas(el: HTMLElement, scale: number) {
   return html2canvas(el, {
     scale,
@@ -67,6 +90,7 @@ export async function downloadProductGuaranteePdf(element: HTMLElement, fileTitl
   } catch {
     /* ignore */
   }
+  await waitForImages(element);
   await new Promise<void>((r) => setTimeout(r, 100));
 
   let canvas: HTMLCanvasElement;
